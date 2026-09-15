@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <title>About - RoadReward</title>
+    <title>About - {{ data["PROD_NAME"] }}</title>
 
     <style>
         /* 
@@ -204,41 +204,37 @@
 
     <header>
         <div class="header-content">
-            <div class="product-name">RoadReward</div>
+            <div class="product-name">{{ data["PROD_NAME"] }}</div>
             <div class="tagline">Good Driving. Better Rewards.</div>
         </div>
     </header>
 
     <main>
         <div class="about-card">
-            <h1>About RoadRewards</h1>
+            <h1>About {{ data["PROD_NAME"] }}</h1>
             <p class="description">
-                RoadReward is a driver incentive web application designed to
-                encourage safer and better on-road performance in the trucking
-                industry. Drivers can earn points for positive driving behavior
-                and redeem those points for products through their sponsoring
-                company's reward catalog.
+                {{ data["PROD_DESC"] }}
             </p>
 
             <div class="info-grid">
                 <div class="info-box">
                     <div class="info-label">Team Number & Name</div>
-                    <div class="info-value">Team 01 - The Fellowship of the Function</div>
+                    <div class="info-value">{{ data["TEAM_NAME"] }}</div>
                 </div>
                 
                 <div class="info-box">
                     <div class="info-label">Product Version</div>
-                    <div class="info-value">Sprint 1</div>
+                    <div class="info-value">Sprint {{ data["SPRINT_NUM"] }}</div>
                 </div>
 
                 <div class="info-box">
                     <div class="info-label">Release Date</div>
-                    <div class="info-value">December 11, 2026</div>
+                    <div class="info-value">{{ data["RELE_DATE"] }}</div>
                 </div>
 
                 <div class="info-box">
                     <div class="info-label">Product Name</div>
-                    <div class="info-value">RoadReward</div>
+                    <div class="info-value">{{ data["PROD_NAME"] }}</div>
                 </div>
 
             </div>
@@ -247,7 +243,7 @@
                 <h2>Our Product</h2>
 
                 <p>
-                    RoadReward connects trucking companies, drivers, and
+                    Road Reward connects trucking companies, drivers, and
                     incentive rewards in one convenient web application.
                     Sponsors can manage their participating drivers, award or 
                     deduct points based on driving performance, and maintain a
