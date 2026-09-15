@@ -1,5 +1,14 @@
 from flask import Flask, render_template
 import mysql.connector 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_NAME = os.getenv("DB_NAME")
 
 app = Flask(__name__)
 
@@ -11,10 +20,10 @@ def home():
 @app.route("/about")
 def about():
     conn = mysql.connector.connect(
-    host="cpsc4910-f26.cobd8enwsupz.us-east-1.rds.amazonaws.com",
-    user="Team01",
-    password="TheFellowshipoftheFuntion",
-    database="Team01_DB"
+    host=DB_HOST,
+    user=DB_USER,
+    password= DB_PASSWORD,
+    database= DB_NAME
     )
     cursor = conn.cursor(dictionary=True)
 
