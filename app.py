@@ -39,5 +39,9 @@ def about():
     conn.close()
     return render_template("about.html", data = data)
 
+@app.route("/test")
+def test():
+    return render_template("test.html")
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
