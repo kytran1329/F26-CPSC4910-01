@@ -32,3 +32,24 @@ CREATE TABLE POINTCHANGES (
 
     FOREIGN KEY (DRIVER_ID) REFERENCES DRIVER(DRIVER_ID)
 );
+
+CREATE TABLE ORDERS(
+	ORDER_ID int auto_increment primary key not null,
+    USER_ID int,
+    DRIVER_ID int,
+    ORDER_DTS datetime,
+    POINT_TOTAL int,
+    ORDER_STATUS VARCHAR (10),
+    CONSTRAINT `ORDERS_USER_ID` FOREIGN KEY (`USER_ID`) REFERENCES `USER` (`USER_ID`),
+    CONSTRAINT `ORDERS_DRIVER_ID` FOREIGN KEY (`DRIVER_ID`) REFERENCES `DRIVER` (`DRIVER_ID`)
+);
+
+CREATE TABLE ABOUT(
+	SPRINT_NUM int primary key not null,
+	TEAM_NAME varchar(40) default 'Team 01 - The Fellowship of the Function',
+	START_DATE varchar(30),
+	END_DATE varchar(30),
+	RELE_DATE varchar(30) default 'December 11, 2026',
+	PROD_NAME varchar(20) default 'Road Reward',
+	PROD_DESC varchar(500)
+);
