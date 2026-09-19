@@ -37,3 +37,55 @@ SELECT
     NEW_PASSWORD, 
     DATE_FORMAT(DTS, '%Y-%m-%d %H:%i:%s') AS DTS 
     FROM `Team01_DB`.`PASSWORDCHANGES`;
+
+    INSERT INTO `USER` (
+    USER_FNAME,
+    USER_LNAME,
+    ROLE,
+    EMAIL,
+    PASSWORD
+)
+VALUES (
+    'Bruce',
+    'Wayne',
+    'Sponsor',
+    'bwayne@gmail.com',
+    'HeartselinaKyle'
+);
+
+CREATE TABLE SPONSOR (
+    SPONSOR_ID INT AUTO_INCREMENT PRIMARY KEY,
+    USER_ID INT NOT NULL,
+    SPONSORCOMP_ID INT NOT NULL,
+
+    FOREIGN KEY (USER_ID) REFERENCES `USER`(USER_ID),
+    FOREIGN KEY (SPONSORCOMP_ID) REFERENCES SPONSORCOMP(SPONSORCOMP_ID)
+);
+
+INSERT INTO SPONSOR (USER_ID, SPONSORCOMP_ID)
+VALUES (2, 1);
+
+INSERT INTO PASSWORDCHANGES (
+    USER_ID,
+    PASSWORDCHANGE_REASON,
+    OLD_PASSWORD,
+    NEW_PASSWORD
+)
+VALUES (
+    2,
+    'User requested password change',
+    'password12345',
+    'HeartselinaKyle'
+);
+INSERT INTO PASSWORDCHANGES (
+    USER_ID,
+    PASSWORDCHANGE_REASON,
+    OLD_PASSWORD,
+    NEW_PASSWORD
+)
+VALUES (
+    2,
+    'User requested password change',
+    'password12345',
+    'ILoveFamily'
+);
