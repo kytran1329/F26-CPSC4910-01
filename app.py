@@ -41,7 +41,71 @@ def about():
 
 @app.route("/test")
 def test():
-    return render_template("test.html")
+    conn = mysql.connector.connect(
+    host=DB_HOST,
+    user=DB_USER,
+    password= DB_PASSWORD,
+    database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    
+    #query gets newest row in about table
+    cursor.execute("""select * from ABOUT where SPRINT_NUM 
+                            = (select max(SPRINT_NUM) from ABOUT)""")
+        
+    data = cursor.fetchone()
+    #check data in term
+    #print(data)
+        
+    cursor.close()
+    conn.close()
+    return render_template("test.html", data = data, password_history=[])
+
+@app.route("/password-history", methods=["GET"])
+def get_password_history():
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT *
+        FROM ABOUT
+        WHERE SPRINT_NUM = (
+            SELECT MAX(SPRINT_NUM)
+            FROM ABOUT
+        )
+    """)
+
+    data = cursor.fetchone()
+
+    cursor.execute("""
+        SELECT PASSWORDCHANGE_ID,
+               USER_ID,
+               PASSWORDCHANGE_REASON,
+               OLD_PASSWORD,
+               NEW_PASSWORD,
+               DTS
+        FROM PASSWORDCHANGES
+        WHERE USER_ID = %s
+        ORDER BY DTS DESC
+    """, (2,))
+
+    password_history = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "test.html",
+        data=data,
+        password_history=password_history
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
