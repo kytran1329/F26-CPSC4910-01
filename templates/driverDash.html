@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>
+        {{ drive_info["USER_FNAME"] }} {{ drive_info["USER_LNAME"] }} - Dashboard
+    </title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='driverDash.css') }}">
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+
+            <div class="dashboard-name">
+                {{ drive_info["USER_FNAME"] }} {{ drive_info["USER_LNAME"] }}'s Dashboard
+            </div>
+
+            <div class="tagline">
+                Good Driving. Better Rewards.
+            </div>
+
+        </div>
+    </header>
+
+
+    <!-- Main Content -->
+    <main>
+
+        <div class="dashboard-card">
+
+            <!-- Point Total -->
+            <div class="points-box">
+
+                <div class="points-label">
+                    Point Total
+                </div>
+
+                <div class="points-value">
+                    {{ drive_info["BALANCE"] }}
+                </div>
+
+            </div>
+
+
+            <!-- Driver Information -->
+            <h2>Driver Information</h2>
+
+            <div class="info-grid">
+
+                <!-- Driver ID -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        Driver ID
+                    </div>
+
+                    <div class="info-value">
+                        {{ drive_info["DRIVER_ID"] }}
+                    </div>
+
+                </div>
+
+
+                <!-- Role -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        Role
+                    </div>
+
+                    <div class="info-value">
+                        {{ drive_info["ROLE"] }}
+                    </div>
+
+                </div>
+
+
+                <!-- Email -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        Email
+                    </div>
+
+                    <div class="info-value">
+                        {{ drive_info["EMAIL"] }}
+                    </div>
+
+                </div>
+
+
+                <!-- Balance -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        Current Balance
+                    </div>
+
+                    <div class="info-value">
+                        {{ drive_info["BALANCE"] }} points (my replace with used points?)
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- Point History -->
+            <div class="history-section">
+
+                <h2>Point History</h2>
+
+                <div class="table-container">
+
+                    <table class="history-table">
+
+                        <thead>
+                            <tr>
+                                <th>Point Change ID</th>
+                                <th>Points</th>
+                                <th>Reason</th>
+                                <th>Date & Time</th>
+                            </tr>
+                        </thead>
+
+
+                        <tbody>
+
+                            {% for row in history %}
+
+                            <tr>
+
+                                <td>
+                                    {{ row["POINTCHANGE_ID"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["POINTCHANGE_AMOUNT"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["POINTCHANGE_REASON"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["DTS"] }}
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+            <!-- Order History -->
+            <div class="history-section">
+
+                <h2>Order History</h2>
+
+                <div class="table-container">
+
+                    <table class="history-table">
+
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Points Total</th>
+                                <th>Status</th>
+                                <th>Date & Time</th>
+                            </tr>
+                        </thead>
+
+
+                        <tbody>
+
+                            {% for row in order_stat %}
+
+                            <tr>
+
+                                <td>
+                                    {{ row["ORDER_ID"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["POINT_TOTAL"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["ORDER_STATUS"] }}
+                                </td>
+                                <td>
+                                    {{ row["ORDER_DTS"] }}
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+
+            <!--Home button -->
+            <a href="/" class="back-link">
+                Back to Home
+            </a>
+
+        </div>
+
+    </main>
+
+
+    <!--footer for fun-->
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2099
+    </footer>
+
+</body>
+
+</html>
