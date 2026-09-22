@@ -15,7 +15,23 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT BALANCE FROM DRIVER LIMIT 1")
+    result = cursor.fetchone()
+    points = result[0] if result else 0
+
+    cursor.close()
+    conn.close()
+
+    return render_template("index.html", points=points)
 
 
 @app.route("/about")
