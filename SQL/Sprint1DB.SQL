@@ -37,7 +37,7 @@ CREATE TABLE ORDERS(
 	ORDER_ID int auto_increment primary key not null,
     USER_ID int,
     DRIVER_ID int,
-    ORDER_DTS datetime,
+    ORDER_DTS datetime DEFAULT CURRENT_TIMESTAMP,
     POINT_TOTAL int,
     ORDER_STATUS VARCHAR (10),
     CONSTRAINT `ORDERS_USER_ID` FOREIGN KEY (`USER_ID`) REFERENCES `USER` (`USER_ID`),

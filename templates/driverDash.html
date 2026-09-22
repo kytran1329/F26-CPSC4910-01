@@ -165,6 +165,58 @@
 
             </div>
 
+            <!-- Order History -->
+            <div class="history-section">
+
+                <h2>Order History</h2>
+
+                <div class="table-container">
+
+                    <table class="history-table">
+
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Points Total</th>
+                                <th>Status</th>
+                                <th>Date & Time</th>
+                            </tr>
+                        </thead>
+
+
+                        <tbody>
+
+                            {% for row in order_stat %}
+
+                            <tr>
+
+                                <td>
+                                    {{ row["ORDER_ID"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["POINT_TOTAL"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["ORDER_STATUS"] }}
+                                </td>
+                                <td>
+                                    {{ row["ORDER_DTS"] }}
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
 
             <!--Home button -->
             <a href="/" class="back-link">

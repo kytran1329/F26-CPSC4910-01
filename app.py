@@ -77,15 +77,30 @@ def driverDash():
             WHERE d.DRIVER_ID = %s
         )
         ORDER BY pc.DTS DESC;
-    """, (drive_info["DRIVER_ID"],))
+            """, (drive_info["DRIVER_ID"],))
 
     history = cursor.fetchall()
+
+    #order and status
+    cursor.execute("""
+        SELECT 
+            ORDER_ID,
+            DRIVER_ID,
+            POINT_TOTAL,
+            ORDER_STATUS,
+            ORDER_DTS
+        FROM ORDERS
+        WHERE DRIVER_ID = %s
+        ORDER BY ORDER_DTS DESC;
+            """, (drive_info["DRIVER_ID"],))
+
+    order_stat = cursor.fetchall()
 
     cursor.close()
     conn.close()
     #print(drive_info)
     return render_template("driverDash.html", drive_info = drive_info,
-                           history= history)
+                           history= history, order_stat = order_stat)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
