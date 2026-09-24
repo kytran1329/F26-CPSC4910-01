@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect
 import mysql.connector 
 import os
 from dotenv import load_dotenv
@@ -13,10 +13,18 @@ DB_NAME = os.getenv("DB_NAME")
 
 app = Flask(__name__, static_folder= "styles")
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+@app.route("/", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        # Not checking credentials right now
+        return redirect("/home")
 
+    return render_template("login.html")
+
+
+@app.route("/home")
+def home():
+    return render_template("home.html")
 
 @app.route("/about")
 def about():
