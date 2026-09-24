@@ -135,6 +135,31 @@ def catalog():
         query=query
     )
 
+@app.route("/userProfile")
+def userProfile():
+    user_id = 2
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT * FROM USER WHERE USER_ID = %s",
+        (user_id,)
+    )
+
+    user = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return render_template("userProfile.html", user=user)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

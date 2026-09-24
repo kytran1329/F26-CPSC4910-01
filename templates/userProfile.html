@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>My Profile</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='/style.css') }}">
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+
+        <div class="header-content">
+
+            <div class="profile-name">
+                {{ user["USER_FNAME"] }} {{ user["USER_LNAME"] }}'s Profile
+            </div>
+
+            <div class="tagline">
+                Good Driving. Better Rewards.
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- Main Content -->
+    <main>
+
+        <div class="profile-card">
+
+            <h2>Profile Information</h2>
+
+
+            <!-- First Name -->
+            <div class="profile-row">
+
+                <div class="profile-info">
+
+                    <div class="profile-label">
+                        First Name
+                    </div>
+
+                    <div class="profile-value">
+                        {{ user["USER_FNAME"] }}
+                    </div>
+
+                </div>
+
+                <a href="{{ url_for('userProfile') }}" class="button">
+                    Update First Name
+                </a>
+
+            </div>
+
+
+            <!-- Last Name -->
+            <div class="profile-row">
+
+                <div class="profile-info">
+
+                    <div class="profile-label">
+                        Last Name
+                    </div>
+
+                    <div class="profile-value">
+                        {{ user["USER_LNAME"] }}
+                    </div>
+
+                </div>
+
+                <a href="{{ url_for('userProfile') }}" class="button">
+                    Update Last Name
+                </a>
+
+            </div>
+
+
+            <!-- Email -->
+            <div class="profile-row">
+
+                <div class="profile-info">
+
+                    <div class="profile-label">
+                        Email
+                    </div>
+
+                    <div class="profile-value">
+                        {{ user["EMAIL"] }}
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- Role -->
+            <div class="profile-row">
+
+                <div class="profile-info">
+
+                    <div class="profile-label">
+                        Role
+                    </div>
+
+                    <div class="profile-value">
+                        {{ user["ROLE"] }}
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- Password -->
+            <div class="profile-row">
+
+                <div class="profile-info">
+
+                    <div class="profile-label">
+                        Password
+                    </div>
+
+                    <div class="profile-value">
+                        ********
+                    </div>
+
+                </div>
+
+                <a href="{{ url_for('userProfile') }}" class="button">
+                    Update Password
+                </a>
+
+            </div>
+
+
+            <!-- Back -->
+            <a href="{{ url_for('home') }}" class="back-link">
+                Back to Home
+            </a>
+
+        </div>
+
+    </main>
+
+
+    <!-- Footer -->
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+    </footer>
+
+</body>
+
+</html>
