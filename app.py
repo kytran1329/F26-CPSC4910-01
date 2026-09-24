@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect
 import mysql.connector 
 import os
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
 from catalog import search_ebay
 
 load_dotenv()
@@ -137,6 +138,8 @@ def catalog():
 
 @app.route("/userProfile")
 def userProfile():
+
+    #temporary until login/session authentication is implemented
     user_id = 1
 
     conn = mysql.connector.connect(
@@ -160,6 +163,100 @@ def userProfile():
 
     return render_template("userProfile.html", user=user)
 
+@app.route("/changePassword", methods=["GET", "POST"])
+def changePassword():
+
+    #temporary until login/session authentication is implemented
+    user_id = 1
+
+    error = None
+    success = None
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    #get current user password hash
+    cursor.execute(
+        "SELECT USER_ID, PASSWORD FROM USER WHERE USER_ID = %s",
+        (user_id,)
+    )
+
+    user = cursor.fetchone()
+
+    if user is None:
+        cursos.close()
+        conn.close()
+        return "User not found", 404
+
+    if request.method == "POST":
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        # check that all fields are entered
+        if not current_password or not new_password or not confirm_password:
+            error = "Please fill in all password fields."
+
+        # verify current password against the stored hash    
+        elif not check_password_hash(
+            user["PASSWORD"],
+            current_password
+        ):
+            error = "Current password is incorrect"
+
+        # confirm the new password is a match
+        elif new_password != confirm_password:
+            error = "The new passwords do not match."
+
+        # make sure the new password is different
+        elif current_password == new_password:
+            error = "Your new password must be different from your current password."
+
+        else:
+
+            #save old password hash before replacing
+            old_password_hash = user["PASSWORD"]
+
+            # generate new password hash
+            new_password_hash = generate_password_hash(new_password)
+
+            # update user table
+            cursor.execute(
+                "UPDATE USER SET PASSWORD = %s WHERE USER_ID = %s",
+                (new_password_hash, user_id)
+            )
+
+            # record password change
+            cursor.execute(
+                """"
+                INSERT INTO PASSWORDCHANGES (
+                    USER_ID,
+                    PASSWORDCHANGE_REASON,
+                    OLD_PASSWORD,
+                    NEW_PASSWORD
+                )
+                VALUES (%s, %s, %s, %s)
+                """",
+                (
+                    user_id, 
+                    "User requested password change", 
+                    old_password_hash, 
+                    new_password_hash
+                )
+            )
+
+            conn.commit()
+            success = "Your password has been changed successfully."
+
+    cursor.close()
+    conn.close()
+    return render_template("changePassword.html", error=error, success=success)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
