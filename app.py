@@ -137,7 +137,7 @@ def catalog():
 
 @app.route("/userProfile")
 def userProfile():
-    user_id = 2
+    user_id = 1
 
     conn = mysql.connector.connect(
         host=DB_HOST,
