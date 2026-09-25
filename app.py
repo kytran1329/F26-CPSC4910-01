@@ -190,7 +190,7 @@ def changePassword():
     user = cursor.fetchone()
 
     if user is None:
-        cursos.close()
+        cursor.close()
         conn.close()
         return "User not found", 404
 
@@ -242,7 +242,7 @@ def changePassword():
                     NEW_PASSWORD
                 )
                 VALUES (%s, %s, %s, %s)
-                """",
+                """,
                 (
                     user_id, 
                     "User requested password change", 
