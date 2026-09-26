@@ -30,7 +30,6 @@
 
     </header>
 
-
     <!-- Main Content -->
     <main>
 
@@ -38,6 +37,17 @@
 
             <h2>Profile Information</h2>
 
+            {% if error %}
+            <div class="message error-message">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            {% if success %}
+                <div class="message success-message">
+                    {{ success }}
+                </div>
+            {% endif %}
 
             <!-- First Name -->
             <div class="profile-row">
@@ -48,18 +58,53 @@
                         First Name
                     </div>
 
-                    <div class="profile-value">
+                    <!-- Normal display -->
+                    <span id="first-name-display" class="profile-value">
                         {{ user["USER_FNAME"] }}
-                    </div>
+                    </span>
+
+
+                    <!-- Edit form -->
+                    <form
+                        id="first-name-form"
+                        action="{{ url_for('updateFirstName') }}"
+                        method="POST"
+                        style="display: none;">
+
+                        <input
+                            type="text"
+                            name="first_name"
+                            id="first-name-input"
+                            class="profile-input"
+                            value="{{ user['USER_FNAME'] }}"
+                        >
+
+                        <button class="button" type="submit">
+                            Confirm
+                        </button>
+
+                        <button
+                            class="button cancel-button"
+                            type="button"
+                            onclick="cancelFirstName()">
+                            Cancel
+                        </button>
+
+                    </form>
 
                 </div>
 
-                <a href="{{ url_for('userProfile') }}" class="button">
+
+                <!-- Update button -->
+                <button
+                    id="edit-first-name-button"
+                    class="button"
+                    type="button"
+                    onclick="editFirstName()">
                     Update First Name
-                </a>
+                </button>
 
             </div>
-
 
             <!-- Last Name -->
             <div class="profile-row">
@@ -70,18 +115,53 @@
                         Last Name
                     </div>
 
-                    <div class="profile-value">
+                    <!-- Normal display -->
+                    <span id="last-name-display" class="profile-value">
                         {{ user["USER_LNAME"] }}
-                    </div>
+                    </span>
+
+
+                    <!-- Edit form -->
+                    <form
+                        id="last-name-form"
+                        action="{{ url_for('updateLastName') }}"
+                        method="POST"
+                        style="display: none;">
+
+                        <input
+                            type="text"
+                            name="last_name"
+                            id="last-name-input"
+                            class="profile-input"
+                            value="{{ user['USER_LNAME'] }}"
+                        >
+
+                        <button class="button" type="submit">
+                            Confirm
+                        </button>
+
+                        <button
+                            class="button cancel-button"
+                            type="button"
+                            onclick="cancelLastName()">
+                            Cancel
+                        </button>
+
+                    </form>
 
                 </div>
 
-                <a href="{{ url_for('userProfile') }}" class="button">
+
+                <!-- Update button -->
+                <button
+                    id="edit-last-name-button"
+                    class="button"
+                    type="button"
+                    onclick="editLastName()">
                     Update Last Name
-                </a>
+                </button>
 
             </div>
-
 
             <!-- Email -->
             <div class="profile-row">
@@ -156,6 +236,66 @@
         Good (Truck) Driver Incentive Program &mdash; Fall 2026
     </footer>
 
+    <script>
+
+        function editFirstName() {
+
+            // Hide the displayed name
+            document.getElementById("first-name-display").style.display = "none";
+
+            // Hide the Update button
+            document.getElementById("edit-first-name-button").style.display = "none";
+
+            // Show the form
+            document.getElementById("first-name-form").style.display = "flex";
+
+            // Put cursor in input
+            document.getElementById("first-name-input").focus();
+        }
+
+
+        function cancelFirstName() {
+
+            // Hide the form
+            document.getElementById("first-name-form").style.display = "none";
+
+            // Show the original name
+            document.getElementById("first-name-display").style.display = "inline";
+
+            // Show Update button
+            document.getElementById("edit-first-name-button").style.display =
+                "inline-block";
+
+            // Reset input to original value
+            document.getElementById("first-name-input").value =
+                document.getElementById("first-name-display").textContent.trim();
+        }
+
+        function editLastName() {
+
+            document.getElementById("last-name-display").style.display = "none";
+
+            document.getElementById("edit-last-name-button").style.display = "none";
+
+            document.getElementById("last-name-form").style.display = "flex";
+
+            document.getElementById("last-name-input").focus();
+        }
+
+
+        function cancelLastName() {
+
+            document.getElementById("last-name-form").style.display = "none";
+
+            document.getElementById("last-name-display").style.display = "inline";
+
+            document.getElementById("edit-last-name-button").style.display =
+                "inline-block";
+
+            document.getElementById("last-name-input").value =
+                document.getElementById("last-name-display").textContent.trim();
+        }
+    </script>
 </body>
 
 </html>

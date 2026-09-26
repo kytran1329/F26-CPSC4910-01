@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, url_for
 import mysql.connector 
 import os
 from dotenv import load_dotenv
@@ -142,6 +142,9 @@ def userProfile():
     #temporary until login/session authentication is implemented
     user_id = 1
 
+    error = request.args.get("error")
+    success = request.args.get("success")
+
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -161,7 +164,87 @@ def userProfile():
     cursor.close()
     conn.close()
 
-    return render_template("userProfile.html", user=user)
+    return render_template("userProfile.html", user=user,error=error,
+        success=success)
+
+@app.route("/updateFirstName", methods=["POST"])
+def updateFirstName():
+
+    user_id = 1
+
+    first_name = request.form["first_name"].strip()
+
+    if not first_name:
+        return redirect(url_for("userProfile", error="First name cannot be empty."))
+
+    if not first_name.isalpha():
+        return redirect(url_for("userProfile", error="First name can only contain letters."))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE USER
+        SET USER_FNAME = %s
+        WHERE USER_ID = %s
+        """,
+        (first_name, user_id)
+    )
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("userProfile", success="First name updated successfully!"))
+
+@app.route("/update-last-name", methods=["POST"])
+def updateLastName():
+
+    user_id = 1
+
+    last_name = request.form["last_name"].strip()
+
+    if not last_name:
+        return redirect(
+            url_for("userProfile",error="Last name cannot be empty."))
+
+    if not last_name.isalpha():
+        return redirect(
+            url_for("userProfile",error="Last name can only contain letters."))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE USER
+        SET USER_LNAME = %s
+        WHERE USER_ID = %s
+        """,
+        (last_name, user_id)
+    )
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("userProfile",success="Last name updated successfully!"))
+    
 
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
