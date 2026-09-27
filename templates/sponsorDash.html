@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sponsor Dashboard</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='driverDash.css') }}">
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+
+            <div class="dashboard-name">
+                Sponsor Dashboard
+            </div>
+
+            <div class="tagline">
+                Good Driving. Better Rewards.
+            </div>
+
+        </div>
+    </header>
+
+
+    <!-- Main Content -->
+    <main>
+
+        <div class="dashboard-card">
+
+            <!-- Driver Count -->
+            <div class="points-box">
+
+                <div class="points-label">
+                    Drivers
+                </div>
+
+                <div class="points-value">
+                    {{ user_info | map(attribute="DRIVER_ID") | unique | list | length }}
+                </div>
+
+            </div>
+
+
+            <!-- Driver Information -->
+            <div class="history-section">
+
+                <h2>Driver Information</h2>
+
+                <div class="table-container">
+
+                    <table class="history-table">
+
+                        <thead>
+                            <tr>
+                                <th>Driver ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Balance</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            {% set seen_drivers = [] %}
+
+                            {% for row in user_info %}
+
+                                {% if row["DRIVER_ID"] not in seen_drivers %}
+
+                                    {% set _ = seen_drivers.append(row["DRIVER_ID"]) %}
+
+                                    <tr>
+
+                                        <td>
+                                            {{ row["DRIVER_ID"] }}
+                                        </td>
+
+                                        <td>
+                                            {{ row["USER_FNAME"] }} {{ row["USER_LNAME"] }}
+                                        </td>
+
+                                        <td>
+                                            {{ row["EMAIL"] }}
+                                        </td>
+
+                                        <td>
+                                            {{ row["ROLE"] }}
+                                        </td>
+
+                                        <td>
+                                            {{ row["BALANCE"] }}
+                                        </td>
+
+                                    </tr>
+
+                                {% endif %}
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+
+            <!-- Point History -->
+            <div class="history-section">
+
+                <h2>Driver Point History</h2>
+
+                <div class="table-container">
+
+                    <table class="history-table">
+
+                        <thead>
+                            <tr>
+                                <th>Driver ID</th>
+                                <th>Driver</th>
+                                <th>Points</th>
+                                <th>Reason</th>
+                                <th>Date & Time</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            {% for row in user_info %}
+
+                            <tr>
+
+                                <td>
+                                    {{ row["DRIVER_ID"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["USER_FNAME"] }} {{ row["USER_LNAME"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["POINTCHANGE_AMOUNT"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["POINTCHANGE_REASON"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["DTS"] }}
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+
+            <!-- Home button -->
+            <a href="/home" class="back-link">
+                Back to Home
+            </a>
+
+        </div>
+
+    </main>
+
+
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+    </footer>
+
+</body>
+
+</html>

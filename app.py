@@ -68,7 +68,8 @@ def driverDash():
                         d.BALANCE
                     from DRIVER as d
                     join `USER` as u
-                        on u.USER_ID = d.USER_ID""")
+                        on u.USER_ID = d.USER_ID
+                    where d.DRIVER_ID = 1""")
         
     drive_info = cursor.fetchone()
 
@@ -134,6 +135,40 @@ def catalog():
         error=error,
         query=query
     )
+
+@app.route("/sponDash")
+def sponDash():
+    conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+            )
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""select 
+                        u.USER_ID,
+                        u.USER_FNAME,
+                        u.USER_LNAME,
+                        u.ROLE,
+                        u.EMAIL,
+                        d.DRIVER_ID,
+                        d.SPONSORCOMP_ID,
+                        d.BALANCE,
+                        p.POINTCHANGE_AMOUNT,
+                        p.POINTCHANGE_REASON,
+                        p.DTS
+                    from `USER` as u
+                    join DRIVER as d
+                        on u.USER_ID = d.USER_ID
+                    join POINTCHANGES as p
+                        on p.USER_ID = d.USER_ID
+                    order by d.DRIVER_ID, p.DTS desc""")
+    user_info = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    return render_template("sponsorDash.html", user_info = user_info)
 
 
 if __name__ == "__main__":
