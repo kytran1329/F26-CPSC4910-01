@@ -110,7 +110,8 @@ def driverDash():
                         d.BALANCE
                     from DRIVER as d
                     join `USER` as u
-                        on u.USER_ID = d.USER_ID""")
+                        on u.USER_ID = d.USER_ID
+                        LIMIT 1;""")
         
     drive_info = cursor.fetchone()
 
