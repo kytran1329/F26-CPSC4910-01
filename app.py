@@ -81,12 +81,12 @@ def driverDash():
             pc.POINTCHANGE_REASON,
             pc.DTS
         from POINTCHANGES as pc
-        WHERE pc.USER_ID = (
+        where pc.USER_ID = (
             select d.USER_ID
             from DRIVER as d
-            WHERE d.DRIVER_ID = %s
+            where d.DRIVER_ID = %s
         )
-        order by pc.DTS DESC;
+        order by pc.DTS desc;
             """, (drive_info["DRIVER_ID"],))
 
     history = cursor.fetchall()
@@ -181,10 +181,10 @@ def sponDash():
         from `USER` as u
 
         join DRIVER as d
-            ON u.USER_ID = d.USER_ID
+            on u.USER_ID = d.USER_ID
 
         left join POINTCHANGES as p
-            ON p.USER_ID = d.USER_ID
+            on p.USER_ID = d.USER_ID
 
         group by
             u.USER_ID,
