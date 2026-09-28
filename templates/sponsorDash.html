@@ -2,18 +2,22 @@
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Sponsor Dashboard</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='driverDash.css') }}">
+
 </head>
+
 
 <body>
 
-    <!-- Header -->
+    <!-- header -->
     <header>
+
         <div class="header-content">
 
             <div class="dashboard-name">
@@ -25,29 +29,29 @@
             </div>
 
         </div>
+
     </header>
 
-
-    <!-- Main Content -->
     <main>
 
         <div class="dashboard-card">
+
 
             <!-- Driver Count -->
             <div class="points-box">
 
                 <div class="points-label">
-                    Drivers
+                    Total Drivers
                 </div>
 
                 <div class="points-value">
-                    {{ user_info | map(attribute="DRIVER_ID") | unique | list | length }}
+                    {{ user_info | length }}
                 </div>
 
             </div>
 
 
-            <!-- Driver Information -->
+            <!-- driver info -->
             <div class="history-section">
 
                 <h2>Driver Information</h2>
@@ -57,6 +61,7 @@
                     <table class="history-table">
 
                         <thead>
+
                             <tr>
                                 <th>Driver ID</th>
                                 <th>Name</th>
@@ -64,43 +69,75 @@
                                 <th>Role</th>
                                 <th>Balance</th>
                             </tr>
+
                         </thead>
+
 
                         <tbody>
 
-                            {% set seen_drivers = [] %}
-
                             {% for row in user_info %}
 
-                                {% if row["DRIVER_ID"] not in seen_drivers %}
+                            <!-- Clickable Driver Row 
+                             Also there is no error here, it's fine-->
+                            <tr class="driver-row"
+                            
+                                onclick="toggleDriver('{{ row['DRIVER_ID'] }}')">
 
-                                    {% set _ = seen_drivers.append(row["DRIVER_ID"]) %}
+                                <td>
+                                    {{ row["DRIVER_ID"] }}
+                                </td>
 
-                                    <tr>
+                                <td>
+                                    {{ row["USER_FNAME"] }}
+                                    {{ row["USER_LNAME"] }}
+                                </td>
 
-                                        <td>
-                                            {{ row["DRIVER_ID"] }}
-                                        </td>
+                                <td>
+                                    {{ row["EMAIL"] }}
+                                </td>
 
-                                        <td>
-                                            {{ row["USER_FNAME"] }} {{ row["USER_LNAME"] }}
-                                        </td>
+                                <td>
+                                    {{ row["ROLE"] }}
+                                </td>
 
-                                        <td>
-                                            {{ row["EMAIL"] }}
-                                        </td>
+                                <td>
+                                    {{ row["BALANCE"] }}
+                                </td>
 
-                                        <td>
-                                            {{ row["ROLE"] }}
-                                        </td>
+                            </tr>
 
-                                        <td>
-                                            {{ row["BALANCE"] }}
-                                        </td>
 
-                                    </tr>
+                            <!-- \Driver Point Summary -->
+                            <tr id="summary-{{ row['DRIVER_ID'] }}"
+                                class="driver-summary"
+                                style="display: none;">
 
-                                {% endif %}
+                                <td colspan="5">
+
+                                    <strong>Point Summary</strong>
+
+                                    <div class="summary-content">
+
+                                        <div>
+                                            <strong>Points Gained:</strong>
+                                            {{ row["POINTS_GAINED"] }}
+                                        </div>
+
+                                        <div>
+                                            <strong>Points Lost:</strong>
+                                            {{ row["POINTS_LOST"] }}
+                                        </div>
+
+                                        <div>
+                                            <strong>Net Change:</strong>
+                                            {{ row["NET_CHANGE"] }}
+                                        </div>
+
+                                    </div>
+
+                                </td>
+
+                            </tr>
 
                             {% endfor %}
 
@@ -113,7 +150,7 @@
             </div>
 
 
-            <!-- Point History -->
+            <!-- point history -->
             <div class="history-section">
 
                 <h2>Driver Point History</h2>
@@ -123,27 +160,36 @@
                     <table class="history-table">
 
                         <thead>
+
                             <tr>
+                                <th>Point Change ID</th>
                                 <th>Driver ID</th>
                                 <th>Driver</th>
                                 <th>Points</th>
                                 <th>Reason</th>
                                 <th>Date & Time</th>
                             </tr>
+
                         </thead>
+
 
                         <tbody>
 
-                            {% for row in user_info %}
+                            {% for row in point_history %}
 
                             <tr>
+
+                                <td>
+                                    {{ row["POINTCHANGE_ID"] }}
+                                </td>
 
                                 <td>
                                     {{ row["DRIVER_ID"] }}
                                 </td>
 
                                 <td>
-                                    {{ row["USER_FNAME"] }} {{ row["USER_LNAME"] }}
+                                    {{ row["USER_FNAME"] }}
+                                    {{ row["USER_LNAME"] }}
                                 </td>
 
                                 <td>
@@ -171,19 +217,42 @@
             </div>
 
 
-            <!-- Home button -->
+            <!-- Home -->
             <a href="/home" class="back-link">
                 Back to Home
             </a>
 
+
         </div>
 
     </main>
-
-
     <footer>
         Good (Truck) Driver Incentive Program &mdash; Fall 2026
     </footer>
+
+
+    <!-- JavaScript for clicking on a driver and getting more info -->
+    <script>
+
+        function toggleDriver(driverId) {
+
+            const summary = document.getElementById(
+                "summary-" + driverId
+            );
+
+            if (summary.style.display === "none") {
+
+                summary.style.display = "table-row";
+
+            } else {
+
+                summary.style.display = "none";
+
+            }
+
+        }
+
+    </script>
 
 </body>
 
