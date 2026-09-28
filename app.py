@@ -16,8 +16,49 @@ app = Flask(__name__, static_folder= "styles")
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        # Not checking credentials right now
-        return redirect("/home")
+        # get username and password values from the html form
+        username = request.form.get("username")
+        pwd = request.form.get("password")
+
+        # USE THIS CODE TO HASH PASSWORDS WHEN THE TIME COMES
+        #
+        # from werkzeug.security import generate_password_hash
+        #
+        # hashed_password = generate_password_hash(pwd)
+        #
+
+        # connect to sql database
+        conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+        )
+        cursor = conn.cursor(dictionary=True)
+
+        try: 
+            # get the password for the current username in the form
+            cursor.execute("SELECT EMAIL, PASSWORD FROM USER WHERE EMAIL = %s", (username,))
+            user = cursor.fetchone()
+
+            # USE THIS CODE TO CHECK THE HASHED PASSWORDS IN THE DATABASE
+            #
+            # from werkzeug.security import check_password_hash
+            #
+            # if user and check_password_hash(user["PASSWORD"], pwd):
+            #    return redirect("/home")
+            #
+
+            # if password matches, go to home page
+            if user and user["PASSWORD"] == pwd:
+                return redirect("/home")
+
+            # if password doesn't match stay on the page and give an error
+            return render_template( "login.html", error="Invalid username or password" )
+            
+        finally:
+            cursor.close()
+            conn.close()
 
     return render_template("login.html")
 
