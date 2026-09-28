@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Good Driver Incentive Program</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='/home.css') }}">
+</head>
+
+<body>
+
+    <header>
+        <div class="header-content">
+            <div class="home-name">Good Driver Incentive Program</div>
+            <div class="tagline">Good Driving. Better Rewards.</div>
+        </div>
+    </header>
+
+    <!-- Horizontal Navigation Banner -->
+    <nav class="home-links">
+        <a href="{{ url_for('driverDash') }}" class="button">Driver Dashboard</a>
+        <a href="{{ url_for('userProfile') }}" class="button">User Profile</a>
+        <a href="{{ url_for('about') }}" class="button">About</a>
+        <a href="{{ url_for('catalog') }}" class="button">Catalog</a>
+    </nav>
+
+    <main>
+        <div class="home-card">
+            <h2>Welcome</h2>
+
+            <p class="home-description">
+                Welcome to the Good Driver Incentive Program.
+                Use the navigation above to access the application.
+            </p>
+        </div>
+    </main>
+
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+    </footer>
+
+</body>
+</html>

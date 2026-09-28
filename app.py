@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 import mysql.connector 
 import os
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
 from catalog import search_ebay
 
 load_dotenv()
@@ -13,10 +14,59 @@ DB_NAME = os.getenv("DB_NAME")
 
 app = Flask(__name__, static_folder= "styles")
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+@app.route("/", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        # get username and password values from the html form
+        username = request.form.get("username")
+        pwd = request.form.get("password")
 
+        # USE THIS CODE TO HASH PASSWORDS WHEN THE TIME COMES
+        #
+        # from werkzeug.security import generate_password_hash
+        #
+        # hashed_password = generate_password_hash(pwd)
+        #
+
+        # connect to sql database
+        conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+        )
+        cursor = conn.cursor(dictionary=True)
+
+        try: 
+            # get the password for the current username in the form
+            cursor.execute("SELECT EMAIL, PASSWORD FROM USER WHERE EMAIL = %s", (username,))
+            user = cursor.fetchone()
+
+            # USE THIS CODE TO CHECK THE HASHED PASSWORDS IN THE DATABASE
+            #
+            # from werkzeug.security import check_password_hash
+            #
+            # if user and check_password_hash(user["PASSWORD"], pwd):
+            #    return redirect("/home")
+            #
+
+            # if password matches, go to home page
+            if user and user["PASSWORD"] == pwd:
+                return redirect("/home")
+
+            # if password doesn't match stay on the page and give an error
+            return render_template( "login.html", error="Invalid username or password" )
+            
+        finally:
+            cursor.close()
+            conn.close()
+
+    return render_template("login.html")
+
+
+@app.route("/home")
+def home():
+    return render_template("home.html")
 
 @app.route("/about")
 def about():
@@ -60,7 +110,8 @@ def driverDash():
                         d.BALANCE
                     from DRIVER as d
                     join `USER` as u
-                        on u.USER_ID = d.USER_ID""")
+                        on u.USER_ID = d.USER_ID
+                        LIMIT 1;""")
         
     drive_info = cursor.fetchone()
 
@@ -127,6 +178,210 @@ def catalog():
         query=query
     )
 
+@app.route("/userProfile")
+def userProfile():
+
+    #temporary until login/session authentication is implemented
+    user_id = 1
+
+    error = request.args.get("error")
+    success = request.args.get("success")
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT * FROM USER WHERE USER_ID = %s",
+        (user_id,)
+    )
+
+    user = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return render_template("userProfile.html", user=user,error=error,
+        success=success)
+
+@app.route("/updateFirstName", methods=["POST"])
+def updateFirstName():
+
+    user_id = 1
+
+    first_name = request.form["first_name"].strip()
+
+    if not first_name:
+        return redirect(url_for("userProfile", error="First name cannot be empty."))
+
+    if not first_name.isalpha():
+        return redirect(url_for("userProfile", error="First name can only contain letters."))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE USER
+        SET USER_FNAME = %s
+        WHERE USER_ID = %s
+        """,
+        (first_name, user_id)
+    )
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("userProfile", success="First name updated successfully!"))
+
+@app.route("/update-last-name", methods=["POST"])
+def updateLastName():
+
+    user_id = 1
+
+    last_name = request.form["last_name"].strip()
+
+    if not last_name:
+        return redirect(
+            url_for("userProfile",error="Last name cannot be empty."))
+
+    if not last_name.isalpha():
+        return redirect(
+            url_for("userProfile",error="Last name can only contain letters."))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE USER
+        SET USER_LNAME = %s
+        WHERE USER_ID = %s
+        """,
+        (last_name, user_id)
+    )
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("userProfile",success="Last name updated successfully!"))
+    
+
+@app.route("/changePassword", methods=["GET", "POST"])
+def changePassword():
+
+    #temporary until login/session authentication is implemented
+    user_id = 1
+
+    error = None
+    success = None
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    #get current user password hash
+    cursor.execute(
+        "SELECT USER_ID, PASSWORD FROM USER WHERE USER_ID = %s",
+        (user_id,)
+    )
+
+    user = cursor.fetchone()
+
+    if user is None:
+        cursor.close()
+        conn.close()
+        return "User not found", 404
+
+    if request.method == "POST":
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        # check that all fields are entered
+        if not current_password or not new_password or not confirm_password:
+            error = "Please fill in all password fields."
+
+        # verify current password against the stored hash    
+        elif not check_password_hash(
+            user["PASSWORD"],
+            current_password
+        ):
+            error = "Current password is incorrect"
+
+        # confirm the new password is a match
+        elif new_password != confirm_password:
+            error = "The new passwords do not match."
+
+        # make sure the new password is different
+        elif current_password == new_password:
+            error = "Your new password must be different from your current password."
+
+        else:
+
+            #save old password hash before replacing
+            old_password_hash = user["PASSWORD"]
+
+            # generate new password hash
+            new_password_hash = generate_password_hash(new_password)
+
+            # update user table
+            cursor.execute(
+                "UPDATE USER SET PASSWORD = %s WHERE USER_ID = %s",
+                (new_password_hash, user_id)
+            )
+
+            # record password change
+            cursor.execute(
+                """"
+                INSERT INTO PASSWORDCHANGES (
+                    USER_ID,
+                    PASSWORDCHANGE_REASON,
+                    OLD_PASSWORD,
+                    NEW_PASSWORD
+                )
+                VALUES (%s, %s, %s, %s)
+                """,
+                (
+                    user_id, 
+                    "User requested password change", 
+                    old_password_hash, 
+                    new_password_hash
+                )
+            )
+
+            conn.commit()
+            success = "Your password has been changed successfully."
+
+    cursor.close()
+    conn.close()
+    return render_template("changePassword.html", error=error, success=success)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
