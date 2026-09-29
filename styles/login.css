@@ -73,6 +73,13 @@ body {
     background-color: white;
 }
 
+.error {
+    color: #dc2626;
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
 /* Login button */
 button {
     width: 100%;

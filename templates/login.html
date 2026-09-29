@@ -17,6 +17,11 @@
             <h1>Road Reward Login</h1>
             <p class="login-subtitle">Sign in to your account</p>
 
+            <!-- Display login errors --> 
+            {% if error %} 
+                <p class="error">{{ error }}</p> 
+            {% endif %}
+
             <form method="POST">
 
                 <div class="form-group">

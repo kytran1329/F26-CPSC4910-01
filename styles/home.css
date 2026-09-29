@@ -1,0 +1,72 @@
+.home-name {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+/* Horizontal navigation banner */
+.home-links {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    width: 100%;
+
+    background: #1f2937;
+
+    padding: 12px 20px;
+
+    gap: 10px;
+}
+
+/* Navigation buttons */
+.home-links .button {
+    color: white;
+    background: transparent;
+
+    padding: 10px 20px;
+
+    border-radius: 5px;
+
+    text-decoration: none;
+    font-weight: bold;
+
+    margin: 0;
+}
+
+/* Highlight button when mouse is over it */
+.home-links .button:hover {
+    background: #374151;
+}
+
+.home-card {
+    background: white;
+    border-radius: 12px;
+    padding: 40px;
+
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.home-description {
+    color: #4b5563;
+    margin-bottom: 10px;
+}
+
+/* Mobile screens */
+@media (max-width: 650px) {
+
+    .home-name {
+        font-size: 1.6rem;
+    }
+
+    .home-links {
+        flex-wrap: wrap;
+    }
+
+    .home-links .button {
+        padding: 8px 12px;
+    }
+
+    .home-card {
+        padding: 25px;
+    }
+}
