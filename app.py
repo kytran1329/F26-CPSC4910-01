@@ -382,8 +382,16 @@ def changePassword():
     conn.close()
     return render_template("changePassword.html", error=error, success=success)
     
-   @app.route("/sponDash")
-   def sponDash():
+@app.route("/sponDash")
+def sponDash():
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+        )
+    cursor = conn.cursor(dictionary=True)
+    
     # Driver information + point summary
     cursor.execute("""
         select 
