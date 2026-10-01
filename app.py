@@ -384,6 +384,18 @@ def changePassword():
     
    @app.route("/sponDash")
    def sponDash():
+    
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    # Temporary sponsor user ID until login/session authentication is implemented
+    sponsor_user_id = 2
+
     # Driver information + point summary
     cursor.execute("""
         select 
@@ -463,11 +475,27 @@ def changePassword():
 
     point_history = cursor.fetchall()
 
+    # Count pending applications for this sponsor
+    cursor.execute("""
+        SELECT COUNT(*) AS PENDING_APPLICATIONS
+        FROM APPLICATIONS AS a
+        JOIN SPONSOR AS s
+            ON a.SPONSOR_ID = s.SPONSOR_ID
+        WHERE s.USER_ID = %s
+            AND a.STATUS = 'PENDING'
+    """, (sponsor_user_id,))
+
+    pending_applications = cursor.fetchone()["PENDING_APPLICATIONS"]
+
 
     cursor.close()
     conn.close()
-    return render_template("sponsorDash.html",
-        user_info=user_info,point_history=point_history)
+    return render_template(
+        "sponsorDash.html",
+        user_info=user_info,
+        point_history=point_history, 
+        pending_applications=pending_applications
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
