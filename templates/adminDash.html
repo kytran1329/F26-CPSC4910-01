@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Admin Dashboard</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='/adminDash.css') }}">
+
+</head>
+
+
+<body>
+
+    <!-- Header -->
+    <header>
+
+        <div class="header-content">
+
+            <div class="dashboard-name">
+                Admin Dashboard
+            </div>
+
+            <div class="tagline">
+                Good Driving. Better Rewards.
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- Main Content -->
+    <main>
+        <!-- SPONSOR COMPANIES -->
+        <section class="admin-card">
+
+            <h2>Sponsor Companies</h2>
+
+
+            <!-- Sponsor Company Table -->
+            <div class="table-container">
+
+                <table class="admin-table">
+
+                    <thead>
+
+                        <tr>
+                            <th>Company ID</th>
+                            <th>Company Name</th>
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        {% for company in sponsor_companies %}
+
+                        <tr
+                            class="company-row"
+                            onclick="showSponsorCompany(
+                                '{{ company['SPONSORCOMP_ID'] }}',
+                                '{{ company['SPONSORCOMP_NAME'] }}',
+                                '{{ company['SPONSORCOMP_DOLLAR'] }}',
+                                '{{ company['SPONSORCOMP_POINT'] }}'
+                            )">
+
+                            <td>
+                                {{ company["SPONSORCOMP_ID"] }}
+                            </td>
+
+                            <td>
+                                {{ company["SPONSORCOMP_NAME"] }}
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+        <!-- SPONSORS -->
+        <section class="admin-card">
+
+            <h2>Sponsors</h2>
+
+
+            <!-- Sponsor Filter -->
+            <div class="filter-container">
+
+                <label for="sponsor-filter">
+                    Filter by Sponsor Company:
+                </label>
+
+                <select id="sponsor-filter"
+                        onchange="filterSponsors()">
+
+                    <option value="all">
+                        All Sponsors
+                    </option>
+
+                    {% for company in sponsor_companies %}
+
+                    <option value="{{ company['SPONSORCOMP_ID'] }}">
+                        {{ company['SPONSORCOMP_NAME'] }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <!-- Sponsor Table -->
+            <div class="table-container">
+
+                <table class="admin-table">
+
+                    <thead>
+
+                        <tr>
+                            <th>Sponsor ID</th>
+                            <th>First Name</th>
+                            <th>Last Name</th>
+                            <th>Sponsor Company</th>
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        {% for sponsor in sponsors %}
+
+                        <tr
+                            class="sponsor-row"
+                            data-sponsor="{{ sponsor['SPONSORCOMP_ID'] }}"
+                            onclick="showSponsor(
+                                '{{ sponsor['SPONSOR_ID'] }}',
+                                '{{ sponsor['USER_FNAME'] }}',
+                                '{{ sponsor['USER_LNAME'] }}',
+                                '{{ sponsor['EMAIL'] }}',
+                                '{{ sponsor['SPONSORCOMP_NAME'] }}'
+                            )">
+
+                            <td>
+                                {{ sponsor["SPONSOR_ID"] }}
+                            </td>
+
+                            <td>
+                                {{ sponsor["USER_FNAME"] }}
+                            </td>
+
+                            <td>
+                                {{ sponsor["USER_LNAME"] }}
+                            </td>
+
+                            <td>
+                                {{ sponsor["SPONSORCOMP_NAME"] }}
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <!-- DRIVERS -->
+        <section class="admin-card">
+
+            <h2>Drivers</h2>
+
+            <!-- Driver Filter -->
+            <div class="filter-container">
+
+                <label for="driver-filter">
+                    Filter by Sponsor Company:
+                </label>
+
+                <select id="driver-filter"
+                        onchange="filterDrivers()">
+
+                    <option value="all">
+                        All Sponsors
+                    </option>
+
+                    {% for company in sponsor_companies %}
+
+                    <option value="{{ company['SPONSORCOMP_ID'] }}">
+                        {{ company['SPONSORCOMP_NAME'] }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <!-- Driver Table -->
+            <div class="table-container">
+
+                <table class="admin-table">
+
+                    <thead>
+
+                        <tr>
+                            <th>Driver ID</th>
+                            <th>First Name</th>
+                            <th>Last Name</th>
+                            <th>Sponsor Company</th>
+                            <th>Points</th>
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        {% for driver in drivers %}
+
+                        <tr
+                            class="driver-row"
+                            data-sponsor="{{ driver['SPONSORCOMP_ID'] }}"
+                            onclick="showDriver(
+                                '{{ driver['DRIVER_ID'] }}',
+                                '{{ driver['USER_FNAME'] }}',
+                                '{{ driver['USER_LNAME'] }}',
+                                '{{ driver['EMAIL'] }}',
+                                '{{ driver['SPONSORCOMP_NAME'] }}',
+                                '{{ driver['BALANCE'] }}'
+                            )">
+
+                            <td>
+                                {{ driver["DRIVER_ID"] }}
+                            </td>
+
+                            <td>
+                                {{ driver["USER_FNAME"] }}
+                            </td>
+
+                            <td>
+                                {{ driver["USER_LNAME"] }}
+                            </td>
+
+                            <td>
+                                {{ driver["SPONSORCOMP_NAME"] }}
+                            </td>
+
+                            <td>
+                                {{ driver["BALANCE"] }}
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <!-- Back -->
+        <a href="{{ url_for('home') }}" class="back-link">
+            Back to Home
+        </a>
+
+
+    </main>
+
+
+    <!-- USER / COMPANY POPUP -->
+    <div id="user-modal" class="modal">
+
+        <div class="modal-content">
+
+            <span class="close-button"
+                  onclick="closeModal()">
+                &times;
+            </span>
+
+
+            <h2 id="modal-title">
+                Information
+            </h2>
+
+
+            <div class="modal-info">
+
+                <!-- ID -->
+                <p>
+                    <strong>ID:</strong>
+                    <span id="modal-id"></span>
+                </p>
+
+
+                <!-- Name -->
+                <p id="modal-name-container">
+
+                    <strong>Name:</strong>
+
+                    <span id="modal-name"></span>
+
+                </p>
+
+
+                <!-- Email -->
+                <p id="modal-email-container">
+
+                    <strong>Email:</strong>
+
+                    <span id="modal-email"></span>
+
+                </p>
+
+
+                <!-- Sponsor Company -->
+                <p id="modal-company-container">
+
+                    <strong>Sponsor Company:</strong>
+
+                    <span id="modal-company"></span>
+
+                </p>
+
+
+                <!-- Driver Points -->
+                <p id="modal-points-container">
+
+                    <strong>Points:</strong>
+
+                    <span id="modal-points"></span>
+
+                </p>
+
+
+                <!-- Sponsor Company Dollar -->
+                <p id="modal-dollar-container">
+
+                    <strong>Dollar Value:</strong>
+
+                    <span id="modal-dollar"></span>
+
+                </p>
+
+
+                <!-- Sponsor Company Point -->
+                <p id="modal-point-container">
+
+                    <strong>Point Value:</strong>
+
+                    <span id="modal-point"></span>
+
+                </p>
+
+            </div>
+
+
+            <button
+                class="button"
+                type="button"
+                onclick="closeModal()">
+
+                Close
+
+            </button>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- Footer -->
+    <footer>
+
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+
+    </footer>
+
+
+    <script>
+        // DRIVER FILTER
+        function filterDrivers() {
+
+            const filter =
+                document.getElementById("driver-filter").value;
+
+            const rows =
+                document.querySelectorAll(".driver-row");
+
+
+            rows.forEach(function(row) {
+
+                if (
+                    filter === "all" ||
+                    row.dataset.sponsor === filter
+                ) {
+
+                    row.style.display = "";
+
+                } else {
+
+                    row.style.display = "none";
+
+                }
+
+            });
+
+        }
+
+
+        // SPONSOR FILTER
+        function filterSponsors() {
+
+            const filter =
+                document.getElementById("sponsor-filter").value;
+
+            const rows =
+                document.querySelectorAll(".sponsor-row");
+
+
+            rows.forEach(function(row) {
+
+                if (
+                    filter === "all" ||
+                    row.dataset.sponsor === filter
+                ) {
+
+                    row.style.display = "";
+
+                } else {
+
+                    row.style.display = "none";
+
+                }
+
+            });
+
+        }
+
+
+        // DRIVER POPUP
+        function showDriver(
+            id,
+            firstName,
+            lastName,
+            email,
+            company,
+            points
+        ) {
+
+            // Popup title
+            document.getElementById("modal-title")
+                .textContent = "Driver Information";
+
+
+            // Driver information
+            document.getElementById("modal-id")
+                .textContent = id;
+
+            document.getElementById("modal-name")
+                .textContent = firstName + " " + lastName;
+
+            document.getElementById("modal-email")
+                .textContent = email;
+
+            document.getElementById("modal-company")
+                .textContent = company;
+
+            document.getElementById("modal-points")
+                .textContent = points;
+
+
+            // Show driver fields
+            document.getElementById("modal-name-container")
+                .style.display = "block";
+
+            document.getElementById("modal-email-container")
+                .style.display = "block";
+
+            document.getElementById("modal-company-container")
+                .style.display = "block";
+
+            document.getElementById("modal-points-container")
+                .style.display = "block";
+
+
+            // Hide company-only fields
+            document.getElementById("modal-dollar-container")
+                .style.display = "none";
+
+            document.getElementById("modal-point-container")
+                .style.display = "none";
+
+
+            // Show popup
+            document.getElementById("user-modal")
+                .style.display = "flex";
+
+        }
+
+
+        // SPONSOR POPUP
+        function showSponsor(
+            id,
+            firstName,
+            lastName,
+            email,
+            company
+        ) {
+
+            // Popup title
+            document.getElementById("modal-title")
+                .textContent = "Sponsor Information";
+
+
+            // Sponsor information
+            document.getElementById("modal-id")
+                .textContent = id;
+
+            document.getElementById("modal-name")
+                .textContent = firstName + " " + lastName;
+
+            document.getElementById("modal-email")
+                .textContent = email;
+
+            document.getElementById("modal-company")
+                .textContent = company;
+
+
+            // Show sponsor fields
+            document.getElementById("modal-name-container")
+                .style.display = "block";
+
+            document.getElementById("modal-email-container")
+                .style.display = "block";
+
+            document.getElementById("modal-company-container")
+                .style.display = "block";
+
+
+            // Hide driver-specific field
+            document.getElementById("modal-points-container")
+                .style.display = "none";
+
+
+            // Hide company-specific fields
+            document.getElementById("modal-dollar-container")
+                .style.display = "none";
+
+            document.getElementById("modal-point-container")
+                .style.display = "none";
+
+
+            // Show popup
+            document.getElementById("user-modal")
+                .style.display = "flex";
+
+        }
+
+
+        // SPONSOR COMPANY POPUP
+        function showSponsorCompany(
+            id,
+            name,
+            dollar,
+            point
+        ) {
+
+            // Popup title
+            document.getElementById("modal-title")
+                .textContent = "Sponsor Company";
+
+
+            // Company information
+            document.getElementById("modal-id")
+                .textContent = id;
+
+            document.getElementById("modal-name")
+                .textContent = name;
+
+            document.getElementById("modal-dollar")
+                .textContent = dollar;
+
+            document.getElementById("modal-point")
+                .textContent = point;
+
+
+            // Show company name
+            document.getElementById("modal-name-container")
+                .style.display = "block";
+
+
+            // Show company-specific fields
+            document.getElementById("modal-dollar-container")
+                .style.display = "block";
+
+            document.getElementById("modal-point-container")
+                .style.display = "block";
+
+
+            // Hide user-specific fields
+            document.getElementById("modal-email-container")
+                .style.display = "none";
+
+            document.getElementById("modal-company-container")
+                .style.display = "none";
+
+            document.getElementById("modal-points-container")
+                .style.display = "none";
+
+
+            // Show popup
+            document.getElementById("user-modal")
+                .style.display = "flex";
+
+        }
+
+
+        // CLOSE POPUP
+        function closeModal() {
+
+            document.getElementById("user-modal")
+                .style.display = "none";
+
+        }
+
+
+
+        // Close popup when clicking outside it
+        window.onclick = function(event) {
+
+            const modal =
+                document.getElementById("user-modal");
+
+            if (event.target === modal) {
+
+                modal.style.display = "none";
+
+            }
+
+        };
+
+
+    </script>
+
+</body>
+
+</html>
