@@ -52,6 +52,8 @@
                         <tr>
                             <th>Company ID</th>
                             <th>Company Name</th>
+                            <th>Dollars</th>
+                            <th>Points</th>
                         </tr>
 
                     </thead>
@@ -76,6 +78,14 @@
 
                             <td>
                                 {{ company["SPONSORCOMP_NAME"] }}
+                            </td>
+
+                             <td>
+                                ${{ company["SPONSORCOMP_DOLLAR"] }}
+                            </td>
+
+                            <td>
+                                {{ company["SPONSORCOMP_POINT"] }} points
                             </td>
 
                         </tr>
