@@ -466,7 +466,7 @@ def sponDash():
         join `USER` as u
             ON d.USER_ID = u.USER_ID
 
-        order by d.DRIVER_ID, p.DTS DESC
+        order by p.POINTCHANGE_ID, p.DTS DESC
     """)
 
     point_history = cursor.fetchall()
