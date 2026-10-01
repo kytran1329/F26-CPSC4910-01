@@ -382,8 +382,8 @@ def changePassword():
     conn.close()
     return render_template("changePassword.html", error=error, success=success)
     
-   @app.route("/sponDash")
-   def sponDash():
+@app.route("/sponDash")
+def sponDash():
     
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -487,6 +487,25 @@ def changePassword():
 
     pending_applications = cursor.fetchone()["PENDING_APPLICATIONS"]
 
+    # Points given to all drivers this month
+    cursor.execute("""
+        SELECT COALESCE(SUM(p.POINTCHANGE_AMOUNT), 0) AS POINTS_THIS_MONTH
+        FROM SPONSOR AS s
+        JOIN DRIVER AS d
+            ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+        JOIN POINTCHANGES AS p
+            ON p.USER_ID = d.USER_ID
+        WHERE s.USER_ID = %s
+            AND p.POINTCHANGE_AMOUNT > 0
+            AND p.DTS >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            AND p.DTS < DATE_ADD(
+                DATE_FORMAT(CURDATE(), '%Y-%m-01'),
+                INTERVAL 1 MONTH
+            )
+    """, (sponsor_user_id,))
+
+    points_this_month = cursor.fetchone()["POINTS_THIS_MONTH"]
+
 
     cursor.close()
     conn.close()
@@ -494,7 +513,8 @@ def changePassword():
         "sponsorDash.html",
         user_info=user_info,
         point_history=point_history, 
-        pending_applications=pending_applications
+        pending_applications=pending_applications,
+        points_this_month=points_this_month
     )
 
 if __name__ == "__main__":
