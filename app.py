@@ -33,19 +33,23 @@ def login():
 
         try: 
             # get the password for the current username in the form
-            cursor.execute("SELECT EMAIL, PASSWORD, USER_ID FROM USER WHERE EMAIL = %s", (username,))
+            cursor.execute("SELECT EMAIL, PASSWORD, USER_ID, ROLE FROM USER WHERE EMAIL = %s", (username,))
             user = cursor.fetchone()
 
             global USER_ID
             USER_ID= user["USER_ID"]
 
             # check if hashed password matches
-            if user and check_password_hash(user["PASSWORD"], pwd):
-                return redirect(url_for("home"))
-
-            # if password matches, go to home page
-            if user and user["PASSWORD"] == pwd:
-                return redirect("/home")
+            if (user and check_password_hash(user["PASSWORD"], pwd)) or (user and user["PASSWORD"] == pwd):
+                role = user["ROLE"]
+                if role == "Driver":
+                    return redirect(url_for("driverDash"))
+                elif role == "Sponsor":
+                    return redirect(url_for("sponDash"))
+                elif role == "Admin":
+                    return redirect(url_for("adminDash"))
+                else:
+                    return redirect(url_for("home"))
 
             # if password doesn't match stay on the page and give an error
             return render_template( "login.html", error="Invalid username or password" )
