@@ -36,6 +36,7 @@ def login():
             cursor.execute("SELECT EMAIL, PASSWORD, USER_ID FROM USER WHERE EMAIL = %s", (username,))
             user = cursor.fetchone()
 
+            global USER_ID
             USER_ID= user["USER_ID"]
 
             # check if hashed password matches
@@ -89,9 +90,9 @@ def signup():
 
             cursor.execute(""" 
                 INSERT INTO `USER` 
-                (USER_FNAME, USER_LNAME, EMAIL, PASSWORD) 
-                VALUES (%s, %s, %s, %s) """, 
-                (first_name, last_name, email, hashed_password)
+                (USER_FNAME, USER_LNAME, EMAIL, PASSWORD, ROLE) 
+                VALUES (%s, %s, %s, %s, %s) """, 
+                (first_name, last_name, email, hashed_password, "Driver")
             )
 
             conn.commit()
