@@ -1,0 +1,298 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #f4f6f8;
+    color: #222;
+    line-height: 1.6;
+}
+
+
+/* Header */
+
+header {
+    background: #1f2937;
+    color: white;
+    padding: 25px 40px;
+}
+
+.header-content {
+    max-width: 1100px;
+    margin: auto;
+}
+
+.dashboard-name {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.tagline {
+    color: #d1d5db;
+    margin-top: 5px;
+}
+
+
+/* Main */
+
+main {
+    max-width: 1100px;
+    margin: 50px auto;
+    padding: 0 25px;
+}
+
+
+/* Admin sections */
+
+.admin-card {
+    background: white;
+    border-radius: 12px;
+    padding: 35px;
+    margin-bottom: 35px;
+
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+h2 {
+    font-size: 1.4rem;
+    color: #1f2937;
+    margin-bottom: 20px;
+}
+
+
+/* Filter */
+
+.filter-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    margin-bottom: 20px;
+}
+
+.filter-container label {
+    font-weight: bold;
+}
+
+.filter-container select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+
+/* Tables */
+
+.table-container {
+    width: 100%;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.admin-table th {
+    background: #1f2937;
+    color: white;
+
+    text-align: left;
+
+    padding: 14px 16px;
+}
+
+.admin-table td {
+    padding: 14px 16px;
+
+    border-bottom: 1px solid #e5e7eb;
+
+    color: #4b5563;
+}
+
+
+/* Clickable rows */
+
+.admin-table tbody tr {
+    cursor: pointer;
+}
+
+.admin-table tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+.admin-table tbody tr:hover {
+    background-color: #e5e7eb;
+}
+
+
+/* Modal */
+
+.modal {
+    display: none;
+
+    position: fixed;
+
+    z-index: 1000;
+
+    left: 0;
+    top: 0;
+
+    width: 100%;
+    height: 100%;
+
+    background-color: rgba(0, 0, 0, 0.45);
+
+    align-items: center;
+    justify-content: center;
+}
+
+
+/* Modal box */
+
+.modal-content {
+    background: white;
+
+    width: 90%;
+    max-width: 450px;
+
+    padding: 30px;
+
+    border-radius: 10px;
+
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+
+    position: relative;
+}
+
+.modal-content .button {
+    display: block;
+    margin-left: auto;
+}
+
+
+/* Close X */
+
+.close-button {
+    position: absolute;
+
+    right: 20px;
+    top: 10px;
+
+    font-size: 28px;
+
+    color: #6b7280;
+
+    cursor: pointer;
+}
+
+.close-button:hover {
+    color: #111827;
+}
+
+
+/* Modal information */
+
+.modal-info {
+    margin-bottom: 25px;
+}
+
+.modal-info p {
+    padding: 8px 0;
+
+    border-bottom: 1px solid #e5e7eb;
+}
+
+
+/* Buttons */
+
+.button {
+    display: inline-block;
+
+    background: #1f2937;
+
+    color: white;
+
+    padding: 10px 18px;
+
+    min-width: 150px;
+
+    text-align: center;
+
+    border-radius: 5px;
+
+    text-decoration: none;
+
+    font-weight: bold;
+
+    border: none;
+
+    cursor: pointer;
+}
+
+.button:hover {
+    background: #374151;
+}
+
+
+/* Back */
+
+.back-link {
+    display: inline-block;
+
+    margin-top: 10px;
+
+    color: #2563eb;
+
+    text-decoration: none;
+
+    font-weight: bold;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+
+/* Mobile */
+
+@media (max-width: 650px) {
+
+    header {
+        padding: 20px;
+    }
+
+    .dashboard-name {
+        font-size: 1.6rem;
+    }
+
+    main {
+        margin: 30px auto;
+        padding: 0 15px;
+    }
+
+    .admin-card {
+        padding: 25px;
+    }
+
+    .filter-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .admin-table th,
+    .admin-table td {
+        padding: 10px 12px;
+        font-size: 0.9rem;
+    }
+
+    .modal-content {
+        width: 95%;
+    }
+}

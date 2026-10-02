@@ -9,7 +9,9 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 mysql-connector-python==26.7.0
+pytest==9.1.1
 python-dotenv==1.2.3
 requests==2.34.2
+selenium==4.50.0
 urllib3==2.8.0
 Werkzeug==3.1.8

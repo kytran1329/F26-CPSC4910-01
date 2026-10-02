@@ -477,5 +477,79 @@ def sponDash():
     return render_template("sponsorDash.html",
         user_info=user_info,point_history=point_history)
 
+@app.route("/adminDash")
+def adminDash():
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    # Get sponsor comps
+    cursor.execute("""
+        SELECT *
+        FROM SPONSORCOMP
+        ORDER BY SPONSORCOMP_NAME
+    """)
+
+    sponsor_companies = cursor.fetchall()
+
+    # Get drivers
+    cursor.execute("""
+        SELECT
+            D.DRIVER_ID,
+            U.USER_ID,
+            U.USER_FNAME,
+            U.USER_LNAME,
+            U.EMAIL,
+            U.ROLE,
+            D.BALANCE,
+            SC.SPONSORCOMP_ID,
+            SC.SPONSORCOMP_NAME
+        FROM DRIVER D
+        INNER JOIN USER U
+            ON D.USER_ID = U.USER_ID
+        INNER JOIN SPONSORCOMP SC
+            ON D.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+        ORDER BY U.USER_LNAME, U.USER_FNAME
+    """)
+
+    drivers = cursor.fetchall()
+
+    # Get sponsors
+    cursor.execute("""
+        SELECT
+            S.SPONSOR_ID,
+            U.USER_ID,
+            U.USER_FNAME,
+            U.USER_LNAME,
+            U.EMAIL,
+            U.ROLE,
+            SC.SPONSORCOMP_ID,
+            SC.SPONSORCOMP_NAME
+        FROM SPONSOR S
+        INNER JOIN USER U
+            ON S.USER_ID = U.USER_ID
+        INNER JOIN SPONSORCOMP SC
+            ON S.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+        ORDER BY U.USER_LNAME, U.USER_FNAME
+    """)
+
+    sponsors = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "adminDash.html",
+        drivers=drivers,
+        sponsors=sponsors,
+        sponsor_companies=sponsor_companies
+    )
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
