@@ -59,6 +59,9 @@
                         type="password"
                         id="password"
                         name="password"
+                        minlength="8"
+                        pattern="(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}"
+                        title="Password must be at least 8 characters long and contain a number and a special character."
                         required
                     >
                 </div>

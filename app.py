@@ -11,6 +11,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_NAME = os.getenv("DB_NAME")
+global USER_ID
 
 app = Flask(__name__, static_folder= "styles")
 
@@ -32,18 +33,12 @@ def login():
 
         try: 
             # get the password for the current username in the form
-            cursor.execute("SELECT EMAIL, PASSWORD FROM USER WHERE EMAIL = %s", (username,))
+            cursor.execute("SELECT EMAIL, PASSWORD, USER_ID FROM USER WHERE EMAIL = %s", (username,))
             user = cursor.fetchone()
 
-            # USE THIS CODE TO CHECK THE HASHED PASSWORDS IN THE DATABASE
-            #
-            # from werkzeug.security import check_password_hash
-            #
-            # if user and check_password_hash(user["PASSWORD"], pwd):
-            #    return redirect("/home")
-            #
+            USER_ID= user["USER_ID"]
 
-
+            # check if hashed password matches
             if user and check_password_hash(user["PASSWORD"], pwd):
                 return redirect(url_for("home"))
 
@@ -71,7 +66,7 @@ def signup():
         pwd = request.form.get("password")
         role = "Driver"
 
-                # connect to sql database
+        # connect to sql database
         conn = mysql.connector.connect(
             host=DB_HOST,
             user=DB_USER,
@@ -233,9 +228,7 @@ def catalog():
 
 @app.route("/userProfile")
 def userProfile():
-
-    #temporary until login/session authentication is implemented
-    user_id = 1
+    user_id = USER_ID
 
     error = request.args.get("error")
     success = request.args.get("success")
@@ -343,8 +336,7 @@ def updateLastName():
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
 
-    #temporary until login/session authentication is implemented
-    user_id = 1
+    user_id = USER_ID
 
     error = None
     success = None
@@ -411,7 +403,7 @@ def changePassword():
 
             # record password change
             cursor.execute(
-                """"
+                """
                 INSERT INTO PASSWORDCHANGES (
                     USER_ID,
                     PASSWORDCHANGE_REASON,
