@@ -21,13 +21,6 @@ def login():
         username = request.form.get("username")
         pwd = request.form.get("password")
 
-        # USE THIS CODE TO HASH PASSWORDS WHEN THE TIME COMES
-        #
-        # from werkzeug.security import generate_password_hash
-        #
-        # hashed_password = generate_password_hash(pwd)
-        #
-
         # connect to sql database
         conn = mysql.connector.connect(
             host=DB_HOST,
@@ -50,6 +43,10 @@ def login():
             #    return redirect("/home")
             #
 
+
+            if user and check_password_hash(user["PASSWORD"], pwd):
+                return redirect(url_for("home"))
+
             # if password matches, go to home page
             if user and user["PASSWORD"] == pwd:
                 return redirect("/home")
@@ -62,6 +59,62 @@ def login():
             conn.close()
 
     return render_template("login.html")
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        # get user info to create an account
+        first_name = request.form.get("first_name") 
+        last_name = request.form.get("last_name") 
+        email = request.form.get("email") 
+        pwd = request.form.get("password")
+        role = "Driver"
+
+                # connect to sql database
+        conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+        )
+        cursor = conn.cursor(dictionary=True)
+
+        try:
+            # check if email already exists 
+            cursor.execute( "SELECT USER_ID FROM `USER` WHERE EMAIL = %s", (email,) )
+            if cursor.fetchone(): 
+                return render_template( 
+                    "signup.html", 
+                    error="An account with this email already exists." 
+                )
+
+            # hash the password
+            hashed_password = generate_password_hash(pwd)
+
+            cursor.execute(""" 
+                INSERT INTO `USER` 
+                (USER_FNAME, USER_LNAME, EMAIL, PASSWORD) 
+                VALUES (%s, %s, %s, %s) """, 
+                (first_name, last_name, email, hashed_password)
+            )
+
+            conn.commit()
+
+            return redirect(url_for("login"))
+
+        except mysql.connector.Error: 
+            conn.rollback() 
+            app.logger.exception("Error creating user account") 
+            return render_template( 
+                "signup.html", 
+                error="Unable to create your account. Please try again." 
+            )
+            
+        finally:
+            cursor.close()
+            conn.close()
+    return render_template("signup.html")
 
 
 @app.route("/home")

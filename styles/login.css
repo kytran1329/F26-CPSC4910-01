@@ -80,6 +80,22 @@ body {
     font-size: 14px;
 }
 
+.signup-link {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+.signup-link a {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.signup-link a:hover {
+    text-decoration: underline;
+}
+
 /* Login button */
 button {
     width: 100%;
