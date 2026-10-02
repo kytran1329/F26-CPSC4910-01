@@ -1,0 +1,84 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
+</head>
+
+<body>
+
+    <div class="login-container">
+        <div class="login-card">
+
+            <h1>Road Reward Sign Up</h1>
+            <p class="login-subtitle">Create your Driver account</p>
+
+            {% if error %}
+                <p class="error">{{ error }}</p>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('signup') }}">
+
+                <div class="form-group">
+                    <label for="first_name">First Name</label>
+                    <input
+                        type="text"
+                        id="first_name"
+                        name="first_name"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="last_name">Last Name</label>
+                    <input
+                        type="text"
+                        id="last_name"
+                        name="last_name"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        minlength="8"
+                        pattern="(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}"
+                        title="Password must be at least 8 characters long and contain a number and a special character."
+                        required
+                    >
+                </div>
+
+                <button type="submit">Create Account</button>
+
+            </form>
+
+            <div class="signup-link">
+                <p>Already have an account?
+                    <a href="{{ url_for('login') }}">Log In</a>
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>
+```
