@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 import mysql.connector 
 import os
 from dotenv import load_dotenv
@@ -14,6 +14,17 @@ DB_NAME = os.getenv("DB_NAME")
 global USER_ID
 
 app = Flask(__name__, static_folder= "styles")
+
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+# THIS STOPS SOMEONE FROM LOGGIN BACK IN BY HITTING THE BACK BUTTON AFTER THEY HAVE LOGGED OUT
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 
 @app.route("/", methods=["GET", "POST"])
 def login():
@@ -42,6 +53,9 @@ def login():
             # check if hashed password matches
             if (user and check_password_hash(user["PASSWORD"], pwd)) or (user and user["PASSWORD"] == pwd):
                 role = user["ROLE"]
+                session["user_id"] = user["USER_ID"]
+                session["role"] = user["ROLE"]
+
                 if role == "Driver":
                     return redirect(url_for("driverDash"))
                 elif role == "Sponsor":
@@ -59,6 +73,13 @@ def login():
             conn.close()
 
     return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    print(session)
+    return redirect(url_for("login"))
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -145,6 +166,11 @@ def about():
 
 @app.route("/driverDash")
 def driverDash():
+
+    # dont allow the page to be accessed unless someone is logged in
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -336,7 +362,6 @@ def updateLastName():
     conn.close()
 
     return redirect(url_for("userProfile",success="Last name updated successfully!"))
-    
 
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
@@ -434,6 +459,11 @@ def changePassword():
     
 @app.route("/sponDash")
 def sponDash():
+
+    # dont allows the page to be accessed unless someone is logged in
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -529,6 +559,10 @@ def sponDash():
 
 @app.route("/adminDash")
 def adminDash():
+
+    # dont allows the page to be accessed unless someone is logged in
+    if "user_id" not in session:
+        return redirect(url_for("login"))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
