@@ -167,14 +167,10 @@ def about():
 @app.route("/driverDash")
 def driverDash():
     #Login check
-    if "USER_ID" not in session:
-        return redirect(url_for("login"))
-
-    user_id = session["USER_ID"]
-
-    # dont allow the page to be accessed unless someone is logged in
     if "user_id" not in session:
         return redirect(url_for("login"))
+
+    user_id = session["user_id"]
 
     conn = mysql.connector.connect(
         host=DB_HOST,
