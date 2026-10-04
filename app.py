@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 import mysql.connector 
 import os
 from dotenv import load_dotenv
@@ -13,6 +13,8 @@ DB_USER = os.getenv("DB_USER")
 DB_NAME = os.getenv("DB_NAME")
 
 app = Flask(__name__, static_folder= "styles")
+#FLASK_SECRET_KEY add in .env
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 @app.route("/", methods=["GET", "POST"])
 def login():
@@ -39,7 +41,7 @@ def login():
 
         try: 
             # get the password for the current username in the form
-            cursor.execute("SELECT EMAIL, PASSWORD FROM USER WHERE EMAIL = %s", (username,))
+            cursor.execute("SELECT USER_ID, EMAIL, PASSWORD, ROLE FROM USER WHERE EMAIL = %s", (username,))
             user = cursor.fetchone()
 
             # USE THIS CODE TO CHECK THE HASHED PASSWORDS IN THE DATABASE
@@ -52,6 +54,9 @@ def login():
 
             # if password matches, go to home page
             if user and user["PASSWORD"] == pwd:
+                session["USER_ID"]= user["USER_ID"]
+                session["ROLE"]= user["ROLE"]
+
                 return redirect("/home")
 
             # if password doesn't match stay on the page and give an error
@@ -92,6 +97,12 @@ def about():
 
 @app.route("/driverDash")
 def driverDash():
+    #Login check
+    if "USER_ID" not in session:
+        return redirect(url_for("login"))
+
+    user_id = session["USER_ID"]
+
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -103,6 +114,7 @@ def driverDash():
         #query gets driver info
     cursor.execute("""select
                         d.DRIVER_ID,
+                        u.USER_ID,
                         u.USER_FNAME,
                         u.USER_LNAME,
                         u.ROLE,
@@ -111,10 +123,14 @@ def driverDash():
                     from DRIVER as d
                     join `USER` as u
                         on u.USER_ID = d.USER_ID
-                    where d.DRIVER_ID = 1""")
+                    where d.USER_ID  = %s""", (user_id,))
         
     drive_info = cursor.fetchone()
-
+    if drive_info is None:
+        cursor.close()
+        conn.close()
+        return "Driver account not found", 404
+    
     #point history
     cursor.execute("""
         select
@@ -123,13 +139,9 @@ def driverDash():
             pc.POINTCHANGE_REASON,
             pc.DTS
         from POINTCHANGES as pc
-        where pc.USER_ID = (
-            select d.USER_ID
-            from DRIVER as d
-            where d.DRIVER_ID = %s
-        )
+        where pc.USER_ID =  %s
         order by pc.DTS desc;
-            """, (drive_info["DRIVER_ID"],))
+            """, (user_id,))
 
     history = cursor.fetchall()
 
