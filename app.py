@@ -11,10 +11,20 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_NAME = os.getenv("DB_NAME")
+global USER_ID
 
 app = Flask(__name__, static_folder= "styles")
 #FLASK_SECRET_KEY add in .env
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+# THIS STOPS SOMEONE FROM LOGGIN BACK IN BY HITTING THE BACK BUTTON AFTER THEY HAVE LOGGED OUT
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 
 @app.route("/", methods=["GET", "POST"])
 def login():
@@ -22,13 +32,6 @@ def login():
         # get username and password values from the html form
         username = request.form.get("username")
         pwd = request.form.get("password")
-
-        # USE THIS CODE TO HASH PASSWORDS WHEN THE TIME COMES
-        #
-        # from werkzeug.security import generate_password_hash
-        #
-        # hashed_password = generate_password_hash(pwd)
-        #
 
         # connect to sql database
         conn = mysql.connector.connect(
@@ -44,20 +47,23 @@ def login():
             cursor.execute("SELECT USER_ID, EMAIL, PASSWORD, ROLE FROM USER WHERE EMAIL = %s", (username,))
             user = cursor.fetchone()
 
-            # USE THIS CODE TO CHECK THE HASHED PASSWORDS IN THE DATABASE
-            #
-            # from werkzeug.security import check_password_hash
-            #
-            # if user and check_password_hash(user["PASSWORD"], pwd):
-            #    return redirect("/home")
-            #
+            global USER_ID
+            USER_ID= user["USER_ID"]
 
-            # if password matches, go to home page
-            if user and user["PASSWORD"] == pwd:
-                session["USER_ID"]= user["USER_ID"]
-                session["ROLE"]= user["ROLE"]
+            # check if hashed password matches
+            if (user and check_password_hash(user["PASSWORD"], pwd)) or (user and user["PASSWORD"] == pwd):
+                role = user["ROLE"]
+                session["user_id"] = user["USER_ID"]
+                session["role"] = user["ROLE"]
 
-                return redirect("/home")
+                if role == "Driver":
+                    return redirect(url_for("driverDash"))
+                elif role == "Sponsor":
+                    return redirect(url_for("sponDash"))
+                elif role == "Admin":
+                    return redirect(url_for("adminDash"))
+                else:
+                    return redirect(url_for("home"))
 
             # if password doesn't match stay on the page and give an error
             return render_template( "login.html", error="Invalid username or password" )
@@ -67,6 +73,69 @@ def login():
             conn.close()
 
     return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    print(session)
+    return redirect(url_for("login"))
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        # get user info to create an account
+        first_name = request.form.get("first_name") 
+        last_name = request.form.get("last_name") 
+        email = request.form.get("email") 
+        pwd = request.form.get("password")
+        role = "Driver"
+
+        # connect to sql database
+        conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+        )
+        cursor = conn.cursor(dictionary=True)
+
+        try:
+            # check if email already exists 
+            cursor.execute( "SELECT USER_ID FROM `USER` WHERE EMAIL = %s", (email,) )
+            if cursor.fetchone(): 
+                return render_template( 
+                    "signup.html", 
+                    error="An account with this email already exists." 
+                )
+
+            # hash the password
+            hashed_password = generate_password_hash(pwd)
+
+            cursor.execute(""" 
+                INSERT INTO `USER` 
+                (USER_FNAME, USER_LNAME, EMAIL, PASSWORD, ROLE) 
+                VALUES (%s, %s, %s, %s, %s) """, 
+                (first_name, last_name, email, hashed_password, "Driver")
+            )
+
+            conn.commit()
+
+            return redirect(url_for("login"))
+
+        except mysql.connector.Error: 
+            conn.rollback() 
+            app.logger.exception("Error creating user account") 
+            return render_template( 
+                "signup.html", 
+                error="Unable to create your account. Please try again." 
+            )
+            
+        finally:
+            cursor.close()
+            conn.close()
+    return render_template("signup.html")
 
 
 @app.route("/home")
@@ -102,6 +171,10 @@ def driverDash():
         return redirect(url_for("login"))
 
     user_id = session["USER_ID"]
+
+    # dont allow the page to be accessed unless someone is logged in
+    if "user_id" not in session:
+        return redirect(url_for("login"))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -192,9 +265,7 @@ def catalog():
 
 @app.route("/userProfile")
 def userProfile():
-
-    #temporary until login/session authentication is implemented
-    user_id = 1
+    user_id = USER_ID
 
     error = request.args.get("error")
     success = request.args.get("success")
@@ -297,13 +368,11 @@ def updateLastName():
     conn.close()
 
     return redirect(url_for("userProfile",success="Last name updated successfully!"))
-    
 
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
 
-    #temporary until login/session authentication is implemented
-    user_id = 1
+    user_id = USER_ID
 
     error = None
     success = None
@@ -370,7 +439,7 @@ def changePassword():
 
             # record password change
             cursor.execute(
-                """"
+                """
                 INSERT INTO PASSWORDCHANGES (
                     USER_ID,
                     PASSWORDCHANGE_REASON,
@@ -396,6 +465,11 @@ def changePassword():
     
 @app.route("/sponDash")
 def sponDash():
+
+    # dont allows the page to be accessed unless someone is logged in
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -491,6 +565,10 @@ def sponDash():
 
 @app.route("/adminDash")
 def adminDash():
+
+    # dont allows the page to be accessed unless someone is logged in
+    if "user_id" not in session:
+        return redirect(url_for("login"))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
