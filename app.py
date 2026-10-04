@@ -14,7 +14,7 @@ DB_NAME = os.getenv("DB_NAME")
 global USER_ID
 
 app = Flask(__name__, static_folder= "styles")
-
+#FLASK_SECRET_KEY add in .env
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 # THIS STOPS SOMEONE FROM LOGGIN BACK IN BY HITTING THE BACK BUTTON AFTER THEY HAVE LOGGED OUT
@@ -44,7 +44,7 @@ def login():
 
         try: 
             # get the password for the current username in the form
-            cursor.execute("SELECT EMAIL, PASSWORD, USER_ID, ROLE FROM USER WHERE EMAIL = %s", (username,))
+            cursor.execute("SELECT USER_ID, EMAIL, PASSWORD, ROLE FROM USER WHERE EMAIL = %s", (username,))
             user = cursor.fetchone()
 
             global USER_ID
@@ -166,10 +166,11 @@ def about():
 
 @app.route("/driverDash")
 def driverDash():
-
-    # dont allow the page to be accessed unless someone is logged in
+    #Login check
     if "user_id" not in session:
         return redirect(url_for("login"))
+
+    user_id = session["user_id"]
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -182,6 +183,7 @@ def driverDash():
         #query gets driver info
     cursor.execute("""select
                         d.DRIVER_ID,
+                        u.USER_ID,
                         u.USER_FNAME,
                         u.USER_LNAME,
                         u.ROLE,
@@ -190,10 +192,14 @@ def driverDash():
                     from DRIVER as d
                     join `USER` as u
                         on u.USER_ID = d.USER_ID
-                    where d.DRIVER_ID = 1""")
+                    where d.USER_ID  = %s""", (user_id,))
         
     drive_info = cursor.fetchone()
-
+    if drive_info is None:
+        cursor.close()
+        conn.close()
+        return "Driver account not found", 404
+    
     #point history
     cursor.execute("""
         select
@@ -202,13 +208,9 @@ def driverDash():
             pc.POINTCHANGE_REASON,
             pc.DTS
         from POINTCHANGES as pc
-        where pc.USER_ID = (
-            select d.USER_ID
-            from DRIVER as d
-            where d.DRIVER_ID = %s
-        )
+        where pc.USER_ID =  %s
         order by pc.DTS desc;
-            """, (drive_info["DRIVER_ID"],))
+            """, (user_id,))
 
     history = cursor.fetchall()
 
