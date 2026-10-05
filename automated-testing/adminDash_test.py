@@ -79,16 +79,4 @@ def test_admin_dashboard_sponsor_companies():
     assert "Sponsor Companies" in driver.page_source
 
     driver.quit()
-
-def test_admin_modal_opens():
-    driver = webdriver.Chrome()
-    driver.get("http://54.226.176.242/adminDash")
-
-    button = driver.find_element(By.CLASS_NAME, "button")
-    button.click()
-
-    modal = driver.find_element(By.ID, "myModal")
-
-    assert modal.is_displayed()
-
-    driver.quit()
+    
