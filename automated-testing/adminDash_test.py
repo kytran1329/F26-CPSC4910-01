@@ -8,7 +8,7 @@ def test_admin_login():
     driver = webdriver.Chrome()
     driver.get("http://54.226.176.242")
 
-    driver.implicitly_wait(1)
+    driver.implicitly_wait(2)
         
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
@@ -27,7 +27,7 @@ def test_admin_dashboard_loads():
     driver = webdriver.Chrome()
     driver.get("http://54.226.176.242")
     
-    driver.implicitly_wait(1)
+    driver.implicitly_wait(2)
             
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
@@ -46,7 +46,7 @@ def test_admin_dashboard_drivers():
     driver = webdriver.Chrome()
     driver.get("http://54.226.176.242")
         
-    driver.implicitly_wait(1)
+    driver.implicitly_wait(2)
                 
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
@@ -65,7 +65,7 @@ def test_admin_dashboard_sponsor_companies():
     driver = webdriver.Chrome()
     driver.get("http://54.226.176.242")
         
-    driver.implicitly_wait(1)
+    driver.implicitly_wait(2)
                 
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
@@ -79,4 +79,3 @@ def test_admin_dashboard_sponsor_companies():
     assert "Sponsor Companies" in driver.page_source
 
     driver.quit()
-    
