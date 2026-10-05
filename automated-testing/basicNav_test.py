@@ -11,7 +11,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 def test_app_loads():
     driver = webdriver.Chrome()
     driver.get("http://54.226.176.242")
-    assert "Welcome" in driver.page_source
+    assert "Road Reward Login" in driver.page_source
     driver.quit
 
 # Checks the about page link
