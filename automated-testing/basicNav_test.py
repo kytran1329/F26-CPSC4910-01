@@ -18,8 +18,23 @@ def test_app_loads():
 def test_about_link():
     driver = webdriver.Chrome()
     driver.get("http://54.226.176.242")
-    link = driver.find_element(By.LINK_TEXT, "Go to About Page")
+    driver.implicitly_wait(1)
+
+    username_field = driver.find_element(By.NAME, "username")
+    password_field = driver.find_element(By.NAME, "password")
+
+    username_field.send_keys("lukeskywalker@gmail.com")
+    password_field.send_keys("T-16Skyhopper")
+
+    button = driver.find_element(By.XPATH, "//button[text()='Login']")
+    button.click()
+
+    link = driver.find_element(By.LINK_TEXT, "Back to Home")
     link.click()
+
+    button = driver.find_element(By.LINK_TEXT, "About")
+    button.click()
+    
     assert "Road Reward" in driver.page_source
     driver.quit
 
