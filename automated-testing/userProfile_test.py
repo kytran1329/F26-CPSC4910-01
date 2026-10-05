@@ -33,7 +33,7 @@ def test_user_profile_loads():
     driver = webdriver.Chrome()
     driver.get("http://54.226.176.242/userProfile")
 
-    assert "My Profile" in driver.page_source
+    assert "Luke Skywalker's Profile" in driver.page_source
 
     driver.quit()    
 
