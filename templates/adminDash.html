@@ -146,8 +146,8 @@
 
                         <tr>
                             <th>Sponsor ID</th>
-                            <th>First Name</th>
-                            <th>Last Name</th>
+                            <th>Name</th>
+                            <th>Email</th>
                             <th>Sponsor Company</th>
                         </tr>
 
@@ -175,10 +175,11 @@
 
                             <td>
                                 {{ sponsor["USER_FNAME"] }}
+                                {{ sponsor["USER_LNAME"] }}
                             </td>
 
                             <td>
-                                {{ sponsor["USER_LNAME"] }}
+                                {{ sponsor["EMAIL"] }}
                             </td>
 
                             <td>
@@ -239,8 +240,8 @@
 
                         <tr>
                             <th>Driver ID</th>
-                            <th>First Name</th>
-                            <th>Last Name</th>
+                            <th>Name</th>
+                            <th>Email</th>
                             <th>Sponsor Company</th>
                             <th>Points</th>
                         </tr>
@@ -270,10 +271,11 @@
 
                             <td>
                                 {{ driver["USER_FNAME"] }}
+                                {{ driver["USER_LNAME"] }}
                             </td>
 
                             <td>
-                                {{ driver["USER_LNAME"] }}
+                                {{ driver["EMAIL"] }}
                             </td>
 
                             <td>
