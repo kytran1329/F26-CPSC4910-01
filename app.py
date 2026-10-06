@@ -553,11 +553,47 @@ def sponDash():
 
     point_history = cursor.fetchall()
 
+    # Count pending applications for this sponsor
+    cursor.execute("""
+        SELECT COUNT(*) AS PENDING_APPLICATIONS
+        FROM APPLICATIONS AS a
+        JOIN SPONSOR AS s
+            ON a.SPONSOR_ID = s.SPONSOR_ID
+        WHERE s.USER_ID = %s
+            AND a.STATUS = 'PENDING'
+    """, (sponsor_user_id,))
+
+    pending_applications = cursor.fetchone()["PENDING_APPLICATIONS"]
+
+    # Points given to all drivers this month
+    cursor.execute("""
+        SELECT COALESCE(SUM(p.POINTCHANGE_AMOUNT), 0) AS POINTS_THIS_MONTH
+        FROM SPONSOR AS s
+        JOIN DRIVER AS d
+            ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+        JOIN POINTCHANGES AS p
+            ON p.USER_ID = d.USER_ID
+        WHERE s.USER_ID = %s
+            AND p.POINTCHANGE_AMOUNT > 0
+            AND p.DTS >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            AND p.DTS < DATE_ADD(
+                DATE_FORMAT(CURDATE(), '%Y-%m-01'),
+                INTERVAL 1 MONTH
+            )
+    """, (sponsor_user_id,))
+
+    points_this_month = cursor.fetchone()["POINTS_THIS_MONTH"]
+
 
     cursor.close()
     conn.close()
-    return render_template("sponsorDash.html",
-        user_info=user_info,point_history=point_history)
+    return render_template(
+        "sponsorDash.html",
+        user_info=user_info,
+        point_history=point_history, 
+        pending_applications=pending_applications,
+        points_this_month=points_this_month
+    )
 
 @app.route("/adminDash")
 def adminDash():
