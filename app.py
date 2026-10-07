@@ -597,6 +597,16 @@ def sponDash():
         points_this_month=points_this_month
     )
 
+@app.route("/applications")
+def applications():
+    # Get pending driver applications
+    # from the database
+
+    return render_template(
+        "applications.html",
+        applications=applications
+    )
+
 @app.route("/adminDash")
 def adminDash():
 

@@ -48,6 +48,22 @@ header {
     background-color: #b91c1c;
 }
 
+.header-links {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.nav-link:hover {
+    text-decoration: underline;
+}
+
 /* Main content */
 main {
     max-width: 1000px;
