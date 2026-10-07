@@ -473,6 +473,8 @@ def sponDash():
         database= DB_NAME
         )
     cursor = conn.cursor(dictionary=True)
+
+    sponsor_user_id = USER_ID
     
     # Driver information + point summary
     cursor.execute("""
