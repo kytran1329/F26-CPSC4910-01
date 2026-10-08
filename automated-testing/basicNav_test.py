@@ -14,6 +14,23 @@ def test_app_loads():
     assert "Road Reward Login" in driver.page_source
     driver.quit
 
+def test_user_login():
+    driver = webdriver.Chrome()
+    driver.get("http://54.226.176.242")
+    driver.implicitly_wait(1)
+    
+    username_field = driver.find_element(By.NAME, "username")
+    password_field = driver.find_element(By.NAME, "password")
+    
+    username_field.send_keys("hansolo@gmail.com")
+    password_field.send_keys("12-parsecs")
+    
+    button = driver.find_element(By.XPATH, "//button[text()='Login']")
+    button.click()
+
+    assert "Han Solo's Dashboard" in driver.page_source
+    driver.quit    
+
 # Checks the about page link
 def test_about_link():
     driver = webdriver.Chrome()
@@ -62,6 +79,29 @@ def test_catalog_link():
     assert "Product Search" in driver.page_source
     driver.quit
 
+def test_user_profile_link():
+    driver = webdriver.Chrome()
+    driver.get("http://54.226.176.242")
+    driver.implicitly_wait(1)
+    
+    username_field = driver.find_element(By.NAME, "username")
+    password_field = driver.find_element(By.NAME, "password")
+    
+    username_field.send_keys("hansolo@gmail.com")
+    password_field.send_keys("12-parsecs")
+    
+    button = driver.find_element(By.XPATH, "//button[text()='Login']")
+    button.click()
+    
+    link = driver.find_element(By.LINK_TEXT, "Back to Home")
+    link.click()
+    
+    button = driver.find_element(By.LINK_TEXT, "User Profile")
+    button.click()
+    
+    assert "Han Solo's Profile" in driver.page_source
+    
+    driver.quit()
 
 def test_placeholder():
     test = 'a'
