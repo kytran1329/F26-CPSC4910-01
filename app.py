@@ -597,7 +597,8 @@ def sponDash():
         points_this_month=points_this_month
     )
 
-@app.route("/applications")
+
+@app.route("/sponDash/applications")
 def applications():
     # Get pending driver applications
     # from the database
@@ -620,7 +621,7 @@ def applications():
         WHERE a.STATUS = 'Pending'
         ORDER BY a.CREATED_DTS DESC;
     """)
-    
+
     applications = cursor.fetchall()
 
     cursor.close()
@@ -630,6 +631,67 @@ def applications():
         "applications.html",
         applications=applications
     )
+
+
+@app.route("/accept_application/<int:application_id>", methods=["POST"])
+def accept_application(application_id):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE APPLICATIONS
+        SET STATUS = 'Accepted',
+            UPDATED_DTS = NOW()
+        WHERE APPLICATION_ID = %s
+    """, (application_id,))
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("applications"))
+
+
+@app.route("/reject_application/<int:application_id>", methods=["POST"])
+def reject_application(application_id):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE APPLICATIONS
+        SET STATUS = 'Rejected',
+            UPDATED_DTS = NOW()
+        WHERE APPLICATION_ID = %s
+    """, (application_id,))
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("applications"))
+
 
 @app.route("/adminDash")
 def adminDash():
