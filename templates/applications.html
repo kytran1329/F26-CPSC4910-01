@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Applications</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='driverDash.css') }}">
+</head>
+
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <div class="dashboard-name">
+                Sponsor Dashboard
+            </div>
+            <div class="tagline">
+                Good Driving. Better Rewards.
+            </div>
+            <div class="header-links">
+                <a href="{{ url_for('sponDash') }}" class="nav-link">
+                    Dashboard
+                </a>
+                <a href="{{ url_for('applications') }}" class="nav-link">
+                    Applications
+                </a>
+                <a href="{{ url_for('logout') }}" class="logout-button">
+                    Logout
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="dashboard-card">
+            <!-- Applications -->
+            <div class="history-section">
+
+                <h2>Driver Applications</h2>
+
+                <div class="table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Application Date</th>
+                                <th>Balance</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for row in applications %}
+                            <tr>
+                                <td>
+                                    {{ row["USER_FNAME"] }}
+                                    {{ row["USER_LNAME"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["EMAIL"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["CREATED_DTS"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["BALANCE"] }}
+                                </td>
+
+                                <td>
+                                    {{ row["STATUS"] }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6">
+                                    No pending applications.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+    </footer>
+</body>
+</html>

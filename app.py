@@ -602,6 +602,30 @@ def applications():
     # Get pending driver applications
     # from the database
 
+    # connect to sql database
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    # grab correct data about each applicant
+    cursor.execute("""
+        SELECT a.APPLICATION_ID, u.USER_FNAME, u.USER_LNAME, u.EMAIL, a.CREATED_DTS, a.STATUS, d.BALANCE
+        FROM USER as u
+        JOIN APPLICATIONS as a ON u.USER_ID = a.USER_ID
+        JOIN DRIVER as d on u.USER_ID = d.USER_ID
+        WHERE a.STATUS = 'Pending'
+        ORDER BY a.CREATED_DTS DESC;
+    """)
+    
+    applications = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
     return render_template(
         "applications.html",
         applications=applications
