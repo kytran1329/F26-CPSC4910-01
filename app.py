@@ -167,8 +167,8 @@ def about():
 @app.route("/driverDash")
 def driverDash():
     #Login check
-    if "user_id" not in session:
-        return redirect(url_for("login"))
+    # if "user_id" not in session:
+    #     return redirect(url_for("login"))
 
     user_id = session["user_id"]
 
@@ -463,8 +463,8 @@ def changePassword():
 def sponDash():
 
     # dont allows the page to be accessed unless someone is logged in
-    if "user_id" not in session:
-        return redirect(url_for("login"))
+    # if "user_id" not in session:
+    #     return redirect(url_for("login"))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -601,8 +601,8 @@ def sponDash():
 def adminDash():
 
     # dont allows the page to be accessed unless someone is logged in
-    if "user_id" not in session:
-        return redirect(url_for("login"))
+    # if "user_id" not in session:
+    #     return redirect(url_for("login"))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
