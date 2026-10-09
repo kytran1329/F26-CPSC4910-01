@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Drivers</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='/style.css') }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='/adminDash.css') }}">
+</head>
+
+<body>
+
+    <header class="dashboard-header">
+        <div class="header-content">
+            <div>
+                <h1 class="dashboard-name">Manage Drivers</h1>
+                <p class="tagline">Good Driving. Better Rewards.</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="admin-page">
+
+        <section class="admin-card">
+            <h2>Drivers</h2>
+
+            <!-- Search and filter controls -->
+            <div class="filter-container">
+
+                <label for="driver-search">Search by Name:</label>
+                <input
+                    type="text"
+                    id="driver-search"
+                    placeholder="Enter first or last name..."
+                    oninput="filterDrivers()"
+                >
+
+                <label for="driver-filter">
+                    Filter by Sponsor Company:
+                </label>
+
+                <select id="driver-filter"
+                        onchange="filterDrivers()">
+
+                    <option value="all">All Sponsor Companies</option>
+
+                    {% for company in sponsor_companies %}
+                    <option value="{{ company['SPONSORCOMP_ID'] }}">
+                        {{ company['SPONSORCOMP_NAME'] }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <!-- Driver table -->
+            <div class="table-container">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Driver ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Sponsor Company</th>
+                            <th>Point Balance</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for driver in drivers %}
+                        <tr
+                            class="driver-row"
+                            data-name="{{ driver['USER_FNAME'] }} {{ driver['USER_LNAME'] }}"
+                            data-sponsor="{{ driver['SPONSORCOMP_ID'] }}"
+                            onclick="showDriver(
+                                '{{ driver['DRIVER_ID'] }}',
+                                '{{ driver['USER_FNAME'] }}',
+                                '{{ driver['USER_LNAME'] }}',
+                                '{{ driver['EMAIL'] }}',
+                                '{{ driver['SPONSORCOMP_NAME'] }}',
+                                '{{ driver['BALANCE'] }}'
+                            )">
+
+                            <td>{{ driver["DRIVER_ID"] }}</td>
+
+                            <td>
+                                {{ driver["USER_FNAME"] }}
+                                {{ driver["USER_LNAME"] }}
+                            </td>
+
+                            <td>{{ driver["EMAIL"] }}</td>
+
+                            <td>{{ driver["SPONSORCOMP_NAME"] }}</td>
+
+                            <td>{{ driver["BALANCE"] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <p id="no-drivers-message" style="display: none;">
+                No drivers match your search.
+            </p>
+        </section>
+
+        <a href="{{ url_for('adminDash') }}" class="back-link">
+            Back to Admin Dashboard
+        </a>
+
+    </main>
+
+    <!-- Driver information popup -->
+    <div id="driver-modal" class="modal">
+        <div class="modal-content">
+
+            <span class="close-button"
+                  onclick="closeDriverModal()">
+                &times;
+            </span>
+
+            <h2 id="driver-modal-title">Driver Information</h2>
+
+            <div class="modal-info">
+
+                <p>
+                    <strong>Driver ID:</strong>
+                    <span id="driver-modal-id"></span>
+                </p>
+
+                <p>
+                    <strong>Name:</strong>
+                    <span id="driver-modal-name"></span>
+                </p>
+
+                <p>
+                    <strong>Email:</strong>
+                    <span id="driver-modal-email"></span>
+                </p>
+
+                <p>
+                    <strong>Sponsor Company:</strong>
+                    <span id="driver-modal-company"></span>
+                </p>
+
+                <p>
+                    <strong>Point Balance:</strong>
+                    <span id="driver-modal-balance"></span>
+                </p>
+
+            </div>
+
+            <button
+                class="button"
+                type="button"
+                onclick="closeDriverModal()">
+                Close
+            </button>
+
+        </div>
+    </div>
+
+    <footer>
+
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+
+    </footer>
+
+    <script>
+        function filterDrivers() {
+            const searchInput = document
+                .getElementById("driver-search")
+                .value
+                .trim()
+                .toLowerCase();
+
+            const selectedCompany = document
+                .getElementById("driver-filter")
+                .value;
+
+            const rows = document.querySelectorAll(".driver-row");
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const name = row.dataset.name.toLowerCase();
+                const company = row.dataset.sponsor;
+
+                const matchesName = name.includes(searchInput);
+                const matchesCompany =
+                    selectedCompany === "all" ||
+                    company === selectedCompany;
+
+                if (matchesName && matchesCompany) {
+                    row.style.display = "";
+                    visibleCount++;
+                } else {
+                    row.style.display = "none";
+                }
+            });
+
+            document.getElementById("no-drivers-message")
+                .style.display =
+                    visibleCount === 0 ? "block" : "none";
+        }
+
+        function showDriver(
+            id,
+            firstName,
+            lastName,
+            email,
+            company,
+            balance
+        ) {
+            document.getElementById("driver-modal-title").textContent =
+                "Driver Information";
+
+            document.getElementById("driver-modal-id").textContent = id;
+            document.getElementById("driver-modal-name").textContent =
+                firstName + " " + lastName;
+            document.getElementById("driver-modal-email").textContent =
+                email;
+            document.getElementById("driver-modal-company").textContent =
+                company;
+            document.getElementById("driver-modal-balance").textContent =
+                balance;
+
+            document.getElementById("driver-modal").style.display = "flex";
+        }
+
+        function closeDriverModal() {
+            document.getElementById("driver-modal").style.display = "none";
+        }
+
+        // Close the popup when clicking outside its content.
+        document.getElementById("driver-modal").addEventListener(
+            "click",
+            function(event) {
+                if (event.target === this) {
+                    closeDriverModal();
+                }
+            }
+        );
+    </script>
+
+</body>
+</html>

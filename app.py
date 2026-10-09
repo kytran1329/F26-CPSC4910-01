@@ -691,7 +691,6 @@ def adminDash():
 
 @app.route("/admin/sponsors")
 def adminSponsors():
-# TODO: Retrieve sponsors from the database
     conn = mysql.connector.connect(
             host=DB_HOST,
             user=DB_USER,
@@ -751,8 +750,52 @@ def adminSponsors():
 
 @app.route("/admin/drivers")
 def adminDrivers():
-    # TODO: Retrieve drivers from the database
-    return render_template("adminDrivers.html")
+    conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME
+        )
+    cursor = conn.cursor(dictionary=True)
+    
+    # Get sponsor comps
+    cursor.execute("""
+            SELECT *
+            FROM SPONSORCOMP
+            ORDER BY SPONSORCOMP_NAME
+        """)
+    sponsor_companies = cursor.fetchall()
+    
+    # Get drivers
+    cursor.execute("""
+            SELECT
+                D.DRIVER_ID,
+                U.USER_ID,
+                U.USER_FNAME,
+                U.USER_LNAME,
+                U.EMAIL,
+                U.ROLE,
+                D.BALANCE,
+                SC.SPONSORCOMP_ID,
+                SC.SPONSORCOMP_NAME
+            FROM DRIVER D
+            INNER JOIN USER U
+                ON D.USER_ID = U.USER_ID
+            INNER JOIN SPONSORCOMP SC
+                ON D.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+            ORDER BY U.USER_LNAME, U.USER_FNAME
+        """)
+    
+    drivers = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+    
+    return render_template(
+        'adminDrivers.html',
+        drivers=drivers,
+        sponsor_companies=sponsor_companies
+    )
 
 
 @app.route("/admin/reports")

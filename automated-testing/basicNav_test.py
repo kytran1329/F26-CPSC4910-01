@@ -1,8 +1,12 @@
+import os
 import pytest
+from dotenv import load_dotenv
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+
+load_dotenv()
 
 # If anyone has to add any more tests, make sure that ALL test files end in "_test.py" 
 # and ALL tests start with "test_"
@@ -23,8 +27,8 @@ def test_about_link():
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
 
-    username_field.send_keys("lukeskywalker@gmail.com")
-    password_field.send_keys("T-16Skyhopper")
+    username_field.send_keys(os.getenv("DRIVER_USER"))
+    password_field.send_keys(os.getenv("DRIVER_PASSWORD"))
 
     button = driver.find_element(By.XPATH, "//button[text()='Login']")
     button.click()
@@ -47,8 +51,8 @@ def test_catalog_link():
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
     
-    username_field.send_keys("lukeskywalker@gmail.com")
-    password_field.send_keys("T-16Skyhopper")
+    username_field.send_keys(os.getenv("DRIVER_USER"))
+    password_field.send_keys(os.getenv("DRIVER_PASSWORD"))
     
     button = driver.find_element(By.XPATH, "//button[text()='Login']")
     button.click()
