@@ -601,8 +601,8 @@ def sponDash():
 def adminDash():
 
     # dont allows the page to be accessed unless someone is logged in
-    # if "user_id" not in session:
-    #     return redirect(url_for("login"))
+    if "user_id" not in session:
+        return redirect(url_for("login"))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -612,6 +612,17 @@ def adminDash():
     )
 
     cursor = conn.cursor(dictionary=True)
+
+    user_id = session["user_id"]
+    cursor.execute(
+            "SELECT ROLE FROM USER WHERE USER_ID = %s",
+            (user_id,)
+        )
+        
+    user = cursor.fetchone()
+    
+    if not user or user['ROLE'] != 'Admin':
+        return redirect(url_for('login'))
 
     # Get sponsor comps
     cursor.execute("""
@@ -689,8 +700,11 @@ def adminDash():
         sponsor_companies=sponsor_companies
     )
 
-@app.route("/admin/sponsors")
+@app.route("/adminDash/sponsors")
 def adminSponsors():
+    if "user_id" not in session:
+            return redirect(url_for("login"))
+    
     conn = mysql.connector.connect(
             host=DB_HOST,
             user=DB_USER,
@@ -698,6 +712,18 @@ def adminSponsors():
             database=DB_NAME
         )
     cursor = conn.cursor(dictionary=True)
+
+    user_id = session["user_id"]
+    cursor.execute(
+            "SELECT ROLE FROM USER WHERE USER_ID = %s",
+            (user_id,)
+        )
+    
+    user = cursor.fetchone()
+
+    if not user or user['ROLE'] != 'Admin':
+        return redirect(url_for('login'))
+
     cursor.execute("""
             SELECT
                 S.SPONSOR_ID,
@@ -748,19 +774,34 @@ def adminSponsors():
         )
 
 
-@app.route("/admin/drivers")
+@app.route("/adminDash/drivers")
 def adminDrivers():
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    
     conn = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
         )
     cursor = conn.cursor(dictionary=True)
+
+    user_id = session["user_id"]
+    cursor.execute(
+            "SELECT ROLE FROM USER WHERE USER_ID = %s",
+            (user_id,)
+        )
+        
+    user = cursor.fetchone()
+    
+    if not user or user['ROLE'] != 'Admin':
+        return redirect(url_for('login'))
     
     # Get sponsor comps
     cursor.execute("""
-            SELECT *
+        SELECT *
             FROM SPONSORCOMP
             ORDER BY SPONSORCOMP_NAME
         """)
@@ -798,8 +839,32 @@ def adminDrivers():
     )
 
 
-@app.route("/admin/reports")
+@app.route("/adminDash/reports")
 def adminReports():
+
+    if "user_id" not in session:
+            return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME
+            )
+    cursor = conn.cursor(dictionary=True)
+    
+    
+    user_id = session["user_id"]
+    cursor.execute(
+            "SELECT ROLE FROM USER WHERE USER_ID = %s",
+            (user_id,)
+        )
+        
+    user = cursor.fetchone()
+
+    if not user or user['ROLE'] != 'Admin':
+        return redirect(url_for('login'))
+    
     return render_template("adminReports.html")
 
 if __name__ == "__main__":
