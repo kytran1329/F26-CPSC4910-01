@@ -654,12 +654,26 @@ def adminDash():
             U.EMAIL,
             U.ROLE,
             SC.SPONSORCOMP_ID,
-            SC.SPONSORCOMP_NAME
+            SC.SPONSORCOMP_NAME,
+            COALESCE(PC.POINTS_AWARDED, 0) AS POINTS_AWARDED
         FROM SPONSOR S
         INNER JOIN USER U
             ON S.USER_ID = U.USER_ID
         INNER JOIN SPONSORCOMP SC
             ON S.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+        LEFT JOIN ( 
+            SELECT
+                USER_ID, 
+                SUM( 
+                    CASE 
+                        WHEN POINTCHANGE_AMOUNT > 0 
+                        THEN POINTCHANGE_AMOUNT 
+                        ELSE 0 
+                    END 
+                ) AS POINTS_AWARDED 
+            FROM POINTCHANGES 
+            GROUP BY USER_ID 
+        ) PC ON PC.USER_ID = U.USER_ID
         ORDER BY U.USER_LNAME, U.USER_FNAME
     """)
 
@@ -674,6 +688,76 @@ def adminDash():
         sponsors=sponsors,
         sponsor_companies=sponsor_companies
     )
+
+@app.route("/admin/sponsors")
+def adminSponsors():
+# TODO: Retrieve sponsors from the database
+    conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME
+        )
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+            SELECT
+                S.SPONSOR_ID,
+                U.USER_ID,
+                U.USER_FNAME,
+                U.USER_LNAME,
+                U.EMAIL,
+                SC.SPONSORCOMP_ID,
+                SC.SPONSORCOMP_NAME,
+                COALESCE(PC.POINTS_AWARDED, 0) AS POINTS_AWARDED
+            FROM SPONSOR S
+            JOIN USER U
+                ON S.USER_ID = U.USER_ID
+            JOIN SPONSORCOMP SC
+                ON S.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+            LEFT JOIN (
+                SELECT
+                    USER_ID,
+                    SUM(
+                        CASE
+                            WHEN POINTCHANGE_AMOUNT > 0
+                            THEN POINTCHANGE_AMOUNT
+                            ELSE 0
+                        END
+                    ) AS POINTS_AWARDED
+                FROM POINTCHANGES
+                GROUP BY USER_ID
+            ) PC
+                ON PC.USER_ID = U.USER_ID
+            ORDER BY U.USER_LNAME, U.USER_FNAME
+        """)
+    sponsors = cursor.fetchall()
+    
+    cursor.execute("""
+            SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+            FROM SPONSORCOMP
+            ORDER BY SPONSORCOMP_NAME
+        """)
+    sponsor_companies = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    
+    return render_template(
+            "adminSponsors.html",
+            sponsors=sponsors,
+            sponsor_companies=sponsor_companies
+        )
+
+
+@app.route("/admin/drivers")
+def adminDrivers():
+    # TODO: Retrieve drivers from the database
+    return render_template("adminDrivers.html")
+
+
+@app.route("/admin/reports")
+def adminReports():
+    return render_template("adminReports.html")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
