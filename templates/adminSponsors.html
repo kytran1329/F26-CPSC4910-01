@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Sponsors</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='/adminDash.css') }}">
+</head>
+
+<body>
+
+    <header class="dashboard-header">
+        <div class="header-content">
+            <div>
+                <h1 class="dashboard-name">Manage Sponsors</h1>
+                <p class="tagline">Good Driving. Better Rewards.</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="admin-page">
+
+        <section class="admin-card">
+            <h2>Sponsors</h2>
+
+            <!-- Search and filter controls -->
+            <div class="filter-container">
+
+                <label for="sponsor-search">Search by Name:</label>
+                <input
+                    type="text"
+                    id="sponsor-search"
+                    placeholder="Enter first or last name..."
+                    oninput="filterSponsors()"
+                >
+
+                <label for="sponsor-filter">
+                    Filter by Sponsor Company:
+                </label>
+
+                <select id="sponsor-filter"
+                        onchange="filterSponsors()">
+
+                    <option value="all">All Sponsor Companies</option>
+
+                    {% for company in sponsor_companies %}
+                    <option value="{{ company['SPONSORCOMP_ID'] }}">
+                        {{ company['SPONSORCOMP_NAME'] }}
+                    </option>
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <!-- Sponsor table -->
+            <div class="table-container">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Sponsor ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Sponsor Company</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for sponsor in sponsors %}
+                        <tr
+                            class="sponsor-row"
+                            data-name="{{ sponsor['USER_FNAME'] }} {{ sponsor['USER_LNAME'] }}"
+                            data-sponsor="{{ sponsor['SPONSORCOMP_ID'] }}"
+                            onclick="showSponsor(
+                                '{{ sponsor['SPONSOR_ID'] }}',
+                                '{{ sponsor['USER_FNAME'] }}',
+                                '{{ sponsor['USER_LNAME'] }}',
+                                '{{ sponsor['EMAIL'] }}',
+                                '{{ sponsor['SPONSORCOMP_NAME'] }}',
+                                '{{ sponsor['POINTS_AWARDED'] }}'
+                            )">
+
+                            <td>{{ sponsor["SPONSOR_ID"] }}</td>
+
+                            <td>
+                                {{ sponsor["USER_FNAME"] }}
+                                {{ sponsor["USER_LNAME"] }}
+                            </td>
+
+                            <td>{{ sponsor["EMAIL"] }}</td>
+
+                            <td>{{ sponsor["SPONSORCOMP_NAME"] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <p id="no-sponsors-message" style="display: none;">
+                No sponsors match your search.
+            </p>
+        </section>
+
+        <a href="{{ url_for('adminDash') }}" class="back-link">
+            Back to Admin Dashboard
+        </a>
+
+    </main>
+
+    <!-- Sponsor information popup -->
+    <div id="user-modal" class="modal">
+
+        <div class="modal-content">
+
+            <span class="close-button"
+                  onclick="closeModal()">
+                &times;
+            </span>
+
+
+            <h2 id="modal-title">
+                Information
+            </h2>
+
+
+            <div class="modal-info">
+
+                <!-- ID -->
+                <p>
+                    <strong>ID:</strong>
+                    <span id="modal-id"></span>
+                </p>
+
+
+                <!-- Name -->
+                <p id="modal-name-container">
+
+                    <strong>Name:</strong>
+
+                    <span id="modal-name"></span>
+
+                </p>
+
+
+                <!-- Email -->
+                <p id="modal-email-container">
+
+                    <strong>Email:</strong>
+
+                    <span id="modal-email"></span>
+
+                </p>
+
+
+                <!-- Sponsor Company -->
+                <p id="modal-company-container">
+
+                    <strong>Sponsor Company:</strong>
+
+                    <span id="modal-company"></span>
+
+                </p>
+                
+                <!-- Points Awarded by Sponsor -->
+                <p id="modal-awarded-container">
+                    <strong>Total Points Awarded:</strong>
+                    <span id="modal-awarded"></span>
+                </p>
+
+            </div>
+
+
+            <button
+                class="button"
+                type="button"
+                onclick="closeModal()">
+
+                Close
+
+            </button>
+
+        </div>
+
+    </div>
+
+    <footer>
+
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+
+    </footer>
+
+    <script>
+        function filterSponsors() {
+            const searchInput = document
+                .getElementById("sponsor-search")
+                .value
+                .trim()
+                .toLowerCase();
+
+            const selectedCompany = document
+                .getElementById("sponsor-filter")
+                .value;
+
+            const rows = document.querySelectorAll(".sponsor-row");
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const name = row.dataset.name.toLowerCase();
+                const company = row.dataset.sponsor;
+
+                const matchesName = name.includes(searchInput);
+                const matchesCompany =
+                    selectedCompany === "all" ||
+                    company === selectedCompany;
+
+                if (matchesName && matchesCompany) {
+                    row.style.display = "";
+                    visibleCount++;
+                } else {
+                    row.style.display = "none";
+                }
+            });
+
+            document.getElementById("no-sponsors-message")
+                .style.display = visibleCount === 0 ? "block" : "none";
+        }
+
+        function showSponsor(
+            id,
+            firstName,
+            lastName,
+            email,
+            company,
+            pointsAwarded
+        ) {
+            document.getElementById("modal-title").textContent =
+                "Sponsor Information";
+
+            document.getElementById("modal-id").textContent = id;
+            document.getElementById("modal-name").textContent =
+                firstName + " " + lastName;
+            document.getElementById("modal-email").textContent = email;
+            document.getElementById("modal-company").textContent = company;
+            document.getElementById("modal-awarded").textContent =
+                pointsAwarded;
+
+            document.getElementById("user-modal").style.display = "flex";
+        }
+
+        function closeModal() {
+            document.getElementById("user-modal").style.display = "none";
+        }
+
+        // Close the popup when clicking outside its content.
+        document.getElementById("user-modal").addEventListener(
+            "click",
+            function(event) {
+                if (event.target === this) {
+                    closeModal();
+                }
+            }
+        );
+    </script>
+
+</body>
+</html>

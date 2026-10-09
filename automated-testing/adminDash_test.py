@@ -1,8 +1,12 @@
+import os
 import pytest
+from dotenv import load_dotenv
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+
+load_dotenv()
 
 def test_admin_login():
     driver = webdriver.Chrome()
@@ -13,8 +17,8 @@ def test_admin_login():
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
         
-    username_field.send_keys("chosenone@gmail.com")
-    password_field.send_keys("Padme")
+    username_field.send_keys(os.getenv("ADMIN_USER"))
+    password_field.send_keys(os.getenv("ADMIN_PASSWORD"))
         
     button = driver.find_element(By.XPATH, "//button[text()='Login']")
     button.click()
@@ -32,8 +36,8 @@ def test_admin_dashboard_loads():
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
             
-    username_field.send_keys("chosenone@gmail.com")
-    password_field.send_keys("Padme")
+    username_field.send_keys(os.getenv("ADMIN_USER"))
+    password_field.send_keys(os.getenv("ADMIN_PASSWORD"))
             
     button = driver.find_element(By.XPATH, "//button[text()='Login']")
     button.click()
@@ -51,8 +55,8 @@ def test_admin_dashboard_drivers():
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
                 
-    username_field.send_keys("chosenone@gmail.com")
-    password_field.send_keys("Padme")
+    username_field.send_keys(os.getenv("ADMIN_USER"))
+    password_field.send_keys(os.getenv("ADMIN_PASSWORD"))
                 
     button = driver.find_element(By.XPATH, "//button[text()='Login']")
     button.click()
@@ -70,8 +74,8 @@ def test_admin_dashboard_sponsor_companies():
     username_field = driver.find_element(By.NAME, "username")
     password_field = driver.find_element(By.NAME, "password")
                 
-    username_field.send_keys("chosenone@gmail.com")
-    password_field.send_keys("Padme")
+    username_field.send_keys(os.getenv("ADMIN_USER"))
+    password_field.send_keys(os.getenv("ADMIN_PASSWORD"))
             
     button = driver.find_element(By.XPATH, "//button[text()='Login']")
     button.click()

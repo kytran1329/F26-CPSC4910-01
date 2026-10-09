@@ -40,6 +40,8 @@
 
     <!-- Main Content -->
     <main>
+    <div class="admin-layout">
+    <div class="admin-tables">
         <!-- SPONSOR COMPANIES -->
         <section class="admin-card">
 
@@ -166,7 +168,8 @@
                                 '{{ sponsor['USER_FNAME'] }}',
                                 '{{ sponsor['USER_LNAME'] }}',
                                 '{{ sponsor['EMAIL'] }}',
-                                '{{ sponsor['SPONSORCOMP_NAME'] }}'
+                                '{{ sponsor['SPONSORCOMP_NAME'] }}',
+                                '{{ sponsor['POINTS_AWARDED'] }}'
                             )">
 
                             <td>
@@ -297,14 +300,33 @@
             </div>
 
         </section>
+        </div>
 
+        <!-- New right-side navigation -->
+        <aside class="admin-sidebar">
+            <h2>Admin Tools</h2>
+
+            <a href="{{ url_for('adminSponsors') }}"
+            class="admin-nav-button">
+                Sponsors
+            </a>
+
+            <a href="{{ url_for('adminDrivers') }}"
+            class="admin-nav-button">
+                Drivers
+            </a>
+
+            <a href="{{ url_for('adminReports') }}"
+            class="admin-nav-button">
+                Reports
+            </a>
+        </aside>
+        </div>
 
         <!-- Back -->
         <a href="{{ url_for('home') }}" class="back-link">
             Back to Home
         </a>
-
-
     </main>
 
 
@@ -390,6 +412,12 @@
 
                     <span id="modal-point"></span>
 
+                </p>
+                
+                <!-- Points Awarded by Sponsor -->
+                <p id="modal-awarded-container">
+                    <strong>Total Points Awarded:</strong>
+                    <span id="modal-awarded"></span>
                 </p>
 
             </div>
@@ -532,6 +560,9 @@
             document.getElementById("modal-point-container")
                 .style.display = "none";
 
+            document.getElementById("modal-awarded-container")
+                .style.display = "none";
+
 
             // Show popup
             document.getElementById("user-modal")
@@ -546,7 +577,8 @@
             firstName,
             lastName,
             email,
-            company
+            company,
+            pointsAwarded
         ) {
 
             // Popup title
@@ -567,6 +599,8 @@
             document.getElementById("modal-company")
                 .textContent = company;
 
+            document.getElementById("modal-awarded")
+                .textContent = pointsAwarded;
 
             // Show sponsor fields
             document.getElementById("modal-name-container")
@@ -576,6 +610,9 @@
                 .style.display = "block";
 
             document.getElementById("modal-company-container")
+                .style.display = "block";
+
+            document.getElementById("modal-awarded-container")
                 .style.display = "block";
 
 
@@ -647,6 +684,9 @@
                 .style.display = "none";
 
             document.getElementById("modal-points-container")
+                .style.display = "none";
+
+            document.getElementById("modal-awarded-container")
                 .style.display = "none";
 
 
