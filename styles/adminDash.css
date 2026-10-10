@@ -387,6 +387,18 @@ h2 {
     min-width: 220px;
 }
 
+#company-search,
+#company-filter {
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+#company-search {
+    min-width: 220px;
+}
+
 .modal-close {
     float: right;
     border: none;

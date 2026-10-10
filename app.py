@@ -758,7 +758,7 @@ def adminSponsors():
     sponsors = cursor.fetchall()
     
     cursor.execute("""
-            SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+            SELECT *
             FROM SPONSORCOMP
             ORDER BY SPONSORCOMP_NAME
         """)

@@ -21,6 +21,60 @@
 
     <main class="admin-page">
 
+        <!-- Search and filter controls -->
+        <section class="admin-card">
+            <h2>Manage Sponsors</h2>
+
+            <!-- Sponsor Companies table -->
+        <section class="admin-card">
+            <h2>Sponsor Companies</h2>
+
+            <div class="filter-container">
+                <label for="company-search">Search by Name:</label>
+                <input
+                    type="text"
+                    id="company-search"
+                    placeholder="Enter company name..."
+                    oninput="filterSponsorCompanies()"
+                >
+            </div>
+
+            <div class="table-container">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Company ID</th>
+                            <th>Company Name</th>
+                            <th>Dollars</th>
+                            <th>Points</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for company in sponsor_companies %}
+                        <tr
+                            class="company-row"
+                            onclick="showSponsorCompany(
+                                '{{ company['SPONSORCOMP_ID'] }}',
+                                '{{ company['SPONSORCOMP_NAME'] }}',
+                                '{{ company['SPONSORCOMP_DOLLAR'] }}',
+                                '{{ company['SPONSORCOMP_POINT'] }}'
+                            )"
+                        >
+                            <td>{{ company["SPONSORCOMP_ID"] }}</td>
+                            <td>{{ company["SPONSORCOMP_NAME"] }}</td>
+                            <td>${{ company["SPONSORCOMP_DOLLAR"] }}</td>
+                            <td>{{ company["SPONSORCOMP_POINT"] }} points</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p id="no-companies-message" style="display: none;">
+                No sponsor companies match your search.
+            </p>
+        </section>
+
         <section class="admin-card">
             <h2>Sponsors</h2>
 
@@ -101,6 +155,7 @@
                 No sponsors match your search.
             </p>
         </section>
+        </section>
 
         <a href="{{ url_for('adminDash') }}" class="back-link">
             Back to Admin Dashboard
@@ -168,6 +223,18 @@
                     <span id="modal-awarded"></span>
                 </p>
 
+                <!-- Sponsor Company Dollar -->
+                <p id="modal-dollar-container" style="display: none;">
+                    <strong>Dollar Value:</strong>
+                    <span id="modal-dollar"></span>
+                </p>
+
+                <!-- Sponsor Company Point -->
+                <p id="modal-point-container" style="display: none;">
+                    <strong>Point Value:</strong>
+                    <span id="modal-point"></span>
+                </p>
+
             </div>
 
 
@@ -191,6 +258,36 @@
     </footer>
 
     <script>
+
+        // SPONSOR COMPANY SEARCH
+        function filterSponsorCompanies() {
+            const searchInput = document
+                .getElementById("company-search")
+                .value
+                .trim()
+                .toLowerCase();
+
+            const rows = document.querySelectorAll(".company-row");
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const companyName = row.cells[1]
+                    .textContent
+                    .trim()
+                    .toLowerCase();
+
+                if (companyName.includes(searchInput)) {
+                    row.style.display = "";
+                    visibleCount++;
+                } else {
+                    row.style.display = "none";
+                }
+            });
+
+            document.getElementById("no-companies-message").style.display =
+                visibleCount === 0 ? "block" : "none";
+        }
+
         function filterSponsors() {
             const searchInput = document
                 .getElementById("sponsor-search")
@@ -226,6 +323,64 @@
                 .style.display = visibleCount === 0 ? "block" : "none";
         }
 
+        // SPONSOR COMPANY POPUP
+        function showSponsorCompany(
+            id,
+            name,
+            dollar,
+            point
+        ) {
+
+            // Popup title
+            document.getElementById("modal-title")
+                .textContent = "Sponsor Company";
+
+
+            // Company information
+            document.getElementById("modal-id")
+                .textContent = id;
+
+            document.getElementById("modal-name")
+                .textContent = name;
+
+            document.getElementById("modal-dollar")
+                .textContent = dollar;
+
+            document.getElementById("modal-point")
+                .textContent = point;
+
+
+            // Show company name
+            document.getElementById("modal-name-container")
+                .style.display = "block";
+
+
+            // Show company-specific fields
+            document.getElementById("modal-dollar-container")
+                .style.display = "block";
+
+            document.getElementById("modal-point-container")
+                .style.display = "block";
+
+
+            // Hide user-specific fields
+            document.getElementById("modal-email-container")
+                .style.display = "none";
+
+            document.getElementById("modal-company-container")
+                .style.display = "none";
+
+            document.getElementById("modal-awarded-container")
+                .style.display = "none";
+
+
+            // Show popup
+            document.getElementById("user-modal")
+                .style.display = "flex";
+
+        }
+
+        // SPONSOR POPUP
         function showSponsor(
             id,
             firstName,
@@ -234,18 +389,53 @@
             company,
             pointsAwarded
         ) {
-            document.getElementById("modal-title").textContent =
-                "Sponsor Information";
 
-            document.getElementById("modal-id").textContent = id;
-            document.getElementById("modal-name").textContent =
-                firstName + " " + lastName;
-            document.getElementById("modal-email").textContent = email;
-            document.getElementById("modal-company").textContent = company;
-            document.getElementById("modal-awarded").textContent =
-                pointsAwarded;
+            // Popup title
+            document.getElementById("modal-title")
+                .textContent = "Sponsor Information";
 
-            document.getElementById("user-modal").style.display = "flex";
+
+            // Sponsor information
+            document.getElementById("modal-id")
+                .textContent = id;
+
+            document.getElementById("modal-name")
+                .textContent = firstName + " " + lastName;
+
+            document.getElementById("modal-email")
+                .textContent = email;
+
+            document.getElementById("modal-company")
+                .textContent = company;
+
+            document.getElementById("modal-awarded")
+                .textContent = pointsAwarded;
+
+            // Show sponsor fields
+            document.getElementById("modal-name-container")
+                .style.display = "block";
+
+            document.getElementById("modal-email-container")
+                .style.display = "block";
+
+            document.getElementById("modal-company-container")
+                .style.display = "block";
+
+            document.getElementById("modal-awarded-container")
+                .style.display = "block";
+
+            // Hide company-specific fields
+            document.getElementById("modal-dollar-container")
+                .style.display = "none";
+
+            document.getElementById("modal-point-container")
+                .style.display = "none";
+
+
+            // Show popup
+            document.getElementById("user-modal")
+                .style.display = "flex";
+
         }
 
         function closeModal() {
