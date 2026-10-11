@@ -235,8 +235,7 @@ footer {
     min-width: 145px;
     white-space: nowrap;
 }
-.view-driver-btn,
-.return-sponsor-btn {
+.view-driver-btn{
     display: inline-block;
     background: #245c43;
     color: #ffffff;
@@ -249,27 +248,6 @@ footer {
     text-decoration: none;
 }
 
-.view-driver-btn:hover,
-.return-sponsor-btn:hover {
+.view-driver-btn:hover{
     background: #194832;
-}
-
-.view-driver-btn:focus-visible,
-.return-sponsor-btn:focus-visible,
-.logout-button:focus-visible,
-.back-link:focus-visible {
-    outline: 3px solid #e0a83e;
-    outline-offset: 3px;
-}
-
-.back-link {
-    display: inline-block;
-    margin-top: 28px;
-    color: #245c43;
-    font-weight: 600;
-    text-decoration: none;
-}
-
-.back-link:hover {
-    text-decoration: underline;
 }
