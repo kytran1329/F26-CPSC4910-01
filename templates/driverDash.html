@@ -228,22 +228,6 @@
             </a>
 
         </div>
-        {% if session.get('ROLE') == 'Sponsor'
-        and session.get('view_as_driver_id') %}
-
-        <div class="sponsor-view-banner">
-            <p>You are viewing this dashboard as a sponsor.</p>
-
-            <form action="{{ url_for('stopViewingAsDriver') }}"
-                method="POST">
-                <button type="submit" class="return-sponsor-btn">
-                    Return to Sponsor Dashboard
-                </button>
-            </form>
-        </div>
-
-{% endif %}
-
     </main>
 
 

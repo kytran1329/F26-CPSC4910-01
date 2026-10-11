@@ -273,16 +273,3 @@ footer {
 .back-link:hover {
     text-decoration: underline;
 }
-.sponsor-view-banner {
-    margin: 18px 0;
-    padding: 16px 18px;
-    border: 1px solid #b8d3c1;
-    border-left: 5px solid #245c43;
-    border-radius: 8px;
-    background: #f0f6f2;
-}
-
-.sponsor-view-banner p {
-    margin: 0 0 12px;
-}
-
