@@ -251,3 +251,28 @@ footer {
 .view-driver-btn:hover{
     background: #194832;
 }
+
+
+.return-dashboard-button {
+    display: inline-block;
+    background-color: #245c43;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    margin-right: 10px;
+    transition: background-color 0.2s ease;
+}
+
+.return-dashboard-button:hover {
+    background-color: #194832;
+}
+
+.return-dashboard-button:focus-visible {
+    outline: 2px solid #245c43;
+    outline-offset: 3px;
+}

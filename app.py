@@ -170,11 +170,14 @@ def driverDash():
         return redirect(url_for("login"))
 
     # A sponsor may view a selected driver's dashboard
-    if session.get("role") == "Sponsor":
+    if session.get("role") in ("Sponsor","Admin"):
         driver_id = session.get("view_as_driver_id")
 
         if driver_id is None:
-            return redirect(url_for("sponDash"))
+            if session.get("role") == "Sponsor":
+                return redirect(url_for("sponDash"))
+            else:
+                return redirect(url_for("adminDash"))
         
         # Find the driver's USER_ID and confirm the sponsor owns them
         conn = mysql.connector.connect(
@@ -186,14 +189,23 @@ def driverDash():
         cursor = conn.cursor(dictionary=True)
 
         try:
-            cursor.execute("""
-                select d.USER_ID
-                from DRIVER as d
-                join SPONSOR as s
-                    on s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
-                where d.DRIVER_ID = %s
-                  and s.USER_ID = %s
-            """, (driver_id, session["user_id"]))
+            if session.get("role") == "Sponsor":
+                # Sponsors can only view drivers in their company.
+                cursor.execute("""
+                    SELECT d.DRIVER_ID, d.USER_ID
+                    FROM DRIVER AS d
+                    JOIN SPONSOR AS s
+                        ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                    WHERE d.DRIVER_ID = %s
+                      AND s.USER_ID = %s
+                """, (driver_id, session["user_id"]))
+            else:
+                # Admins can view any existing driver.
+                cursor.execute("""
+                    SELECT DRIVER_ID, USER_ID
+                    FROM DRIVER
+                    WHERE DRIVER_ID = %s
+                """, (driver_id,))
 
             driver = cursor.fetchone()
         finally:
@@ -915,7 +927,7 @@ def viewAsDriver(driver_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
 
-    if session.get("role") != "Sponsor":
+    if session.get("role") not in ("Sponsor", "Admin"):
         return "Unauthorized", 403
 
     conn = mysql.connector.connect(
@@ -927,15 +939,26 @@ def viewAsDriver(driver_id):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # Verify that this driver belongs to the sponsor's company
-        cursor.execute("""
-            SELECT d.DRIVER_ID
-            FROM DRIVER AS d
-            JOIN SPONSOR AS s
-                ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
-            WHERE d.DRIVER_ID = %s
-              AND s.USER_ID = %s
-        """, (driver_id, session["user_id"]))
+        print(session.get("role"))
+        print("Logged-in user ID:", session.get("user_id"))
+        print("Requested driver ID:", driver_id)
+        if session.get("role") == "Sponsor":
+            # Sponsors can only view drivers in their company.
+            cursor.execute("""
+                SELECT d.DRIVER_ID
+                FROM DRIVER AS d
+                JOIN SPONSOR AS s
+                    ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                WHERE d.DRIVER_ID = %s
+                  AND s.USER_ID = %s
+            """, (driver_id, session["user_id"]))
+        else:
+            # Admins can view any existing driver.
+            cursor.execute("""
+                SELECT DRIVER_ID
+                FROM DRIVER
+                WHERE DRIVER_ID = %s
+            """, (driver_id,))
 
         driver = cursor.fetchone()
 
@@ -957,11 +980,14 @@ def stopViewingAsDriver():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
-    if session.get("role") != "Sponsor":
+    if session.get("role") not in ("Sponsor", "Admin"):
         return "Unauthorized", 403
 
     # Return the sponsor view
     session.pop("view_as_driver_id", None)
+
+    if session.get("role") == "Admin":
+        return redirect(url_for("adminDash"))
 
     return redirect(url_for("sponDash"))
 
