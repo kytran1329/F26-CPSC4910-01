@@ -166,22 +166,64 @@ def about():
 
 @app.route("/driverDash")
 def driverDash():
-    #Login check
-    # if "user_id" not in session:
-    #     return redirect(url_for("login"))
+    if "user_id" not in session:
+        return redirect(url_for("login"))
 
-    user_id = session["user_id"]
+    # A sponsor may view a selected driver's dashboard
+    if session.get("role") == "Sponsor":
+        driver_id = session.get("view_as_driver_id")
+
+        if driver_id is None:
+            return redirect(url_for("sponDash"))
+        
+        # Find the driver's USER_ID and confirm the sponsor owns them
+        conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME
+        )
+        cursor = conn.cursor(dictionary=True)
+
+        try:
+            cursor.execute("""
+                select d.USER_ID
+                from DRIVER as d
+                join SPONSOR as s
+                    on s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                where d.DRIVER_ID = %s
+                  and s.USER_ID = %s
+            """, (driver_id, session["user_id"]))
+
+            driver = cursor.fetchone()
+        finally:
+            cursor.close()
+            conn.close()
+        if driver is None:
+            session.pop("view_as_driver_id", None)
+            return "Driver not found or not authorized", 403
+
+        user_id = driver["USER_ID"]
+
+
+    elif session.get("role") == "Driver":
+        user_id = session["user_id"]
+
+    else:
+        return "Unauthorized", 403
+    
+    #new connection
 
     conn = mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password= DB_PASSWORD,
-        database= DB_NAME
-        )
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME
+            )
     cursor = conn.cursor(dictionary=True)
-    
         #query gets driver info
-    cursor.execute("""select
+    try:
+        cursor.execute("""select
                         d.DRIVER_ID,
                         u.USER_ID,
                         u.USER_FNAME,
@@ -194,46 +236,47 @@ def driverDash():
                         on u.USER_ID = d.USER_ID
                     where d.USER_ID  = %s""", (user_id,))
         
-    drive_info = cursor.fetchone()
-    if drive_info is None:
+        drive_info = cursor.fetchone()
+        if drive_info is None:
+            return "Driver account not found", 404
+        
+        #point history
+        cursor.execute("""
+            select
+                pc.POINTCHANGE_ID,
+                pc.POINTCHANGE_AMOUNT,
+                pc.POINTCHANGE_REASON,
+                pc.DTS
+            from POINTCHANGES as pc
+            where pc.USER_ID =  %s
+            order by pc.DTS desc;
+                """, (user_id,))
+
+        history = cursor.fetchall()
+
+        #order and status
+        cursor.execute("""
+            select 
+                ORDER_ID,
+                DRIVER_ID,
+                POINT_TOTAL,
+                ORDER_STATUS,
+                ORDER_DTS
+            from ORDERS
+            WHERE DRIVER_ID = %s
+            order by ORDER_DTS DESC;
+                """, (drive_info["DRIVER_ID"],))
+
+        order_stat = cursor.fetchall()
+
         cursor.close()
         conn.close()
-        return "Driver account not found", 404
-    
-    #point history
-    cursor.execute("""
-        select
-            pc.POINTCHANGE_ID,
-            pc.POINTCHANGE_AMOUNT,
-            pc.POINTCHANGE_REASON,
-            pc.DTS
-        from POINTCHANGES as pc
-        where pc.USER_ID =  %s
-        order by pc.DTS desc;
-            """, (user_id,))
-
-    history = cursor.fetchall()
-
-    #order and status
-    cursor.execute("""
-        select 
-            ORDER_ID,
-            DRIVER_ID,
-            POINT_TOTAL,
-            ORDER_STATUS,
-            ORDER_DTS
-        from ORDERS
-        WHERE DRIVER_ID = %s
-        order by ORDER_DTS DESC;
-            """, (drive_info["DRIVER_ID"],))
-
-    order_stat = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-    #print(drive_info)
-    return render_template("driverDash.html", drive_info = drive_info,
-                           history= history, order_stat = order_stat)
+        #print(drive_info)
+        return render_template("driverDash.html", drive_info = drive_info,
+                            history= history, order_stat = order_stat)
+    finally: 
+        cursor.close()
+        conn.close()
 
 @app.route("/catalog", methods=["GET", "POST"])
 def catalog():
@@ -866,6 +909,61 @@ def adminReports():
         return redirect(url_for('login'))
     
     return render_template("adminReports.html")
+
+@app.route("/viewAsDriver/<int:driver_id>", methods=["POST"])
+def viewAsDriver(driver_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("role") != "Sponsor":
+        return "Unauthorized", 403
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # Verify that this driver belongs to the sponsor's company
+        cursor.execute("""
+            SELECT d.DRIVER_ID
+            FROM DRIVER AS d
+            JOIN SPONSOR AS s
+                ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+            WHERE d.DRIVER_ID = %s
+              AND s.USER_ID = %s
+        """, (driver_id, session["user_id"]))
+
+        driver = cursor.fetchone()
+
+        if driver is None:
+            return "Driver not found or not authorized", 403
+
+        # save the driver being viewed without changing sponsor login
+        session["view_as_driver_id"] = driver_id
+
+        return redirect(url_for("driverDash"))
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.route("/stopViewingAsDriver", methods=["POST"])
+def stopViewingAsDriver():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("role") != "Sponsor":
+        return "Unauthorized", 403
+
+    # Return the sponsor view
+    session.pop("view_as_driver_id", None)
+
+    return redirect(url_for("sponDash"))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
