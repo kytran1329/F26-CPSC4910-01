@@ -67,6 +67,7 @@
                             <th>Email</th>
                             <th>Sponsor Company</th>
                             <th>Point Balance</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
 
@@ -97,6 +98,23 @@
                             <td>{{ driver["SPONSORCOMP_NAME"] }}</td>
 
                             <td>{{ driver["BALANCE"] }}</td>
+
+                            <td class="actions-cell" onclick="event.stopPropagation();">
+                                <form
+                                    action="{{ url_for('viewAsDriver', driver_id=driver['DRIVER_ID']) }}"
+                                    method="POST"
+                                    onsubmit="return confirmViewAsDriver(
+                                        '{{ driver['USER_FNAME'] | e }}',
+                                        '{{ driver['USER_LNAME'] | e }}'
+                                    );">
+
+                                    <button type="submit" class="view-driver-btn">
+                                        View as Driver
+                                    </button>
+
+                                </form>
+                            </td>
+
                         </tr>
                         {% endfor %}
                     </tbody>

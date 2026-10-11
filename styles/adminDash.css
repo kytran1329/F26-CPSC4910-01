@@ -406,3 +406,47 @@ h2 {
     font-size: 28px;
     cursor: pointer;
 }
+
+/* Driver table rows */
+.driver-row {
+    cursor: pointer;
+}
+
+.driver-row:hover {
+    cursor: pointer;
+}
+
+/* Expanded driver summary */
+.driver-summary {
+    background-color: #f4f6f8;
+}
+
+.summary-content {
+    display: flex;
+    gap: 30px;
+    margin-top: 10px;
+    padding: 10px 0;
+}
+
+/* View as Driver button */
+.actions-cell {
+    min-width: 145px;
+    white-space: nowrap;
+}
+
+.view-driver-btn {
+    display: inline-block;
+    background: #245c43;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.view-driver-btn:hover {
+    background: #194832;
+}
