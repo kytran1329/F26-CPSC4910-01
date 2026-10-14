@@ -922,6 +922,34 @@ def adminReports():
     
     return render_template("adminReports.html")
 
+@app.route("/adminDash/audit")
+def adminAudit():
+
+    if "user_id" not in session:
+            return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME
+            )
+    cursor = conn.cursor(dictionary=True)
+    
+    
+    user_id = session["user_id"]
+    cursor.execute(
+            "SELECT ROLE FROM USER WHERE USER_ID = %s",
+            (user_id,)
+        )
+        
+    user = cursor.fetchone()
+
+    if not user or user['ROLE'] != 'Admin':
+        return redirect(url_for('login'))
+    
+    return render_template("adminAudit.html")
+
 @app.route("/viewAsDriver/<int:driver_id>", methods=["POST"])
 def viewAsDriver(driver_id):
     if "user_id" not in session:
