@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 import mysql.connector 
 import os
 from dotenv import load_dotenv
@@ -651,6 +651,172 @@ def sponDash():
         pending_applications=pending_applications,
         points_this_month=points_this_month
     )
+
+@app.route("/assignPoints", methods=["GET", "POST"])
+def assignPoints():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    
+    if session.get("role") != "Sponsor":
+        return "Unauthorized", 403
+
+    sponsor_user_id = session["user_id"]
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        if request.method == "POST":
+            driver_id_raw = request.form.get("driver_id", "")
+            action = request.form.get("action", "")
+            amount_raw = request.form.get("amount", "")
+            reason = request.form.get("reason", "").strip()
+
+            # validate the form before making database changes
+            try:
+                driver_id = int(driver_id_raw)
+                amount = int(amount_raw)
+            except (TypeError, ValueError):
+                flash("Enter a valid driver and a whole-number point amount.", "error")
+                return redirect(url_for("assignPoints"))
+
+            if amount <= 0:
+                flash("The point amount must be greater than zero.", "error")
+                return redirect(url_for("assignPoints"))
+            
+            if action not in ("add", "subtract"):
+                flash("Choose whether to add or subtract points.", "error")
+                return redirect(url_for("assignPoints"))
+
+            if not reason:
+                flash("Please enter a reason for the point change.", "error")
+                return redirect(url_for("assignPoints"))
+
+            # lock the driver's balance while checking and updating it
+            # condition to ensure the sponsor owns the driver
+            cursor.execute("""
+                SELECT d.DRIVER_ID, d.BALANCE
+                FROM DRIVER AS d
+                WHERE d.DRIVER_ID = %s
+                    AND EXISTS (
+                        SELECT 1
+                        FROM SPONSOR AS s
+                        WHERE s.USER_ID = %s
+                            AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                    )
+                FOR UPDATE
+                """, 
+                (driver_id, sponsor_user_id),
+            )
+            driver = cursor.fetchone()
+
+            if driver is None:
+                conn.rollback()
+                flash("That driver was not found or is not assigned to your company.", "error")
+                return redirect(url_for("assignPoints"))
+
+            current_balance = float(driver["BALANCE"] or 0)
+            signed_amount = amount if action == "add" else -amount
+            new_balance = current_balance + signed_amount
+
+            if new_balance < 0:
+                conn.rollback()
+                flash(f"This driver only has {current_balance:g} points. You cannot subtract {amount} points.", "error")
+                return redirect(url_for("assignPoints"))
+
+            cursor.execute(
+                "UPDATE DRIVER SET BALANCE = %s WHERE DRIVER_ID = %s",
+                (new_balance, driver_id),
+            )
+            cursor.execute("""
+                INSERT INTO POINTCHANGES
+                (DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON)
+                VALUES (%s, %s, %s)
+                """,
+                (driver_id, signed_amount, reason),
+            )
+            conn.commit()
+            flash(
+                f"Successfully {'added' if action == 'add' else 'subtracted'} {amount} points.",
+                "success",
+            )
+            return redirect(url_for("assignPoints"))
+
+        # list only drivers belonging to one of the logged-in sponsor's companies
+        cursor.execute("""
+            SELECT
+                d.DRIVER_ID,
+                d.USER_ID,
+                d.BALANCE,
+                d.SPONSORCOMP_ID,
+                u.USER_FNAME,
+                u.USER_LNAME,
+                u.EMAIL,
+                latest.POINTCHANGE_AMOUNT AS LAST_CHANGE_AMOUNT,
+                latest.POINTCHANGE_REASON AS LAST_CHANGE_REASON,
+                latest.DTS AS LAST_CHANGE_DTS
+            FROM DRIVER AS d
+            JOIN `USER` AS u ON u.USER_ID = d.USER_ID
+            LEFT JOIN POINTCHANGES AS latest
+                ON latest.POINTCHANGE_ID = (
+                    SELECT p.POINTCHANGE_ID
+                    FROM POINTCHANGES AS p
+                    WHERE p.DRIVER_ID = d.DRIVER_ID
+                    ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
+                    LIMIT 1
+                )
+            WHERE EXISTS (
+                SELECT 1
+                FROM SPONSOR AS s
+                WHERE s.USER_ID = %s
+                    AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+            )
+            ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
+            """,
+            (sponsor_user_id,),
+        )
+        drivers = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT
+                p.POINTCHANGE_ID,
+                p.DRIVER_ID,
+                p.POINTCHANGE_AMOUNT,
+                p.POINTCHANGE_REASON,
+                p.DTS,
+            FROM POINTCHANGES AS p
+            JOIN DRIVER AS d ON d.DRIVER_ID = p.DRIVER_ID
+            WHERE EXISTS (
+                SELECT 1
+                FROM SPONSOR AS s
+                WHERE s.USER_ID = %s
+                    AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+            )
+            ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
+            """,
+            (sponsor_user_id,),
+        )
+        history_rows = cursor.fetchall()
+
+        history_by_driver = {}
+        for change in history_rows:
+            history_by_driver.setdefault(change["DRIVER_ID"], []).append(change)
+
+        return render_template(
+            "assignPoints.html",
+            drivers=drivers,
+            history_by_driver=history_by_driver,
+        )
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 @app.route("/adminDash")
 def adminDash():
