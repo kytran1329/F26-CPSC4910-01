@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Assign Points</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='assignPoints.css') }}">
+</head>
+
+<body>
+    <header>
+        <div class="header-content">
+            <div class="dashboard-name">
+                Assign Points
+            </div>
+
+            <div class="tagline">
+                Reward good driving and explain every point change.
+            </div>
+
+            <a href="{{ url_for('sponDash') }}" class="return-dashboard-button">
+                Back to Sponsor Dashboard
+            </a>
+            <a href="{{ url_for('logout') }}" class="logout-button">
+                Logout
+            </a>
+    </header>
+
+    <main>
+        <section class="page-card">
+            <h1>Driver Points</h1>
+            <p class="intro">Add or subtract points for drivers in your company.  Point changes cannot reduce a driver's balance below zero.</p>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="notice {{ category }}" role="status">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% if drivers %}
+                <div class="table-container">
+                    <table class="drivers-table">
+                        <thead>
+                            <tr>
+                                <th>Driver</th>
+                                <th>Current Points</th>
+                                <th>Last Change</th>
+                                <th>Last Reason</th>
+                                <th>Change Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for driver in drivers %}
+                                <tr>
+                                    <td>
+                                        <button type="button" class="driver-name"
+                                            aria-expanded="false"
+                                            aria-controls="driver-info-{{ driver['DRIVER_ID'] }}"
+                                            onclick="toggleDriverInfo('{{ driver['DRIVER_ID'] }}', this)">
+                                            {{ driver['USER_FNAME'] }} {{ driver['USER_LNAME'] }}
+                                        </button>
+
+                                        <div class="driver-email">{{ driver['EMAIL'] }}</div>
+                                        <div id="driver-info-{{ driver['DRIVER_ID'] }}" class="driver-info" hidden>
+                                            <strong>Driver ID:</strong> {{ driver['DRIVER_ID'] }}<br>
+                                            <strong>Email:</strong> {{ driver['EMAIL'] }}<br>
+                                            <strong>Current balance:</strong> {{ driver['BALANCE'] }} points
+                                            <h3>Recent Point History</h3>
+                                            {% set changes = history_by_driver.get(driver['DRIVER_ID'], []) %}
+                                            {% if changes %}
+                                                <ul class="history-list">
+                                                {% for change in changes[:5] %}
+                                                    <li>
+                                                        <strong class="{% if change['POINTCHANGE_AMOUNT'] > 0 %}positive{% else %}negative{% endif %}">
+                                                            {% if change['POINTCHANGE_AMOUNT'] > 0 %}+{% endif %}{{ change['POINTCHANGE_AMOUNT'] }} points
+                                                        </strong>
+                                                        - {{ change['POINTCHANGE_REASON'] }}
+                                                        <span class="history-date">({{ change['DTS'] }})</span>
+                                                    </li>
+                                                {% endfor %}
+                                                </ul>
+                                            {% else %}
+                                                <p>No point changes recorded yet.</p>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+
+                                    <td class="balance">{{ driver['BALANCE'] }}</td>
+                                    <td>
+                                        {% if driver['LAST_CHANGE_DTS'] %}
+                                            {{ driver['LAST_CHANGE_DTS'] }}
+                                            <div class="small-detail">
+                                                {% if driver['LAST_CHANGE_AMOUNT'] > 0 %}+{% endif %}{{ driver['LAST_CHANGE_AMOUNT'] }} points
+                                            </div>
+                                        {% else %}
+                                            <span class="small-detail">No changes yet</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ driver['LAST_CHANGE_REASON'] or '-' }}</td>
+                                    <td>
+                                        <form class="change-form" method="POST" action="{{ url_for('assignPoints') }}">
+                                            <input type="hidden" name="driver_id" value="{{ driver['DRIVER_ID'] }}">
+                                            <label class="sr-only" for="amount-{{ driver['DRIVER_ID'] }}">Point amount for {{ driver['USER_FNAME'] }} {{ driver['USER_LNAME'] }}</label>
+                                            <input id="amount-{{ driver['DRIVER_ID'] }}" type="number" name="amount" min="1" step="1" required placeholder="Points">
+                                            <label class="sr-only" for="reason-{{ driver['DRIVER_ID'] }}">Reason for point change</label>
+                                            <input id="reason-{{ driver['DRIVER_ID'] }}" type="text" name="reason" maxlength="255" required placeholder="Reason for change">
+                                            <div class="change-buttons">
+                                                <button type="submit" name="action" value="add" class="add-button">+ Add</button>
+                                                <button type="submit" name="action" value="subtract" class="subtract-button">- Subtract</button>
+                                            </div>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p>No drivers are currently associated with your sponsor company.</p>
+            {% endif %}
+        </section>
+    </main>
+
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+    </footer>
+
+
+    <!-- JavaScript for clicking on a driver and getting more info -->
+    <script>
+
+        function toggleDriverInfo(driverId, button) {
+
+            const info = document.getElementById('driver-info-' + driverId);
+            const isOpen = !info.hidden;
+            info.hidden = isOpen;
+            button.setAttribute('aria-expanded', String(!isOpen));
+
+        }
+
+    </script>
+</body>
+</html>
