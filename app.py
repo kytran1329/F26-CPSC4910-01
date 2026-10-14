@@ -734,10 +734,10 @@ def assignPoints():
             )
             cursor.execute("""
                 INSERT INTO POINTCHANGES
-                (DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON)
-                VALUES (%s, %s, %s)
+                (DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON, USER_ID)
+                VALUES (%s, %s, %s, %s)
                 """,
-                (driver_id, signed_amount, reason),
+                (driver_id, signed_amount, reason, sponsor_user_id),
             )
             conn.commit()
             flash(
@@ -787,7 +787,7 @@ def assignPoints():
                 p.DRIVER_ID,
                 p.POINTCHANGE_AMOUNT,
                 p.POINTCHANGE_REASON,
-                p.DTS,
+                p.DTS
             FROM POINTCHANGES AS p
             JOIN DRIVER AS d ON d.DRIVER_ID = p.DRIVER_ID
             WHERE EXISTS (
