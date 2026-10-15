@@ -28,6 +28,15 @@
                 Good Driving. Better Rewards.
             </div>
 
+            {% if session.get("view_as_sponsor_id") is not none %}
+                <form action="{{ url_for('stopViewingAsSponsor') }}" method="POST"
+                    style="display: inline;">
+                    <button type="submit" class="return-dashboard-button">
+                        Return to Admin Dashboard
+                    </button>
+                </form>
+            {% endif %}
+
             <a href="{{ url_for('logout') }}" class="logout-button">
                 Logout
             </a>

@@ -529,7 +529,35 @@ def sponDash():
         )
     cursor = conn.cursor(dictionary=True)
 
-    sponsor_user_id = USER_ID
+    role = session.get("role")
+
+    # Determine which sponsor dashboard to display.
+    if role == "Sponsor":
+        sponsor_user_id = session["user_id"]
+
+    elif role == "Admin":
+        # Admins must select a sponsor first.
+        sponsor_user_id = session.get("view_as_sponsor_id")
+
+        if sponsor_user_id is None:
+            return redirect(url_for("adminDash"))
+
+    else:
+        return "Unauthorized", 403
+
+    if role == "Admin":
+        # Find the sponsor's company and sponsor record.
+        cursor.execute("""
+            SELECT USER_ID, SPONSOR_ID, SPONSORCOMP_ID
+            FROM SPONSOR
+            WHERE SPONSOR_ID = %s
+        """, (sponsor_user_id,))
+
+        sponsor = cursor.fetchone()
+
+        if sponsor is None:
+            session.pop("view_as_sponsor_id", None)
+            return "Sponsor account not found", 404
     
     # Driver information + point summary
     cursor.execute("""
@@ -1088,6 +1116,34 @@ def adminReports():
     
     return render_template("adminReports.html")
 
+@app.route("/adminDash/audit")
+def adminAudit():
+
+    if "user_id" not in session:
+            return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME
+            )
+    cursor = conn.cursor(dictionary=True)
+    
+    
+    user_id = session["user_id"]
+    cursor.execute(
+            "SELECT ROLE FROM USER WHERE USER_ID = %s",
+            (user_id,)
+        )
+        
+    user = cursor.fetchone()
+
+    if not user or user['ROLE'] != 'Admin':
+        return redirect(url_for('login'))
+    
+    return render_template("adminAudit.html")
+
 @app.route("/viewAsDriver/<int:driver_id>", methods=["POST"])
 def viewAsDriver(driver_id):
     if "user_id" not in session:
@@ -1105,9 +1161,6 @@ def viewAsDriver(driver_id):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        print(session.get("role"))
-        print("Logged-in user ID:", session.get("user_id"))
-        print("Requested driver ID:", driver_id)
         if session.get("role") == "Sponsor":
             # Sponsors can only view drivers in their company.
             cursor.execute("""
@@ -1156,6 +1209,58 @@ def stopViewingAsDriver():
         return redirect(url_for("adminDash"))
 
     return redirect(url_for("sponDash"))
+
+@app.route("/viewAsSponsor/<int:sponsor_id>", methods=["POST"])
+def viewAsSponsor(sponsor_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("role") not in ("Admin"):
+        return "Unauthorized", 403
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT SPONSOR_ID
+            FROM SPONSOR
+            WHERE SPONSOR_ID = %s
+            """, (sponsor_id,))
+
+        sponsor = cursor.fetchone()
+
+        if sponsor is None:
+            return "Sponsor not found or not authorized", 403
+
+        # save the sponsor being viewed without changing sponsor login
+        session["view_as_sponsor_id"] = sponsor_id
+
+        return redirect(url_for("sponDash"))
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.route("/stopViewingAsSponsor", methods=["POST"])
+def stopViewingAsSponsor():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("role") not in ("Admin"):
+        return "Unauthorized", 403
+
+    # Return the sponsor view
+    session.pop("view_as_sponsor_id", None)
+
+    if session.get("role") == "Admin":
+        return redirect(url_for("adminDash"))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
