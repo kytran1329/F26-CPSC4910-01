@@ -117,6 +117,7 @@
                             <th>Name</th>
                             <th>Email</th>
                             <th>Sponsor Company</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
 
@@ -145,6 +146,22 @@
                             <td>{{ sponsor["EMAIL"] }}</td>
 
                             <td>{{ sponsor["SPONSORCOMP_NAME"] }}</td>
+
+                            <td class="actions-cell" onclick="event.stopPropagation();">
+                                <form
+                                    action="{{ url_for('viewAsSponsor', sponsor_id=sponsor['SPONSOR_ID']) }}"
+                                    method="POST"
+                                    onsubmit="return confirmViewAsDriver(
+                                        '{{ sponsor['USER_FNAME'] | e }}',
+                                        '{{ sponsor['USER_LNAME'] | e }}'
+                                    );">
+
+                                    <button type="submit" class="view-sponsor-btn">
+                                        View as Sponsor
+                                    </button>
+
+                                </form>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
