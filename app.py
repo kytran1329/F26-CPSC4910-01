@@ -699,6 +699,107 @@ def assignPoints():
 
     try:
         if request.method == "POST":
+
+            # handle the bulk changes for all drivers
+            bulk_action = request.form.get("bulk_action")
+
+            if bulk_action in ("add_all", "subtract_all"):
+                try:
+                    bulk_amount = int(request.form.get("bulk_amount", ""))
+                except (TypeError, ValueError):
+                    flash("Enter a valid whole-number point amount.", "error")
+                    return redirect(url_for("assignPoints"))
+
+                bulk_reason = request.form.get("bulk_reason", "").strip()
+
+                if bulk_amount <= 0:
+                    flash("The point amount must be greater than zero.", "error")
+                    return redirect(url_for("assignPoints"))
+
+                if not bulk_reason:
+                    flash("Please enter a reason for the point change.", "error")
+                    return redirect(url_for("assignPoints"))
+
+                # negative amount means points are being subtracted
+                signed_amount = (
+                    bulk_amount if bulk_action == "add_all" 
+                    else -bulk_amount
+                )
+
+                # lock sponsor company's driver balances before checking
+                cursor.execute("""
+                    SELECT d.DRIVER_ID, d.BALANCE
+                    FROM DRIVER AS d
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM SPONSOR AS s
+                        WHERE s.USER_ID = %s
+                            AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                    )
+                    FOR UPDATE
+                    """, 
+                    (sponsor_user_id,)
+                )
+                company_drivers = cursor.fetchall()
+
+                if not company_drivers:
+                    conn.rollback()
+                    flash("There are no drivers to update.", "error")
+                    return redirect(url_for("assignPoints"))
+
+                # reject the whole subtraction is any driver would go negative
+                if bulk_action == "subtract_all":
+                    drivers_without_enough_points = [
+                        driver for driver in company_drivers
+                        if float(driver["BALANCE"] or 0) < bulk_amount
+                    ]
+
+                    if drivers_without_enough_points:
+                        conn.rollback()
+                        flash("Bulk subtraction cancelled: at least one driver does not have enough points. No balances were changes.", "error")
+                        return redirect(url_for("assignPoints"))
+
+                # update all drivers belonging to the sponsor's company
+                cursor.execute("""
+                    UPDATE DRIVER AS d
+                    SET BALANCE = BALANCE + %s
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM SPONSOR AS s
+                        WHERE s.USER_ID = %s
+                            AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                    )
+                    """,
+                    (signed_amount, sponsor_user_id)
+                )
+
+                # record the change separately for each affected driver
+                cursor.execute("""
+                    INSERT INTO POINTCHANGES
+                        (DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON, USER_ID)
+                    SELECT 
+                        d.DRIVER_ID, %s, %s, s.USER_ID
+                    FROM DRIVER AS d
+                    JOIN SPONSOR AS s
+                        ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                    WHERE s.USER_ID = %s
+                    """,
+                    (signed_amount, bulk_reason, sponsor_user_id)
+                )
+
+                conn.commit()
+
+                operation = (
+                    "added to" if bulk_action == "add_all" 
+                    else "subtracted from"
+                )
+                flash(
+                    f"{bulk_amount} points successfully {operation} "
+                    f"all {len(company_drivers)} drivers.",
+                    "success"
+                )
+                return redirect(url_for("assignPoints"))
+
             driver_id_raw = request.form.get("driver_id", "")
             action = request.form.get("action", "")
             amount_raw = request.form.get("amount", "")
