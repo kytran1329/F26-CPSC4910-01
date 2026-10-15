@@ -230,6 +230,52 @@ h1 {
     border: 0;
 }
 
+/* Bulk Assign Points section */
+.bulk-points-section {
+    margin-top: 35px;
+    padding: 25px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+}
+
+.bulk-points-section h2 {
+    margin-bottom: 8px;
+    color: #1f2937;
+}
+
+.bulk-points-section p {
+    margin-bottom: 20px;
+    color: #6b7280;
+}
+
+.bulk-form-fields {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.bulk-form-fields label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: bold;
+}
+
+.bulk-form-fields input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font: inherit;
+}
+
+.bulk-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
 footer {
     text-align: center;
     color: #6b7280;
@@ -252,5 +298,9 @@ footer {
 
     .page-card {
         padding: 18px;
+    }
+
+    .bulk-form-fields {
+        grid-template-columns: 1fr;
     }
 }

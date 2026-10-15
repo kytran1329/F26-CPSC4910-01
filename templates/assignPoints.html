@@ -124,6 +124,30 @@
             {% else %}
                 <p>No drivers are currently associated with your sponsor company.</p>
             {% endif %}
+
+            <div class="bulk-points-section">
+                <h2>Assign Points to All Drivers</h2>
+                <p>Add or subtract the same number of points from every driver in your sponsor company.</p>
+
+                <form method="POST" action="{{ url_for('assignPoints') }}">
+                    <div class="bulk-form-fields">
+                        <div>
+                            <label for="bulk-amount">Point Amount</label>
+                            <input type="number" id="bulk-amount" name="bulk_amount" min="1" step="1" required placeholder="Enter points">
+                        </div>
+
+                        <div>
+                            <label for="bulk-reason">Reason for Change</label>
+                            <input type="text" id="bulk-reason" name="bulk_reason" maxlength="255" required placeholder="Enter reason">
+                        </div>
+                    </div>
+
+                    <div class="bulk-buttons">
+                        <button type="submit" name="bulk_action" value="add_all" class="add-button" onclick="return confirm('Add these points to ALL your drivers?');">+ Add to All Drivers</button>
+                        <button type="submit" name="bulk_action" value="subtract_all" class="subtract-button" onclick="return confirm('Subtract these points from ALL your drivers? The request will be rejected if any driver does not have enough points.');">- Subtract from All Drivers</button>
+                    </div>
+                </form>
+            </div>
         </section>
     </main>
 
