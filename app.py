@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from catalog import search_ebay
+from datetime import date
 
 load_dotenv()
 
@@ -600,6 +601,32 @@ def sponDash():
 
 @app.route("/sponDash/applications")
 def applications():
+
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+
+    print("Start date:", start_date)
+    print("End date:", end_date)
+
+    # Validate the selected dates
+    try:
+        if start_date:
+            date.fromisoformat(start_date)
+
+        if end_date:
+            date.fromisoformat(end_date)
+
+        if start_date and end_date and start_date > end_date:
+            raise ValueError("Start date must not be after end date.")
+
+    except ValueError:
+        return render_template(
+            "applications.html",
+            applications=[],
+            start_date=start_date,
+            end_date=end_date,
+            error="Please enter a valid date range."
+        )
     # Get pending driver applications
     # from the database
 
@@ -613,14 +640,27 @@ def applications():
     cursor = conn.cursor(dictionary=True)
 
     # grab correct data about each applicant
-    cursor.execute("""
+    query = """
         SELECT a.APPLICATION_ID, u.USER_FNAME, u.USER_LNAME, u.EMAIL, a.CREATED_DTS, a.STATUS, d.BALANCE
         FROM USER as u
         JOIN APPLICATIONS as a ON u.USER_ID = a.USER_ID
         JOIN DRIVER as d on u.USER_ID = d.USER_ID
         WHERE a.STATUS = 'Pending'
-        ORDER BY a.CREATED_DTS DESC;
-    """)
+    """
+
+    params = []
+
+    if start_date:
+        query += " AND a.CREATED_DTS >= %s"
+        params.append(start_date)
+
+    if end_date:
+        query += " AND a.CREATED_DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
+        params.append(end_date)
+
+    query += " ORDER BY a.CREATED_DTS DESC"
+
+    cursor.execute(query, params)
 
     applications = cursor.fetchall()
 

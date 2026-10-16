@@ -36,6 +36,34 @@
     <main>
         <div class="dashboard-card">
             <!-- Applications -->
+
+            <form method="GET" action="{{ url_for('applications') }}"
+                class="date-filter">
+                <div class="filter-field">
+                    <label for="start_date">Start Date</label>
+                    <input
+                        type="date"
+                        id="start_date"
+                        name="start_date"
+                        value="{{ start_date }}"
+                    >
+                </div>
+
+                <div class="filter-field">
+                    <label for="end_date">End Date</label>
+                    <input
+                        type="date"
+                        id="end_date"
+                        name="end_date"
+                        value="{{ end_date }}"
+                    >
+                </div>
+
+                <button type="submit">Filter</button>
+                <a href="{{ url_for('applications') }}"
+                class="clear-filter">Clear Filters</a>
+            </form>
+
             <div class="history-section">
 
                 <h2>Driver Applications</h2>
