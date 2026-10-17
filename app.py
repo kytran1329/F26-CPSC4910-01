@@ -345,7 +345,7 @@ def userProfile():
 @app.route("/updateFirstName", methods=["POST"])
 def updateFirstName():
 
-    user_id = 1
+    user_id = session["user_id"]
 
     first_name = request.form["first_name"].strip()
 
@@ -380,10 +380,10 @@ def updateFirstName():
 
     return redirect(url_for("userProfile", success="First name updated successfully!"))
 
-@app.route("/update-last-name", methods=["POST"])
+@app.route("/updateLastName", methods=["POST"])
 def updateLastName():
 
-    user_id = 1
+    user_id = session["user_id"]
 
     last_name = request.form["last_name"].strip()
 
