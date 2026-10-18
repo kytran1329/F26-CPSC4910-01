@@ -673,6 +673,81 @@ def applications():
     )
 
 
+@app.route("/sponDash/applications/bulk_update_applications", methods=["POST"])
+def bulk_update_applications():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("role") != "Sponsor":
+        return redirect(url_for("home"))
+
+    action = request.form.get("action")
+    application_ids = request.form.getlist("application_ids")
+
+    start_date = request.form.get("start_date", "")
+    end_date = request.form.get("end_date", "")
+
+    # Only allow these two status changes
+    if action not in ("Accepted", "Rejected"):
+        return redirect(url_for(
+            "applications",
+            start_date=start_date,
+            end_date=end_date
+        ))
+
+    # Require at least one selected application
+    if not application_ids:
+        return redirect(url_for(
+            "applications",
+            start_date=start_date,
+            end_date=end_date
+        ))
+
+    # Validate that all IDs are integers
+    try:
+        application_ids = [int(app_id) for app_id in application_ids]
+    except ValueError:
+        return "Invalid application ID", 400
+
+    placeholders = ", ".join(["%s"] * len(application_ids))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    try:
+        query = f"""
+            UPDATE APPLICATIONS
+            SET STATUS = %s,
+                UPDATED_DTS = NOW()
+            WHERE STATUS = 'Pending'
+              AND APPLICATION_ID IN ({placeholders})
+        """
+
+        cursor.execute(query, [action] + application_ids)
+        conn.commit()
+
+    except mysql.connector.Error:
+        conn.rollback()
+        app.logger.exception("Failed to update applications")
+        return "Unable to update applications. Please try again.", 500
+
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for(
+        "applications",
+        start_date=start_date,
+        end_date=end_date
+    ))
+
+
 @app.route("/accept_application/<int:application_id>", methods=["POST"])
 def accept_application(application_id):
 

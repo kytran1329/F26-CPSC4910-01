@@ -237,6 +237,51 @@ h2 {
     text-decoration: underline;
 }
 
+.bulk-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.select-all-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: auto;
+    font-weight: bold;
+}
+
+.bulk-actions button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 5px;
+    background-color: #15803d;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.bulk-actions button:hover {
+    background-color: #166534;
+}
+
+.bulk-actions button.reject-button {
+    background-color: #dc2626;
+}
+
+.bulk-actions button.reject-button:hover {
+    background-color: #b91c1c;
+}
+
+.application-checkbox,
+#select-all {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
 /* Footer */
 footer {
     text-align: center;
