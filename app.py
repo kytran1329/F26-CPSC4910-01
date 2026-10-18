@@ -628,13 +628,17 @@ def sponDash():
         from POINTCHANGES as p
 
         join DRIVER as d
-            ON p.USER_ID = d.USER_ID
-
-        join `USER` as u
-            ON d.USER_ID = u.USER_ID
+            on p.DRIVER_ID = d.DRIVER_ID
+        left join `USER` as u
+            on d.USER_ID = u.USER_ID
+        where d.SPONSORCOMP_ID in (
+            select s.SPONSORCOMP_ID
+            from SPONSOR as s
+            where s.USER_ID = %s
+        )
 
         order by p.POINTCHANGE_ID, p.DTS DESC
-    """)
+    """, (session["user_id"],))
 
     point_history = cursor.fetchall()
 
