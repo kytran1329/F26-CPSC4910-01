@@ -397,6 +397,14 @@ def bulk_update_applications():
     if session.get("role") != "Sponsor":
         return redirect(url_for("home"))
 
+    # connect to sql database
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+
     action = request.form.get("action")
     application_ids = request.form.getlist("application_ids")
 
@@ -429,22 +437,17 @@ def bulk_update_applications():
 
     cursor = conn.cursor()
 
-    try:
-        query = f"""
-            UPDATE APPLICATIONS
-            SET STATUS = %s,
-                UPDATED_DTS = NOW()
-            WHERE STATUS = 'Pending'
-              AND APPLICATION_ID IN ({placeholders})
-        """
+    query = f"""
+        UPDATE APPLICATIONS
+        SET STATUS = %s,
+            UPDATED_DTS = NOW()
+        WHERE STATUS = 'Pending'
+            AND APPLICATION_ID IN ({placeholders})
+    """
 
-        cursor.execute(query, [action] + application_ids)
-        conn.commit()
+    cursor.execute(query, [action] + application_ids)
+    conn.commit()
 
-    except mysql.connector.Error:
-        conn.rollback()
-        app.logger.exception("Failed to update applications")
-        return "Unable to update applications. Please try again.", 500
     return redirect(url_for(
         "applications",
         start_date=start_date,
