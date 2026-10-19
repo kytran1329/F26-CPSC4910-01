@@ -260,9 +260,15 @@ def catalog():
         query=query
     )
 
-@app.route("/userProfile")
-def userProfile():
-    user_id = USER_ID
+@app.route("/userProfile/<int:user_id>")
+def userProfile(user_id):
+    # user_id = USER_ID
+
+    current_user_id = session.get("user_id")
+
+    if current_user_id is None:
+        user_id = USER_ID
+        # return redirect(url_for("login"))
 
     error = request.args.get("error")
     success = request.args.get("success")
@@ -285,21 +291,21 @@ def userProfile():
     cursor.close()
     conn.close()
 
-    return render_template("userProfile.html", user=user,error=error,
+    return render_template("userProfile.html", user_id=user_id, user=user,error=error,
         success=success)
 
 @app.route("/updateFirstName", methods=["POST"])
 def updateFirstName():
 
-    user_id = 1
+    user_id = USER_ID
 
     first_name = request.form["first_name"].strip()
 
     if not first_name:
-        return redirect(url_for("userProfile", error="First name cannot be empty."))
+        return redirect(url_for("userProfile", user_id=user_id, error="First name cannot be empty."))
 
     if not first_name.isalpha():
-        return redirect(url_for("userProfile", error="First name can only contain letters."))
+        return redirect(url_for("userProfile", user_id=user_id, error="First name can only contain letters."))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -324,22 +330,22 @@ def updateFirstName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile", success="First name updated successfully!"))
+    return redirect(url_for("userProfile", user_id=user_id, success="First name updated successfully!"))
 
 @app.route("/update-last-name", methods=["POST"])
 def updateLastName():
 
-    user_id = 1
+    user_id = USER_ID
 
     last_name = request.form["last_name"].strip()
 
     if not last_name:
         return redirect(
-            url_for("userProfile",error="Last name cannot be empty."))
+            url_for("userProfile", user_id=user_id, error="Last name cannot be empty."))
 
     if not last_name.isalpha():
         return redirect(
-            url_for("userProfile",error="Last name can only contain letters."))
+            url_for("userProfile", user_id=user_id, error="Last name can only contain letters."))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -364,7 +370,7 @@ def updateLastName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile",success="Last name updated successfully!"))
+    return redirect(url_for("userProfile", user_id=user_id, success="Last name updated successfully!"))
 
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
