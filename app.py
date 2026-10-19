@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from catalog import search_ebay
+from datetime import date
 
 load_dotenv()
 
@@ -314,9 +315,212 @@ def catalog():
         query=query
     )
 
-@app.route("/userProfile")
-def userProfile():
-    user_id = USER_ID
+@app.route("/sponDash/applications")
+def applications():
+
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+
+    print("Start date:", start_date)
+    print("End date:", end_date)
+
+    # Validate the selected dates
+    try:
+        if start_date:
+            date.fromisoformat(start_date)
+
+        if end_date:
+            date.fromisoformat(end_date)
+
+        if start_date and end_date and start_date > end_date:
+            raise ValueError("Start date must not be after end date.")
+
+    except ValueError:
+        return render_template(
+            "applications.html",
+            applications=[],
+            start_date=start_date,
+            end_date=end_date,
+            error="Please enter a valid date range."
+        )
+    # Get pending driver applications
+    # from the database
+
+    # connect to sql database
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    # grab correct data about each applicant
+    query = """
+        SELECT a.APPLICATION_ID, u.USER_FNAME, u.USER_LNAME, u.EMAIL, a.CREATED_DTS, a.STATUS, d.BALANCE, u.USER_ID
+        FROM USER as u
+        JOIN APPLICATIONS as a ON u.USER_ID = a.USER_ID
+        JOIN DRIVER as d on u.USER_ID = d.USER_ID
+        WHERE a.STATUS = 'Pending'
+    """
+
+    params = []
+
+    if start_date:
+        query += " AND a.CREATED_DTS >= %s"
+        params.append(start_date)
+
+    if end_date:
+        query += " AND a.CREATED_DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
+        params.append(end_date)
+
+    query += " ORDER BY a.CREATED_DTS DESC"
+
+    cursor.execute(query, params)
+
+    applications = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "applications.html",
+        applications=applications
+    )
+
+
+@app.route("/sponDash/applications/bulk_update_applications", methods=["POST"])
+def bulk_update_applications():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("role") != "Sponsor":
+        return redirect(url_for("home"))
+
+    action = request.form.get("action")
+    application_ids = request.form.getlist("application_ids")
+
+    start_date = request.form.get("start_date", "")
+    end_date = request.form.get("end_date", "")
+
+    # Only allow these two status changes
+    if action not in ("Accepted", "Rejected"):
+        return redirect(url_for(
+            "applications",
+            start_date=start_date,
+            end_date=end_date
+        ))
+
+    # Require at least one selected application
+    if not application_ids:
+        return redirect(url_for(
+            "applications",
+            start_date=start_date,
+            end_date=end_date
+        ))
+
+    # Validate that all IDs are integers
+    try:
+        application_ids = [int(app_id) for app_id in application_ids]
+    except ValueError:
+        return "Invalid application ID", 400
+
+    placeholders = ", ".join(["%s"] * len(application_ids))
+
+    cursor = conn.cursor()
+
+    try:
+        query = f"""
+            UPDATE APPLICATIONS
+            SET STATUS = %s,
+                UPDATED_DTS = NOW()
+            WHERE STATUS = 'Pending'
+              AND APPLICATION_ID IN ({placeholders})
+        """
+
+        cursor.execute(query, [action] + application_ids)
+        conn.commit()
+
+    except mysql.connector.Error:
+        conn.rollback()
+        app.logger.exception("Failed to update applications")
+        return "Unable to update applications. Please try again.", 500
+    return redirect(url_for(
+        "applications",
+        start_date=start_date,
+        end_date=end_date
+    ))
+
+
+@app.route("/accept_application/<int:application_id>", methods=["POST"])
+def accept_application(application_id):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE APPLICATIONS
+        SET STATUS = 'Accepted',
+            UPDATED_DTS = NOW()
+        WHERE APPLICATION_ID = %s
+    """, (application_id,))
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("applications"))
+
+
+@app.route("/reject_application/<int:application_id>", methods=["POST"])
+def reject_application(application_id):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE APPLICATIONS
+        SET STATUS = 'Rejected',
+            UPDATED_DTS = NOW()
+        WHERE APPLICATION_ID = %s
+    """, (application_id,))
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("applications"))
+
+
+@app.route("/userProfile/<int:user_id>")
+def userProfile(user_id):
+    # user_id = USER_ID
+
+    current_user_id = session.get("user_id")
+
+    if current_user_id is None:
+        user_id = USER_ID
+        # return redirect(url_for("login"))
 
     error = request.args.get("error")
     success = request.args.get("success")
@@ -339,7 +543,7 @@ def userProfile():
     cursor.close()
     conn.close()
 
-    return render_template("userProfile.html", user=user,error=error,
+    return render_template("userProfile.html", user_id=user_id, user=user,error=error,
         success=success)
 
 @app.route("/updateFirstName", methods=["POST"])
@@ -350,10 +554,10 @@ def updateFirstName():
     first_name = request.form["first_name"].strip()
 
     if not first_name:
-        return redirect(url_for("userProfile", error="First name cannot be empty."))
+        return redirect(url_for("userProfile", user_id=user_id, error="First name cannot be empty."))
 
     if not first_name.isalpha():
-        return redirect(url_for("userProfile", error="First name can only contain letters."))
+        return redirect(url_for("userProfile", user_id=user_id, error="First name can only contain letters."))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -378,7 +582,7 @@ def updateFirstName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile", success="First name updated successfully!"))
+    return redirect(url_for("userProfile", user_id=user_id, success="First name updated successfully!"))
 
 @app.route("/updateLastName", methods=["POST"])
 def updateLastName():
@@ -389,11 +593,11 @@ def updateLastName():
 
     if not last_name:
         return redirect(
-            url_for("userProfile",error="Last name cannot be empty."))
+            url_for("userProfile", user_id=user_id, error="Last name cannot be empty."))
 
     if not last_name.isalpha():
         return redirect(
-            url_for("userProfile",error="Last name can only contain letters."))
+            url_for("userProfile", user_id=user_id, error="Last name can only contain letters."))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -418,7 +622,7 @@ def updateLastName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile",success="Last name updated successfully!"))
+    return redirect(url_for("userProfile", user_id=user_id, success="Last name updated successfully!"))
 
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
