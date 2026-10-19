@@ -113,7 +113,12 @@
                                         value="{{ row['APPLICATION_ID'] }}"
                                     >
                                 </td>
-                                <td>{{ row["USER_FNAME"] }} {{ row["USER_LNAME"] }}</td>
+                                <td>
+                                    <a href="{{ url_for('userProfile',
+                                                        user_id=row['USER_ID']) }}">
+                                        {{ row["USER_FNAME"] }} {{ row["USER_LNAME"] }}
+                                    </a>
+                                </td>
                                 <td>{{ row["EMAIL"] }}</td>
                                 <td>{{ row["CREATED_DTS"] }}</td>
                                 <td>{{ row["STATUS"] }}</td>

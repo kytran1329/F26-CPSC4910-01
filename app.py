@@ -641,7 +641,7 @@ def applications():
 
     # grab correct data about each applicant
     query = """
-        SELECT a.APPLICATION_ID, u.USER_FNAME, u.USER_LNAME, u.EMAIL, a.CREATED_DTS, a.STATUS, d.BALANCE
+        SELECT a.APPLICATION_ID, u.USER_FNAME, u.USER_LNAME, u.EMAIL, a.CREATED_DTS, a.STATUS, d.BALANCE, u.USER_ID
         FROM USER as u
         JOIN APPLICATIONS as a ON u.USER_ID = a.USER_ID
         JOIN DRIVER as d on u.USER_ID = d.USER_ID
