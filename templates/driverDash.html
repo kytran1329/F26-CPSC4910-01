@@ -40,7 +40,7 @@
                 </form>
             {% endif %}
 
-            <a href="{{ url_for('logout') }}" class="logout-button">
+            <a href="{{ url_for('auth.logout') }}" class="logout-button">
                 Logout
             </a>
 
@@ -122,7 +122,7 @@
                     </div>
 
                     <div class="info-value">
-                        {{ drive_info["BALANCE"] }} points (my replace with used points?)
+                        {{ drive_info["BALANCE"] }} points
                     </div>
 
                 </div>

@@ -22,7 +22,7 @@
     <!-- Horizontal Navigation Banner -->
     <nav class="home-links">
         <a href="{{ url_for('driverDash') }}" class="button">Driver Dashboard</a>
-        <a href="{{ url_for('userProfile') }}" class="button">User Profile</a>
+        <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="button">User Profile</a>
         <a href="{{ url_for('about') }}" class="button">About</a>
         <a href="{{ url_for('catalog') }}" class="button">Catalog</a>
         <a href="{{ url_for('sponDash') }}" class="button">Sponsor Dashboard</a>
