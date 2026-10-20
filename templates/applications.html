@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Applications</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='driverDash.css') }}">
+</head>
+
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <div class="dashboard-name">
+                Sponsor Dashboard
+            </div>
+            <div class="tagline">
+                Good Driving. Better Rewards.
+            </div>
+            <div class="header-links">
+                <a href="{{ url_for('sponDash') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('applications') }}" class="nav-link">Applications</a>
+                <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="dashboard-card">
+            <!-- Applications -->
+
+            <form method="GET" action="{{ url_for('applications') }}"
+                class="date-filter">
+                <div class="filter-field">
+                    <label for="start_date">Start Date</label>
+                    <input
+                        type="date"
+                        id="start_date"
+                        name="start_date"
+                        value="{{ start_date }}"
+                    >
+                </div>
+
+                <div class="filter-field">
+                    <label for="end_date">End Date</label>
+                    <input
+                        type="date"
+                        id="end_date"
+                        name="end_date"
+                        value="{{ end_date }}"
+                    >
+                </div>
+
+                <button type="submit">Filter</button>
+                <a href="{{ url_for('applications') }}"
+                class="clear-filter">Clear Filters</a>
+            </form>
+
+            <form method="POST"
+                action="{{ url_for('bulk_update_applications') }}"
+                id="bulk-applications-form">
+
+                <!-- Preserve the selected date range after an action -->
+                <input type="hidden" name="start_date" value="{{ start_date }}">
+                <input type="hidden" name="end_date" value="{{ end_date }}">
+
+                <div class="bulk-actions">
+                    <label class="select-all-label">
+                        <input type="checkbox" id="select-all">
+                        Select All
+                    </label>
+
+                    <button type="submit" name="action" value="Accepted">
+                        Accept Selected
+                    </button>
+
+                    <button type="submit" name="action" value="Rejected"
+                            class="reject-button">
+                        Reject Selected
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Select</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Application Date</th>
+                                <th>Status</th>
+                                <th>Balance</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for row in applications %}
+                            <tr>
+                                <td>
+                                    <input
+                                        type="checkbox"
+                                        class="application-checkbox"
+                                        name="application_ids"
+                                        value="{{ row['APPLICATION_ID'] }}"
+                                    >
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('userProfile',
+                                                        user_id=row['USER_ID']) }}">
+                                        {{ row["USER_FNAME"] }} {{ row["USER_LNAME"] }}
+                                    </a>
+                                </td>
+                                <td>{{ row["EMAIL"] }}</td>
+                                <td>{{ row["CREATED_DTS"] }}</td>
+                                <td>{{ row["STATUS"] }}</td>
+                                <td>{{ row["BALANCE"] }}</td>
+                                <td>
+                                    <form method="POST"
+                                          action="{{ url_for(
+                                              'accept_application',
+                                              application_id=row['APPLICATION_ID']
+                                          ) }}"
+                                          style="display: inline;">
+                                        <button type="submit">
+                                            Accept
+                                        </button>
+                                    </form>
+
+                                    <form method="POST"
+                                          action="{{ url_for(
+                                              'reject_application',
+                                              application_id=row['APPLICATION_ID']
+                                          ) }}"
+                                          style="display: inline;">
+                                        <button type="submit">
+                                            Reject
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6">
+                                    No pending applications found in this date range.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+
+            <script>
+                const selectAll = document.getElementById("select-all");
+                const applicationCheckboxes =
+                    document.querySelectorAll(".application-checkbox");
+
+                selectAll.addEventListener("change", function () {
+                    applicationCheckboxes.forEach(function (checkbox) {
+                        checkbox.checked = selectAll.checked;
+                    });
+                });
+
+                applicationCheckboxes.forEach(function (checkbox) {
+                    checkbox.addEventListener("change", function () {
+                        selectAll.checked =
+                            applicationCheckboxes.length > 0 &&
+                            Array.from(applicationCheckboxes).every(
+                                checkbox => checkbox.checked
+                            );
+                    });
+                });
+            </script>
+        </div>
+    </main>
+
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+    </footer>
+</body>
+</html>
