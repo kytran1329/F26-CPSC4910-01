@@ -685,10 +685,13 @@ def assignPoints():
     if "user_id" not in session:
         return redirect(url_for("login"))
     
-    if session.get("role") != "Sponsor":
+    role = session.get("role")
+    if role not in ("Sponsor", "Admin"):
         return "Unauthorized", 403
 
-    sponsor_user_id = session["user_id"]
+    is_admin = role == "Admin"
+    actor_user_id = session["user_id"]
+    sponsor_user_id = actor_user_id
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -704,6 +707,9 @@ def assignPoints():
             bulk_action = request.form.get("bulk_action")
 
             if bulk_action in ("add_all", "subtract_all"):
+                if is_admin:
+                    return "Unauthorized", 403
+
                 try:
                     bulk_amount = int(request.form.get("bulk_amount", ""))
                 except (TypeError, ValueError):
@@ -825,27 +831,42 @@ def assignPoints():
                 flash("Please enter a reason for the point change.", "error")
                 return redirect(url_for("assignPoints"))
 
-            # lock the driver's balance while checking and updating it
-            # condition to ensure the sponsor owns the driver
-            cursor.execute("""
-                SELECT d.DRIVER_ID, d.BALANCE
-                FROM DRIVER AS d
-                WHERE d.DRIVER_ID = %s
-                    AND EXISTS (
-                        SELECT 1
-                        FROM SPONSOR AS s
-                        WHERE s.USER_ID = %s
-                            AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
-                    )
-                FOR UPDATE
-                """, 
-                (driver_id, sponsor_user_id),
-            )
+            if is_admin:
+                cursor.execute("""
+                    SELECT DRIVER_ID, BALANCE
+                    FROM DRIVER
+                    WHERE DRIVER_ID = %s
+                    FOR UPDATE
+                    """,
+                    (driver_id,),
+                )
+            else:
+                # lock the driver's balance while checking and updating it
+                # condition to ensure the sponsor owns the driver
+                cursor.execute("""
+                    SELECT d.DRIVER_ID, d.BALANCE
+                    FROM DRIVER AS d
+                    WHERE d.DRIVER_ID = %s
+                        AND EXISTS (
+                            SELECT 1
+                            FROM SPONSOR AS s
+                            WHERE s.USER_ID = %s
+                                AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                        )
+                    FOR UPDATE
+                    """,
+                    (driver_id, sponsor_user_id),
+                )
             driver = cursor.fetchone()
 
             if driver is None:
                 conn.rollback()
-                flash("That driver was not found or is not assigned to your company.", "error")
+                message = (
+                    "That driver was not found."
+                    if is_admin
+                    else "That driver was not found or is not assigned to your company."
+                )
+                flash(message, "error")
                 return redirect(url_for("assignPoints"))
 
             current_balance = float(driver["BALANCE"] or 0)
@@ -866,7 +887,7 @@ def assignPoints():
                 (DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON, USER_ID)
                 VALUES (%s, %s, %s, %s)
                 """,
-                (driver_id, signed_amount, reason, sponsor_user_id),
+                (driver_id, signed_amount, reason, actor_user_id),
             )
             conn.commit()
             flash(
@@ -875,8 +896,7 @@ def assignPoints():
             )
             return redirect(url_for("assignPoints"))
 
-        # list only drivers belonging to one of the logged-in sponsor's companies
-        cursor.execute("""
+        driver_query = """
             SELECT
                 d.DRIVER_ID,
                 d.USER_ID,
@@ -898,19 +918,27 @@ def assignPoints():
                     ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
                     LIMIT 1
                 )
-            WHERE EXISTS (
-                SELECT 1
-                FROM SPONSOR AS s
-                WHERE s.USER_ID = %s
-                    AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+            """
+        if is_admin:
+            cursor.execute(driver_query + """
+                ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
+                """)
+        else:
+            # list only drivers belonging to one of the logged-in sponsor's companies
+            cursor.execute(driver_query + """
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM SPONSOR AS s
+                    WHERE s.USER_ID = %s
+                        AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                )
+                ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
+                """,
+                (sponsor_user_id,),
             )
-            ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
-            """,
-            (sponsor_user_id,),
-        )
         drivers = cursor.fetchall()
 
-        cursor.execute("""
+        history_query = """
             SELECT
                 p.POINTCHANGE_ID,
                 p.DRIVER_ID,
@@ -919,16 +947,23 @@ def assignPoints():
                 p.DTS
             FROM POINTCHANGES AS p
             JOIN DRIVER AS d ON d.DRIVER_ID = p.DRIVER_ID
-            WHERE EXISTS (
-                SELECT 1
-                FROM SPONSOR AS s
-                WHERE s.USER_ID = %s
-                    AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+            """
+        if is_admin:
+            cursor.execute(history_query + """
+                ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
+                """)
+        else:
+            cursor.execute(history_query + """
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM SPONSOR AS s
+                    WHERE s.USER_ID = %s
+                        AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                )
+                ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
+                """,
+                (sponsor_user_id,),
             )
-            ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
-            """,
-            (sponsor_user_id,),
-        )
         history_rows = cursor.fetchall()
 
         history_by_driver = {}
@@ -939,6 +974,7 @@ def assignPoints():
             "assignPoints.html",
             drivers=drivers,
             history_by_driver=history_by_driver,
+            is_admin=is_admin,
         )
     except Exception:
         conn.rollback()
