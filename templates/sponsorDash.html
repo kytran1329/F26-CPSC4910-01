@@ -224,9 +224,40 @@
             <div class="history-section">
 
                 <h2>Driver Point History</h2>
+                
+                <div class="history-filter">
+
+                    <form method="GET" action="{{ url_for('sponDash') }}">
+
+                        <label for="history_filter">Filter by date:</label>
+
+                        <select name="history_filter" id="history_filter">
+                            <option value="all_time"
+                                {% if history_filter == "all_time" %}selected{% endif %}>
+                                All Time
+                            </option>
+
+                            <option value="current_month"
+                                {% if history_filter == "current_month" %}selected{% endif %}>
+                                Current Month
+                            </option>
+
+                            <option value="past_month"
+                                {% if history_filter == "past_month" %}selected{% endif %}>
+                                Past Month
+                            </option>
+                        </select>
+
+                        <button type="submit" class="view-driver-btn">
+                            Apply Filter
+                        </button>
+
+                    </form>
+
+                </div>
 
                 <div class="table-container">
-
+                    
                     <table class="history-table">
 
                         <thead>
