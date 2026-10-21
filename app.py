@@ -6,6 +6,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from catalog import search_ebay
 from datetime import date
 
+from auth import auth
+
 load_dotenv()
 
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -18,6 +20,8 @@ app = Flask(__name__, static_folder= "styles")
 #FLASK_SECRET_KEY add in .env
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
+app.register_blueprint(auth)
+
 # THIS STOPS SOMEONE FROM LOGGIN BACK IN BY HITTING THE BACK BUTTON AFTER THEY HAVE LOGGED OUT
 @app.after_request
 def add_no_cache_headers(response):
@@ -25,118 +29,6 @@ def add_no_cache_headers(response):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
-
-
-@app.route("/", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        # get username and password values from the html form
-        username = request.form.get("username")
-        pwd = request.form.get("password")
-
-        # connect to sql database
-        conn = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password= DB_PASSWORD,
-            database= DB_NAME
-        )
-        cursor = conn.cursor(dictionary=True)
-
-        try: 
-            # get the password for the current username in the form
-            cursor.execute("SELECT USER_ID, EMAIL, PASSWORD, ROLE FROM USER WHERE EMAIL = %s", (username,))
-            user = cursor.fetchone()
-
-            global USER_ID
-            USER_ID= user["USER_ID"]
-
-            # check if hashed password matches
-            if (user and check_password_hash(user["PASSWORD"], pwd)) or (user and user["PASSWORD"] == pwd):
-                role = user["ROLE"]
-                session["user_id"] = user["USER_ID"]
-                session["role"] = user["ROLE"]
-
-                if role == "Driver":
-                    return redirect(url_for("driverDash"))
-                elif role == "Sponsor":
-                    return redirect(url_for("sponDash"))
-                elif role == "Admin":
-                    return redirect(url_for("adminDash"))
-                else:
-                    return redirect(url_for("home"))
-
-            # if password doesn't match stay on the page and give an error
-            return render_template( "login.html", error="Invalid username or password" )
-            
-        finally:
-            cursor.close()
-            conn.close()
-
-    return render_template("login.html")
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    print(session)
-    return redirect(url_for("login"))
-
-
-@app.route("/signup", methods=["GET", "POST"])
-def signup():
-    if request.method == "POST":
-        # get user info to create an account
-        first_name = request.form.get("first_name") 
-        last_name = request.form.get("last_name") 
-        email = request.form.get("email") 
-        pwd = request.form.get("password")
-        role = "Driver"
-
-        # connect to sql database
-        conn = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password= DB_PASSWORD,
-            database= DB_NAME
-        )
-        cursor = conn.cursor(dictionary=True)
-
-        try:
-            # check if email already exists 
-            cursor.execute( "SELECT USER_ID FROM `USER` WHERE EMAIL = %s", (email,) )
-            if cursor.fetchone(): 
-                return render_template( 
-                    "signup.html", 
-                    error="An account with this email already exists." 
-                )
-
-            # hash the password
-            hashed_password = generate_password_hash(pwd)
-
-            cursor.execute(""" 
-                INSERT INTO `USER` 
-                (USER_FNAME, USER_LNAME, EMAIL, PASSWORD, ROLE) 
-                VALUES (%s, %s, %s, %s, %s) """, 
-                (first_name, last_name, email, hashed_password, "Driver")
-            )
-
-            conn.commit()
-
-            return redirect(url_for("login"))
-
-        except mysql.connector.Error: 
-            conn.rollback() 
-            app.logger.exception("Error creating user account") 
-            return render_template( 
-                "signup.html", 
-                error="Unable to create your account. Please try again." 
-            )
-            
-        finally:
-            cursor.close()
-            conn.close()
-    return render_template("signup.html")
 
 
 @app.route("/home")
@@ -315,9 +207,215 @@ def catalog():
         query=query
     )
 
-@app.route("/userProfile")
-def userProfile():
-    user_id = USER_ID
+@app.route("/sponDash/applications")
+def applications():
+
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+
+    print("Start date:", start_date)
+    print("End date:", end_date)
+
+    # Validate the selected dates
+    try:
+        if start_date:
+            date.fromisoformat(start_date)
+
+        if end_date:
+            date.fromisoformat(end_date)
+
+        if start_date and end_date and start_date > end_date:
+            raise ValueError("Start date must not be after end date.")
+
+    except ValueError:
+        return render_template(
+            "applications.html",
+            applications=[],
+            start_date=start_date,
+            end_date=end_date,
+            error="Please enter a valid date range."
+        )
+    # Get pending driver applications
+    # from the database
+
+    # connect to sql database
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    # grab correct data about each applicant
+    query = """
+        SELECT a.APPLICATION_ID, u.USER_FNAME, u.USER_LNAME, u.EMAIL, a.CREATED_DTS, a.STATUS, d.BALANCE, u.USER_ID
+        FROM USER as u
+        JOIN APPLICATIONS as a ON u.USER_ID = a.USER_ID
+        JOIN DRIVER as d on u.USER_ID = d.USER_ID
+        WHERE a.STATUS = 'Pending'
+    """
+
+    params = []
+
+    if start_date:
+        query += " AND a.CREATED_DTS >= %s"
+        params.append(start_date)
+
+    if end_date:
+        query += " AND a.CREATED_DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
+        params.append(end_date)
+
+    query += " ORDER BY a.CREATED_DTS DESC"
+
+    cursor.execute(query, params)
+
+    applications = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "applications.html",
+        applications=applications
+    )
+
+
+@app.route("/sponDash/applications/bulk_update_applications", methods=["POST"])
+def bulk_update_applications():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("role") != "Sponsor":
+        return redirect(url_for("home"))
+
+    # connect to sql database
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+
+    action = request.form.get("action")
+    application_ids = request.form.getlist("application_ids")
+
+    start_date = request.form.get("start_date", "")
+    end_date = request.form.get("end_date", "")
+
+    # Only allow these two status changes
+    if action not in ("Accepted", "Rejected"):
+        return redirect(url_for(
+            "applications",
+            start_date=start_date,
+            end_date=end_date
+        ))
+
+    # Require at least one selected application
+    if not application_ids:
+        return redirect(url_for(
+            "applications",
+            start_date=start_date,
+            end_date=end_date
+        ))
+
+    # Validate that all IDs are integers
+    try:
+        application_ids = [int(app_id) for app_id in application_ids]
+    except ValueError:
+        return "Invalid application ID", 400
+
+    placeholders = ", ".join(["%s"] * len(application_ids))
+
+    cursor = conn.cursor()
+
+    query = f"""
+        UPDATE APPLICATIONS
+        SET STATUS = %s,
+            UPDATED_DTS = NOW()
+        WHERE STATUS = 'Pending'
+            AND APPLICATION_ID IN ({placeholders})
+    """
+
+    cursor.execute(query, [action] + application_ids)
+    conn.commit()
+
+    return redirect(url_for(
+        "applications",
+        start_date=start_date,
+        end_date=end_date
+    ))
+
+
+@app.route("/accept_application/<int:application_id>", methods=["POST"])
+def accept_application(application_id):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE APPLICATIONS
+        SET STATUS = 'Accepted',
+            UPDATED_DTS = NOW()
+        WHERE APPLICATION_ID = %s
+    """, (application_id,))
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("applications"))
+
+
+@app.route("/reject_application/<int:application_id>", methods=["POST"])
+def reject_application(application_id):
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE APPLICATIONS
+        SET STATUS = 'Rejected',
+            UPDATED_DTS = NOW()
+        WHERE APPLICATION_ID = %s
+    """, (application_id,))
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("applications"))
+
+
+@app.route("/userProfile/<int:user_id>")
+def userProfile(user_id):
+    # user_id = USER_ID
+
+    current_user_id = session.get("user_id")
+
+    if current_user_id is None:
+        user_id = USER_ID
+        # return redirect(url_for("login"))
 
     error = request.args.get("error")
     success = request.args.get("success")
@@ -340,7 +438,7 @@ def userProfile():
     cursor.close()
     conn.close()
 
-    return render_template("userProfile.html", user=user,error=error,
+    return render_template("userProfile.html", user_id=user_id, user=user,error=error,
         success=success)
 
 @app.route("/updateFirstName", methods=["POST"])
@@ -351,10 +449,10 @@ def updateFirstName():
     first_name = request.form["first_name"].strip()
 
     if not first_name:
-        return redirect(url_for("userProfile", error="First name cannot be empty."))
+        return redirect(url_for("userProfile", user_id=user_id, error="First name cannot be empty."))
 
     if not first_name.isalpha():
-        return redirect(url_for("userProfile", error="First name can only contain letters."))
+        return redirect(url_for("userProfile", user_id=user_id, error="First name can only contain letters."))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -379,7 +477,7 @@ def updateFirstName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile", success="First name updated successfully!"))
+    return redirect(url_for("userProfile", user_id=user_id, success="First name updated successfully!"))
 
 @app.route("/updateLastName", methods=["POST"])
 def updateLastName():
@@ -390,11 +488,11 @@ def updateLastName():
 
     if not last_name:
         return redirect(
-            url_for("userProfile",error="Last name cannot be empty."))
+            url_for("userProfile", user_id=user_id, error="Last name cannot be empty."))
 
     if not last_name.isalpha():
         return redirect(
-            url_for("userProfile",error="Last name can only contain letters."))
+            url_for("userProfile", user_id=user_id, error="Last name can only contain letters."))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -419,7 +517,7 @@ def updateLastName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile",success="Last name updated successfully!"))
+    return redirect(url_for("userProfile", user_id=user_id, success="Last name updated successfully!"))
 
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
@@ -727,10 +825,13 @@ def assignPoints():
     if "user_id" not in session:
         return redirect(url_for("login"))
     
-    if session.get("role") != "Sponsor":
+    role = session.get("role")
+    if role not in ("Sponsor", "Admin"):
         return "Unauthorized", 403
 
-    sponsor_user_id = session["user_id"]
+    is_admin = role == "Admin"
+    actor_user_id = session["user_id"]
+    sponsor_user_id = actor_user_id
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -746,6 +847,9 @@ def assignPoints():
             bulk_action = request.form.get("bulk_action")
 
             if bulk_action in ("add_all", "subtract_all"):
+                if is_admin:
+                    return "Unauthorized", 403
+
                 try:
                     bulk_amount = int(request.form.get("bulk_amount", ""))
                 except (TypeError, ValueError):
@@ -867,27 +971,42 @@ def assignPoints():
                 flash("Please enter a reason for the point change.", "error")
                 return redirect(url_for("assignPoints"))
 
-            # lock the driver's balance while checking and updating it
-            # condition to ensure the sponsor owns the driver
-            cursor.execute("""
-                SELECT d.DRIVER_ID, d.BALANCE
-                FROM DRIVER AS d
-                WHERE d.DRIVER_ID = %s
-                    AND EXISTS (
-                        SELECT 1
-                        FROM SPONSOR AS s
-                        WHERE s.USER_ID = %s
-                            AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
-                    )
-                FOR UPDATE
-                """, 
-                (driver_id, sponsor_user_id),
-            )
+            if is_admin:
+                cursor.execute("""
+                    SELECT DRIVER_ID, BALANCE
+                    FROM DRIVER
+                    WHERE DRIVER_ID = %s
+                    FOR UPDATE
+                    """,
+                    (driver_id,),
+                )
+            else:
+                # lock the driver's balance while checking and updating it
+                # condition to ensure the sponsor owns the driver
+                cursor.execute("""
+                    SELECT d.DRIVER_ID, d.BALANCE
+                    FROM DRIVER AS d
+                    WHERE d.DRIVER_ID = %s
+                        AND EXISTS (
+                            SELECT 1
+                            FROM SPONSOR AS s
+                            WHERE s.USER_ID = %s
+                                AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                        )
+                    FOR UPDATE
+                    """,
+                    (driver_id, sponsor_user_id),
+                )
             driver = cursor.fetchone()
 
             if driver is None:
                 conn.rollback()
-                flash("That driver was not found or is not assigned to your company.", "error")
+                message = (
+                    "That driver was not found."
+                    if is_admin
+                    else "That driver was not found or is not assigned to your company."
+                )
+                flash(message, "error")
                 return redirect(url_for("assignPoints"))
 
             current_balance = float(driver["BALANCE"] or 0)
@@ -908,7 +1027,7 @@ def assignPoints():
                 (DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON, USER_ID)
                 VALUES (%s, %s, %s, %s)
                 """,
-                (driver_id, signed_amount, reason, sponsor_user_id),
+                (driver_id, signed_amount, reason, actor_user_id),
             )
             conn.commit()
             flash(
@@ -917,8 +1036,7 @@ def assignPoints():
             )
             return redirect(url_for("assignPoints"))
 
-        # list only drivers belonging to one of the logged-in sponsor's companies
-        cursor.execute("""
+        driver_query = """
             SELECT
                 d.DRIVER_ID,
                 d.USER_ID,
@@ -940,19 +1058,27 @@ def assignPoints():
                     ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
                     LIMIT 1
                 )
-            WHERE EXISTS (
-                SELECT 1
-                FROM SPONSOR AS s
-                WHERE s.USER_ID = %s
-                    AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+            """
+        if is_admin:
+            cursor.execute(driver_query + """
+                ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
+                """)
+        else:
+            # list only drivers belonging to one of the logged-in sponsor's companies
+            cursor.execute(driver_query + """
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM SPONSOR AS s
+                    WHERE s.USER_ID = %s
+                        AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                )
+                ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
+                """,
+                (sponsor_user_id,),
             )
-            ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
-            """,
-            (sponsor_user_id,),
-        )
         drivers = cursor.fetchall()
 
-        cursor.execute("""
+        history_query = """
             SELECT
                 p.POINTCHANGE_ID,
                 p.DRIVER_ID,
@@ -961,16 +1087,23 @@ def assignPoints():
                 p.DTS
             FROM POINTCHANGES AS p
             JOIN DRIVER AS d ON d.DRIVER_ID = p.DRIVER_ID
-            WHERE EXISTS (
-                SELECT 1
-                FROM SPONSOR AS s
-                WHERE s.USER_ID = %s
-                    AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+            """
+        if is_admin:
+            cursor.execute(history_query + """
+                ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
+                """)
+        else:
+            cursor.execute(history_query + """
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM SPONSOR AS s
+                    WHERE s.USER_ID = %s
+                        AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                )
+                ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
+                """,
+                (sponsor_user_id,),
             )
-            ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
-            """,
-            (sponsor_user_id,),
-        )
         history_rows = cursor.fetchall()
 
         history_by_driver = {}
@@ -981,6 +1114,7 @@ def assignPoints():
             "assignPoints.html",
             drivers=drivers,
             history_by_driver=history_by_driver,
+            is_admin=is_admin,
         )
     except Exception:
         conn.rollback()
@@ -1014,7 +1148,7 @@ def adminDash():
     user = cursor.fetchone()
     
     if not user or user['ROLE'] != 'Admin':
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
 
     # Get sponsor comps
     cursor.execute("""
@@ -1114,7 +1248,7 @@ def adminSponsors():
     user = cursor.fetchone()
 
     if not user or user['ROLE'] != 'Admin':
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
 
     cursor.execute("""
             SELECT
@@ -1189,7 +1323,7 @@ def adminDrivers():
     user = cursor.fetchone()
     
     if not user or user['ROLE'] != 'Admin':
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
     
     # Get sponsor comps
     cursor.execute("""
@@ -1255,7 +1389,7 @@ def adminReports():
     user = cursor.fetchone()
 
     if not user or user['ROLE'] != 'Admin':
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
     
     return render_template("adminReports.html")
 
@@ -1283,7 +1417,7 @@ def adminAudit():
     user = cursor.fetchone()
 
     if not user or user['ROLE'] != 'Admin':
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
     
     return render_template("adminAudit.html")
 

@@ -37,9 +37,12 @@
                 </form>
             {% endif %}
 
-            <a href="{{ url_for('logout') }}" class="logout-button">
-                Logout
-            </a>
+            <div class="header-links">
+                <a href="{{ url_for('sponDash') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('applications') }}" class="nav-link">Applications</a>
+                <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
+            </div>
 
 
         </div>
