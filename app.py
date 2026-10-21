@@ -713,32 +713,68 @@ def sponDash():
     user_info = cursor.fetchall()
     
     # Individual point history
-    cursor.execute("""
-        select
+        # Individual point history
+    # Get the selected history filter
+    history_filter = request.args.get("history_filter", "all_time")
+
+    today = date.today()
+    month_start = today.replace(day=1)
+
+    # Determine the previous calendar month's start date
+    if month_start.month == 1:
+        previous_month_start = date(month_start.year - 1, 12, 1)
+    else:
+        previous_month_start = date(
+            month_start.year, month_start.month - 1, 1
+        )
+
+    # Base query: only show point changes for this sponsor's company
+    history_query = """
+        SELECT
             p.POINTCHANGE_ID,
-            p.USER_ID,
-            d.DRIVER_ID,
+            p.DRIVER_ID,
             u.USER_FNAME,
             u.USER_LNAME,
             p.POINTCHANGE_AMOUNT,
             p.POINTCHANGE_REASON,
             p.DTS
-
-        from POINTCHANGES as p
-
-        join DRIVER as d
-            on p.DRIVER_ID = d.DRIVER_ID
-        left join `USER` as u
-            on d.USER_ID = u.USER_ID
-        where d.SPONSORCOMP_ID in (
-            select s.SPONSORCOMP_ID
-            from SPONSOR as s
-            where s.USER_ID = %s
+        FROM POINTCHANGES AS p
+        JOIN DRIVER AS d
+            ON p.DRIVER_ID = d.DRIVER_ID
+        JOIN `USER` AS u
+            ON d.USER_ID = u.USER_ID
+        WHERE d.SPONSORCOMP_ID IN (
+            SELECT s.SPONSORCOMP_ID
+            FROM SPONSOR AS s
+            WHERE s.USER_ID = %s
         )
+    """
 
-        order by p.POINTCHANGE_ID, p.DTS DESC
-    """, (session["user_id"],))
+    params = [sponsor_user_id]
 
+    # Apply the selected date range
+    if history_filter == "current_month":
+        history_query += " AND p.DTS >= %s AND p.DTS < %s"
+
+        if month_start.month == 12:
+            next_month_start = date(month_start.year + 1, 1, 1)
+        else:
+            next_month_start = date(
+                month_start.year, month_start.month + 1, 1
+            )
+
+        params.extend([month_start, next_month_start])
+
+    elif history_filter == "past_month":
+        history_query += " AND p.DTS >= %s AND p.DTS < %s"
+        params.extend([previous_month_start, month_start])
+
+    elif history_filter != "all_time":
+        history_filter = "all_time"
+
+    history_query += " ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC"
+
+    cursor.execute(history_query, tuple(params))
     point_history = cursor.fetchall()
 
     # Count pending applications for this sponsor
@@ -779,6 +815,7 @@ def sponDash():
         "sponsorDash.html",
         user_info=user_info,
         point_history=point_history, 
+        history_filter=history_filter,
         pending_applications=pending_applications,
         points_this_month=points_this_month
     )
