@@ -21,6 +21,130 @@
 
     <main class="admin-page">
 
+        <div class="report-container">
+
+            <!-- Tabs -->
+            <div class="report-tabs" role="tablist" aria-label="Reports">
+
+                <button
+                    class="report-tab active"
+                    id="tab-driver-applications"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="driver-applications"
+                    onclick="showReport('driver-applications', this)">
+                    Driver Applications Audit Log
+                </button>
+
+                <button
+                    class="report-tab"
+                    id="tab-point-changes"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="point-changes"
+                    onclick="showReport('point-changes', this)">
+                    Point Changes Audit Log
+                </button>
+
+                <button
+                    class="report-tab"
+                    id="tab-password-changes"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="password-changes"
+                    onclick="showReport('password-changes', this)">
+                    Password Changes Audit Log
+                </button>
+
+                <button
+                    class="report-tab"
+                    id="tab-login-attempts"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="login-attempts"
+                    onclick="showReport('login-attempts', this)">
+                    Login Attempts Audit Log
+                </button>
+
+            </div>
+
+            <!-- Driver Applications -->
+            <section
+                class="report-content active"
+                id="driver-applications"
+                role="tabpanel"
+                aria-labelledby="tab-driver-applications">
+
+                <h2>Driver Applications</h2>
+
+                <p>
+                    View Driver Applications
+                </p>
+
+                <!-- Add application stuff here -->
+
+            </section>
+
+            <!-- Point Changes -->
+            <section
+                class="report-content"
+                id="point-changes"
+                role="tabpanel"
+                aria-labelledby="tab-point-changes"
+                hidden>
+
+                <h2>Point Changes</h2>
+
+                <p>
+                    View Point Changes.
+                </p>
+
+                <!-- Add point changes stuff here -->
+
+            </section>
+
+            <!-- Password Changes -->
+            <section
+                class="report-content"
+                id="password-changes"
+                role="tabpanel"
+                aria-labelledby="tab-password-changes"
+                hidden>
+
+                <h2>Password Changes</h2>
+
+                <p>
+                    View password changes.
+                </p>
+
+                <!-- Add password change stuff here -->
+
+            </section>
+
+            <!-- Password Changes -->
+            <section
+                class="report-content"
+                id="login-attempts"
+                role="tabpanel"
+                aria-labelledby="tab-login-attempts"
+                hidden>
+
+                <h2>Login Attempts</h2>
+
+                <p>
+                    View login attempts.
+                </p>
+
+                <!-- Add login attempts stuff here -->
+
+            </section>
+
+        </div>
+
         <a href="{{ url_for('adminDash') }}" class="back-link">
             Back to Admin Dashboard
         </a>
@@ -32,6 +156,32 @@
         Good (Truck) Driver Incentive Program &mdash; Fall 2026
 
     </footer>
+
+    <script>
+        function showReport(reportId, clickedTab) {
+
+            // Hide all report sections
+            document.querySelectorAll(".report-content").forEach(section => {
+                section.classList.remove("active");
+                section.hidden = true;
+            });
+
+            // Deactivate all tabs
+            document.querySelectorAll(".report-tab").forEach(tab => {
+                tab.classList.remove("active");
+                tab.setAttribute("aria-selected", "false");
+            });
+
+            // Show the selected report
+            const selectedReport = document.getElementById(reportId);
+            selectedReport.classList.add("active");
+            selectedReport.hidden = false;
+
+            // Highlight the selected tab
+            clickedTab.classList.add("active");
+            clickedTab.setAttribute("aria-selected", "true");
+        }
+    </script>
 
 </body>
 </html>
