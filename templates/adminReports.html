@@ -21,6 +21,101 @@
 
     <main class="admin-page">
 
+        <div class="report-container">
+
+            <!-- Tabs -->
+            <div class="report-tabs" role="tablist" aria-label="Reports">
+
+                <button
+                    class="report-tab active"
+                    id="tab-sponsors"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="sales-sponsors"
+                    onclick="showReport('sales-sponsors', this)">
+                    Sales by Sponsors
+                </button>
+
+                <button
+                    class="report-tab"
+                    id="tab-drivers"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="sales-drivers"
+                    onclick="showReport('sales-drivers', this)">
+                    Sales by Driver
+                </button>
+
+                <button
+                    class="report-tab"
+                    id="tab-invoice"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="invoice"
+                    onclick="showReport('invoice', this)">
+                    Invoice
+                </button>
+
+            </div>
+
+            <!-- Sales by Sponsors -->
+            <section
+                class="report-content active"
+                id="sales-sponsors"
+                role="tabpanel"
+                aria-labelledby="tab-sponsors">
+
+                <h2>Sales by Sponsors</h2>
+
+                <p>
+                    View sales totals grouped by sponsor company.
+                </p>
+
+                <!-- Add sponsor sales stuff here -->
+
+            </section>
+
+            <!-- Sales by Driver -->
+            <section
+                class="report-content"
+                id="sales-drivers"
+                role="tabpanel"
+                aria-labelledby="tab-drivers"
+                hidden>
+
+                <h2>Sales by Driver</h2>
+
+                <p>
+                    View purchases and sales totals grouped by driver.
+                </p>
+
+                <!-- Add driver sales stuff here -->
+
+            </section>
+
+            <!-- Invoice -->
+            <section
+                class="report-content"
+                id="invoice"
+                role="tabpanel"
+                aria-labelledby="tab-invoice"
+                hidden>
+
+                <h2>Invoice</h2>
+
+                <p>
+                    View invoice information and purchase details.
+                </p>
+
+                <!-- Add your invoice stuff here -->
+
+            </section>
+
+        </div>
+        
         <a href="{{ url_for('adminDash') }}" class="back-link">
             Back to Admin Dashboard
         </a>
@@ -32,6 +127,32 @@
         Good (Truck) Driver Incentive Program &mdash; Fall 2026
 
     </footer>
+
+    <script>
+        function showReport(reportId, clickedTab) {
+
+            // Hide all report sections
+            document.querySelectorAll(".report-content").forEach(section => {
+                section.classList.remove("active");
+                section.hidden = true;
+            });
+
+            // Deactivate all tabs
+            document.querySelectorAll(".report-tab").forEach(tab => {
+                tab.classList.remove("active");
+                tab.setAttribute("aria-selected", "false");
+            });
+
+            // Show the selected report
+            const selectedReport = document.getElementById(reportId);
+            selectedReport.classList.add("active");
+            selectedReport.hidden = false;
+
+            // Highlight the selected tab
+            clickedTab.classList.add("active");
+            clickedTab.setAttribute("aria-selected", "true");
+        }
+    </script>
 
 </body>
 </html>
