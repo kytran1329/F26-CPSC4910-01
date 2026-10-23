@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from catalog import search_ebay
 from datetime import date
+from decimal import Decimal
 
 from auth import auth
 
@@ -1365,33 +1366,189 @@ def adminDrivers():
     )
 
 
-@app.route("/adminDash/reports")
+@app.route("/adminDash/reports", methods=["GET", "POST"])
 def adminReports():
 
+    # required login
     if "user_id" not in session:
             return redirect(url_for("login"))
 
     conn = mysql.connector.connect(
-                host=DB_HOST,
-                user=DB_USER,
-                password=DB_PASSWORD,
-                database=DB_NAME
-            )
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
     cursor = conn.cursor(dictionary=True)
     
-    
-    user_id = session["user_id"]
-    cursor.execute(
+    try:
+        # verify the loggin in user is admin
+        cursor.execute(
             "SELECT ROLE FROM USER WHERE USER_ID = %s",
-            (user_id,)
+            (session["user_id"],)
         )
-        
-    user = cursor.fetchone()
+        user = cursor.fetchone()
 
-    if not user or user['ROLE'] != 'Admin':
-        return redirect(url_for('auth.login'))
+        if not user or user["ROLE"] != "Admin":
+            return "Unauthorized", 403
+
+        if request.method == "POST":
+            sponsorcomp_id = request.form.get("sponsorcomp_id", "")
+            start_test = request.form.get("start_date", "")
+            end_text = request.form.get("end_date", "")
+
+            # validate submitted form
+            try:
+                sponsorcomp_id = int(sponsorcomp_id)
+                start_date = date.fromisoformat(start_text)
+                end_date = date.fromisoformat(end_text)
+            except (ValueError, TypeError):
+                flash("Please select a sponsor and valid dates.", "error")
+                return redirect(url_for("adminReports") + "#invoice")
+            
+            if start_date > end_date:
+                flash("The end date must be on or after the start date.", "error")
+                return redirect(url_for("adminReports") + "#invoice")
+
+            cursor.execute(
+                """
+                SELECT SPONSORCOMP_ID
+                FROM SPONSORCOMP
+                WHERE SPONSORCOMP_ID = %s
+                """,
+                (sponsorcomp_id,)
+            )
+
+            if cursor.fetchone() is None:
+                flash("The selected sponsor company was not found.", "error")
+                return redirect(url_for("adminReports") + "#invoice")
+
+            # get itemized purchases for this sponsor and date range
+            # only completed orders count as purchases
+            cursor.execute(
+                """
+                SELECT
+                    o.ORDER_ID,
+                    o.DRIVER_ID,
+                    io.ITEM_NAME,
+                    io.ITEM_AMOUNT,
+                    io.ITEM_PRICE,
+                    (io.ITEM_AMOUNT * io.ITEM_PRICE) AS LINE_TOTAL
+                FROM ORDERS AS o
+                JOIN DRIVER AS d
+                    ON d.DRIVER_ID = o.DRIVER_ID
+                JOIN ITEMIZEDORDER AS io
+                    ON io.ORDER_ID = o.ORDER_ID
+                WHERE d.SPONSORCOMP_ID = %s
+                    AND LOWER(o.ORDER_STATUS) = 'completed'
+                    AND o.ORDER_DTS >= %s
+                    AND o.ORDER_DTE < DATE_ADD(%s, INTERVAL 1 DAY)
+                ORDER BY o.DRIVER_ID, o.ORDER_ID, io.ITEMIZED_ID
+                """,
+                (sponsorcomp_id, start_date, end_date)
+            )
+
+            purchase_rows = cursor.fetchall()
+
+            if not purchase_rows:
+                flash ("No completed itemized purchases were found for that sponsor and date range. No invoice was created.", "error")
+                return redirect(url_for("adminReports") + "#invoice")
+
+            # calculate invoice total
+            total_fee = sum (
+                (Decimal(str(row["LINE_TOTAL"])) for row in purchase_rows),
+                Decimal("0.00")
+            )
+
+            try:
+                # save the invoice header
+                cursor.execute(
+                    """
+                    INSERT INTO INVOICE (
+                        SPONSORCOMP_ID,
+                        PERIOD_START,
+                        PERIOD_END,
+                        TOTAL_FEE
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (sponsorcomp_id, start_date, end_date, total_fee)
+                )
+
+                invoice_id = cursor.lastrowid
+
+                # save each item as an invoice detail
+                for row in purchase_rows:
+                    cursor.execute(
+                        """
+                        INSERT INTO INVOICEDETAIL (
+                            INVOICE_ID,
+                            ORDER_ID,
+                            DRIVER_ID,
+                            ITEM_NAME,
+                            ITEM_AMOUNT,
+                            ITEM_PRICE,
+                            LINE_TOTAL
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            invoice_id,
+                            row["ORDER_ID"],
+                            row["DRIVER_ID"],
+                            row["ITEM_NAME"],
+                            row["ITEM_AMOUNT"],
+                            row["ITEM_PRICE"],
+                            row["LINE_TOTAL"]
+                        )
+                    )
+                
+                conn.commit()
+            
+            except Exception:
+                conn.rollback()
+                raise
+            
+            flash(f"Invoice #{invoice_id} was generated successfully.", "success")
+            return redirect(url_for("adminReports") + "#invoice")
+
+        # load sponsor companies for dropdown
+        cursor.execute(
+            """
+            SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+            FROM SPONSORCOMP
+            ORDER BY SPONSORCOMP_NAME
+            """
+        )
+        sponsor_companies = cursor.fetchall()
+
+        # load previously generated invoices
+        cursor.execute(
+            """
+            SELECT
+                i.INVOICE_ID,
+                i.PERIOD_START,
+                i.PERIOD_END,
+                i.GENERATED_DTS,
+                i.TOTAL_FEE,
+                sc.SPONSORCOMP_NAME
+            FROM INVOICE AS i
+            JOIN SPONSORCOMP AS sc
+                ON sc.SPONSORCOMP_ID = i.SPONSORCOMP_ID
+            ORDER BY i.GENERATED_DTS DESC, i.INVOICE_ID DESC
+            """
+        )
+        invoices = cursor.fetchall()
+        
+        return render_template(
+            "adminReports.html", 
+            sponsor_companies=sponsor_companies,
+            invoices=invoices
+        )
     
-    return render_template("adminReports.html")
+    finally:
+        cursor.close()
+        conn.close()
 
 @app.route("/adminDash/audit")
 def adminAudit():
