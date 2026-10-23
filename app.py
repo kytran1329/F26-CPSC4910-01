@@ -1550,6 +1550,112 @@ def adminReports():
         cursor.close()
         conn.close()
 
+@app.route("/adminDash/invoices/<int:invoice_id>")
+def viewInvoice(invoice_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # verify the loggin in user is admin
+        cursor.execute(
+            "SELECT ROLE FROM USER WHERE USER_ID = %s",
+            (session["user_id"],)
+        )
+        user = cursor.fetchone()
+
+        if not user or user["ROLE"] != "Admin":
+            return "Unauthorized", 403
+
+        # get saved invoice header
+        cursor.execute(
+            """
+            SELECT
+                i.INVOICE_ID,
+                i.PERIOD_START,
+                i.PERIOD_END,
+                i.GENERATED_DTS,
+                i.TOTAL_FEE,
+                sc.SPONSORCOMP_NAME
+            FROM INVOICE AS i
+            JOIN SPONSORCOMP AS sc
+                ON sc.SPONSORCOMP_ID = i.SPONSORCOMP_ID
+            WHERE i.INVOICE_ID = %s
+            """,
+            (invoice_id,)
+        )
+        invoice = cursor.fetchone()
+
+        if invoice is None:
+            return "Invoice not found", 404
+
+        # get individual saved purchase lines
+        cursor.execute(
+            """
+            SELECT
+                id.ORDER_ID,
+                id.DRIVER_ID,
+                u.USER_FNAME,
+                u.USER_LNAME,
+                id.ITEM_NAME,
+                id.ITEM_AMOUNT,
+                id.ITEM_PRICE,
+                id.LINE_TOTAL
+            FROM INVOICEDETAIL AS id
+            JOIN DRIVER AS d
+                ON d.DRIVER_ID = id.DRIVER_ID
+            JOIN USER AS u
+                ON u.USER_ID = d.USER_ID
+            WHERE id.INVOICE_ID = %s
+            ORDER BY u.USER_LNAME, u.USER_FNAME, id.ORDER_ID,
+                id.INVOICEDETAIL_ID
+            """,
+            (invoice_id,)
+        )
+        details = cursor.fetchall()
+
+        # summarize each driver's purchases for the invoice
+        cursor.execute(
+            """
+            SELECT
+                id.DRIVER_ID,
+                u.USER_FNAME,
+                u.USER_LNAME,
+                COUNT(DISTINCT id.ORDER_ID) AS PURCHASE_COUNT,
+                SUM(id.LINE_TOTAL) AS DRIVER_TOTAL
+            FROM INVOICEDETAIL AS id
+            JOIN DRIVER AS d
+                ON d.DRIVER_ID = id.DRIVER_ID
+            JOIN USER AS u
+                ON u.USER_ID = d.USER_ID
+            WHERE id.INVOICE_ID = %s
+            GROUP BY
+                id.DRIVER_ID, u.USER_FNAME, u.USER_LNAME
+            ORDER BY u.USER_LNAME, u.USER_FNAME
+            """,
+            (invoice_id,)
+        )
+        driver_summaries = cursor.fetchall()
+
+        return render_template(
+            "invoiceDetail.html",
+            invoice=invoice,
+            details=details,
+            driver_summaries=driver_summaries
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+    
+
 @app.route("/adminDash/audit")
 def adminAudit():
 
