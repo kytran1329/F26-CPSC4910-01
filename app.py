@@ -6,6 +6,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from catalog import search_ebay
 from datetime import date
 
+from export import export
+
 from auth import auth
 
 load_dotenv()
@@ -21,6 +23,7 @@ app = Flask(__name__, static_folder= "styles")
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 app.register_blueprint(auth)
+app.register_blueprint(export)
 
 # THIS STOPS SOMEONE FROM LOGGIN BACK IN BY HITTING THE BACK BUTTON AFTER THEY HAVE LOGGED OUT
 @app.after_request
@@ -150,7 +153,7 @@ def driverDash():
             select
                 pc.POINTCHANGE_ID,
                 pc.POINTCHANGE_AMOUNT,
-                pc.POINTCHANGE_REASON,
+                pc.POINTCHANGE_REASON AS REASON,
                 pc.DTS
             from POINTCHANGES as pc
             where pc.USER_ID =  %s
@@ -1512,8 +1515,37 @@ def adminAudit():
 
     if not user or user['ROLE'] != 'Admin':
         return redirect(url_for('auth.login'))
+
+
+    cursor.execute("""
+        SELECT ATTEMPTED_EMAIL, RESULT, DTS
+        FROM LOGINATTEMPTS
+        ORDER BY DTS DESC
+    """)
+
+    login_attempts = cursor.fetchall()
+
+    cursor.execute("""
+            SELECT
+                U.EMAIL,
+                PC.PASSWORDCHANGE_REASON,
+                PC.DTS
+            FROM PASSWORDCHANGES AS PC
+            INNER JOIN `USER` AS U
+                ON PC.USER_ID = U.USER_ID
+            ORDER BY PC.DTS DESC;
+        """)
     
-    return render_template("adminAudit.html")
+    password_changes = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        'adminAudit.html',
+        login_attempts=login_attempts,
+        password_changes=password_changes
+    )
 
 @app.route("/viewAsDriver/<int:driver_id>", methods=["POST"])
 def viewAsDriver(driver_id):

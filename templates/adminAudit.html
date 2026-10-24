@@ -117,15 +117,50 @@
 
                 <h2>Password Changes</h2>
 
-                <p>
-                    View password changes.
-                </p>
+                <p>Review password change history.</p>
 
-                <!-- Add password change stuff here -->
+                <div class="audit-actions">
+                    <a href="{{ url_for('export.exportPasswordChangesCsv') }}"
+                    class="back-link">
+                        Download CSV
+                    </a>
 
+                    <a href="{{ url_for('export.exportPasswordChangesPdf') }}"
+                    class="back-link">
+                        Download PDF
+                    </a>
+                </div>
+
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Reason</th>
+                                <th>Date and Time</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for change in password_changes %}
+                            <tr>
+                                <td>{{ change.EMAIL or 'N/A' }}</td>
+                                <td>{{ change.REASON or 'N/A' }}</td>
+                                <td>{{ change.DTS or 'N/A' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3">
+                                    No password changes found.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
-            <!-- Password Changes -->
+            <!-- Login Attempts -->
             <section
                 class="report-content"
                 id="login-attempts"
@@ -135,11 +170,54 @@
 
                 <h2>Login Attempts</h2>
 
-                <p>
-                    View login attempts.
-                </p>
+                <p>Review successful and unsuccessful login attempts.</p>
 
-                <!-- Add login attempts stuff here -->
+                <div class="audit-actions">
+                    <a href="{{ url_for('export.exportLoginAttemptsCsv') }}"
+                    class="back-link">
+                        Download CSV
+                    </a>
+
+                    <a href="{{ url_for('export.exportLoginAttemptsPdf') }}"
+                    class="back-link">
+                        Download PDF
+                    </a>
+                </div>
+
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Email Attempted</th>
+                                <th>Result</th>
+                                <th>Date and Time</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for attempt in login_attempts %}
+                            <tr>
+                                <td>{{ attempt.ATTEMPTED_EMAIL or 'N/A' }}</td>
+
+                                <td>
+                                    {% if attempt.RESULT %}
+                                        <span class="login-success">Success</span>
+                                    {% else %}
+                                        <span class="login-failure">Failure</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>{{ attempt.DTS }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3">No login attempts found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
 
             </section>
 
