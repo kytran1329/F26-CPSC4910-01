@@ -262,8 +262,7 @@
                             <th>Driver ID</th>
                             <th>Name</th>
                             <th>Email</th>
-                            <th>Sponsor Company</th>
-                            <th>Balance</th>
+                            <th>Sponsor Companies & Balances</th>
                             <th>Action</th>
                         </tr>
 
@@ -276,53 +275,38 @@
 
                         <tr
                             class="driver-row"
-                            data-sponsor="{{ driver['SPONSORCOMP_ID'] }}"
-                            onclick="showDriver(
-                                '{{ driver['DRIVER_ID'] }}',
-                                '{{ driver['USER_FNAME'] }}',
-                                '{{ driver['USER_LNAME'] }}',
-                                '{{ driver['EMAIL'] }}',
-                                '{{ driver['SPONSORCOMP_NAME'] }}',
-                                '{{ driver['BALANCE'] }}'
-                            )">
+                            data-driver-id="{{ driver['DRIVER_ID'] }}"
+                            data-first-name="{{ driver['USER_FNAME'] | e }}"
+                            data-last-name="{{ driver['USER_LNAME'] | e }}"
+                            data-email="{{ driver['EMAIL'] | e }}"
+                            data-sponsor-balances="{{ driver['SPONSOR_BALANCES'] | e }}"
+                            data-sponsor-ids="{{ driver['SPONSOR_IDS'] or '' }}">
 
-                            <td>
-                                {{ driver["DRIVER_ID"] }}
-                            </td>
+                            <td>{{ driver["DRIVER_ID"] }}</td>
 
                             <td>
                                 {{ driver["USER_FNAME"] }}
                                 {{ driver["USER_LNAME"] }}
                             </td>
 
-                            <td>
-                                {{ driver["EMAIL"] }}
-                            </td>
+                            <td>{{ driver["EMAIL"] }}</td>
 
-                            <td>
-                                {{ driver["SPONSORCOMP_NAME"] }}
-                            </td>
-
-                            <td>
-                                {{ driver["BALANCE"] }}
-                            </td>
+                            <td>{{ driver["SPONSOR_BALANCES"] }}</td>
 
                             <td class="actions-cell" onclick="event.stopPropagation();">
                                 <form
                                     action="{{ url_for('viewAsDriver', driver_id=driver['DRIVER_ID']) }}"
                                     method="POST"
                                     onsubmit="return confirmViewAsDriver(
-                                        '{{ driver['USER_FNAME'] | e }}',
-                                        '{{ driver['USER_LNAME'] | e }}'
+                                        {{ driver['USER_FNAME'] | tojson }},
+                                        {{ driver['USER_LNAME'] | tojson }}
                                     );">
 
                                     <button type="submit" class="view-driver-btn">
                                         View as Driver
                                     </button>
-
                                 </form>
                             </td>
-
                         </tr>
 
                         {% endfor %}
@@ -498,9 +482,12 @@
 
             rows.forEach(function(row) {
 
+                const sponsorIds =
+                    row.dataset.sponsorIds.split(",");
+
                 if (
                     filter === "all" ||
-                    row.dataset.sponsor === filter
+                    sponsorIds.includes(filter)
                 ) {
 
                     row.style.display = "";
@@ -542,9 +529,7 @@
                 }
 
             });
-
         }
-
 
         // DRIVER POPUP
         function showDriver(
@@ -552,8 +537,7 @@
             firstName,
             lastName,
             email,
-            company,
-            points
+            sponsorBalances
         ) {
 
             // Popup title
@@ -571,11 +555,9 @@
             document.getElementById("modal-email")
                 .textContent = email;
 
-            document.getElementById("modal-company")
-                .textContent = company;
-
-            document.getElementById("modal-points")
-                .textContent = points;
+            // Show all sponsor companies and their individual balances
+            document.getElementById("modal-company").textContent =
+                sponsorBalances || "No sponsor companies";
 
 
             // Show driver fields
@@ -589,7 +571,7 @@
                 .style.display = "block";
 
             document.getElementById("modal-points-container")
-                .style.display = "block";
+                .style.display = "none";
 
 
             // Hide company-only fields
@@ -609,6 +591,17 @@
 
         }
 
+        document.querySelectorAll(".driver-row").forEach(row => {
+            row.addEventListener("click", function () {
+                showDriver(
+                    this.dataset.driverId,
+                    this.dataset.firstName,
+                    this.dataset.lastName,
+                    this.dataset.email,
+                    this.dataset.sponsorBalances
+                );
+            });
+        });
 
         // SPONSOR POPUP
         function showSponsor(
