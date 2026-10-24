@@ -6,6 +6,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from catalog import search_ebay
 from datetime import date
 
+from export import export
+
 from auth import auth
 
 load_dotenv()
@@ -21,6 +23,7 @@ app = Flask(__name__, static_folder= "styles")
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 app.register_blueprint(auth)
+app.register_blueprint(export)
 
 # THIS STOPS SOMEONE FROM LOGGIN BACK IN BY HITTING THE BACK BUTTON AFTER THEY HAVE LOGGED OUT
 @app.after_request
@@ -1167,15 +1170,62 @@ def adminDash():
             U.USER_FNAME,
             U.USER_LNAME,
             U.EMAIL,
-            U.ROLE,
-            D.BALANCE,
-            SC.SPONSORCOMP_ID,
-            SC.SPONSORCOMP_NAME
+
+            COALESCE(
+                GROUP_CONCAT(
+                    DISTINCT CONCAT(
+                        SC.SPONSORCOMP_NAME,
+                        ': ',
+                        B.BALANCE,
+                        ' points'
+                    )
+                    ORDER BY SC.SPONSORCOMP_NAME
+                    SEPARATOR '; '
+                ),
+                'None'
+            ) AS SPONSOR_BALANCES,
+
+            COALESCE(PC.POINTS_AWARDED, 0) AS POINTS_AWARDED,
+
+            GROUP_CONCAT(
+                DISTINCT B.SPONSORCOMP_ID
+                SEPARATOR ','
+            ) AS SPONSOR_IDS
+
         FROM DRIVER D
-        INNER JOIN USER U
+
+        INNER JOIN `USER` U
             ON D.USER_ID = U.USER_ID
-        INNER JOIN SPONSORCOMP SC
-            ON D.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+
+        LEFT JOIN `BALANCE` B
+            ON D.DRIVER_ID = B.DRIVER_ID
+
+        LEFT JOIN SPONSORCOMP SC
+            ON B.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+
+        LEFT JOIN (
+            SELECT
+                USER_ID,
+                SUM(
+                    CASE
+                        WHEN POINTCHANGE_AMOUNT > 0
+                        THEN POINTCHANGE_AMOUNT
+                        ELSE 0
+                    END
+                ) AS POINTS_AWARDED
+            FROM POINTCHANGES
+            GROUP BY USER_ID
+        ) PC
+            ON PC.USER_ID = U.USER_ID
+
+        GROUP BY
+            D.DRIVER_ID,
+            U.USER_ID,
+            U.USER_FNAME,
+            U.USER_LNAME,
+            U.EMAIL,
+            PC.POINTS_AWARDED
+
         ORDER BY U.USER_LNAME, U.USER_FNAME
     """)
 
@@ -1335,24 +1385,71 @@ def adminDrivers():
     
     # Get drivers
     cursor.execute("""
+        SELECT
+            D.DRIVER_ID,
+            U.USER_ID,
+            U.USER_FNAME,
+            U.USER_LNAME,
+            U.EMAIL,
+
+            COALESCE(
+                GROUP_CONCAT(
+                    DISTINCT CONCAT(
+                        SC.SPONSORCOMP_NAME,
+                        ': ',
+                        B.BALANCE,
+                        ' points'
+                    )
+                    ORDER BY SC.SPONSORCOMP_NAME
+                    SEPARATOR '; '
+                ),
+                'None'
+            ) AS SPONSOR_BALANCES,
+
+            COALESCE(PC.POINTS_AWARDED, 0) AS POINTS_AWARDED,
+
+            GROUP_CONCAT(
+                DISTINCT B.SPONSORCOMP_ID
+                SEPARATOR ','
+            ) AS SPONSOR_IDS
+
+        FROM DRIVER D
+
+        INNER JOIN `USER` U
+            ON D.USER_ID = U.USER_ID
+
+        LEFT JOIN `BALANCE` B
+            ON D.DRIVER_ID = B.DRIVER_ID
+
+        LEFT JOIN SPONSORCOMP SC
+            ON B.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+
+        LEFT JOIN (
             SELECT
-                D.DRIVER_ID,
-                U.USER_ID,
-                U.USER_FNAME,
-                U.USER_LNAME,
-                U.EMAIL,
-                U.ROLE,
-                D.BALANCE,
-                SC.SPONSORCOMP_ID,
-                SC.SPONSORCOMP_NAME
-            FROM DRIVER D
-            INNER JOIN USER U
-                ON D.USER_ID = U.USER_ID
-            INNER JOIN SPONSORCOMP SC
-                ON D.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
-            ORDER BY U.USER_LNAME, U.USER_FNAME
-        """)
-    
+                USER_ID,
+                SUM(
+                    CASE
+                        WHEN POINTCHANGE_AMOUNT > 0
+                        THEN POINTCHANGE_AMOUNT
+                        ELSE 0
+                    END
+                ) AS POINTS_AWARDED
+            FROM POINTCHANGES
+            GROUP BY USER_ID
+        ) PC
+            ON PC.USER_ID = U.USER_ID
+
+        GROUP BY
+            D.DRIVER_ID,
+            U.USER_ID,
+            U.USER_FNAME,
+            U.USER_LNAME,
+            U.EMAIL,
+            PC.POINTS_AWARDED
+
+        ORDER BY U.USER_LNAME, U.USER_FNAME
+    """)
+
     drivers = cursor.fetchall()
 
     cursor.close()
@@ -1418,8 +1515,37 @@ def adminAudit():
 
     if not user or user['ROLE'] != 'Admin':
         return redirect(url_for('auth.login'))
+
+
+    cursor.execute("""
+        SELECT ATTEMPTED_EMAIL, RESULT, DTS
+        FROM LOGINATTEMPTS
+        ORDER BY DTS DESC
+    """)
+
+    login_attempts = cursor.fetchall()
+
+    cursor.execute("""
+            SELECT
+                U.EMAIL,
+                PC.PASSWORDCHANGE_REASON,
+                PC.DTS
+            FROM PASSWORDCHANGES AS PC
+            INNER JOIN `USER` AS U
+                ON PC.USER_ID = U.USER_ID
+            ORDER BY PC.DTS DESC;
+        """)
     
-    return render_template("adminAudit.html")
+    password_changes = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        'adminAudit.html',
+        login_attempts=login_attempts,
+        password_changes=password_changes
+    )
 
 @app.route("/viewAsDriver/<int:driver_id>", methods=["POST"])
 def viewAsDriver(driver_id):

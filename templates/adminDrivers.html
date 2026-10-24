@@ -62,34 +62,36 @@
 
             </div>
 
-            <!-- Driver table -->
+            <!-- Driver Table -->
             <div class="table-container">
+
                 <table class="admin-table">
+
                     <thead>
+
                         <tr>
                             <th>Driver ID</th>
                             <th>Name</th>
                             <th>Email</th>
-                            <th>Sponsor Company</th>
-                            <th>Point Balance</th>
+                            <th>Sponsor Companies & Balances</th>
                             <th>Action</th>
                         </tr>
+
                     </thead>
 
+
                     <tbody>
+
                         {% for driver in drivers %}
+
                         <tr
                             class="driver-row"
-                            data-name="{{ driver['USER_FNAME'] }} {{ driver['USER_LNAME'] }}"
-                            data-sponsor="{{ driver['SPONSORCOMP_ID'] }}"
-                            onclick="showDriver(
-                                '{{ driver['DRIVER_ID'] }}',
-                                '{{ driver['USER_FNAME'] }}',
-                                '{{ driver['USER_LNAME'] }}',
-                                '{{ driver['EMAIL'] }}',
-                                '{{ driver['SPONSORCOMP_NAME'] }}',
-                                '{{ driver['BALANCE'] }}'
-                            )">
+                            data-driver-id="{{ driver['DRIVER_ID'] }}"
+                            data-first-name="{{ driver['USER_FNAME'] | e }}"
+                            data-last-name="{{ driver['USER_LNAME'] | e }}"
+                            data-email="{{ driver['EMAIL'] | e }}"
+                            data-sponsor-balances="{{ driver['SPONSOR_BALANCES'] | e }}"
+                            data-sponsor-ids="{{ driver['SPONSOR_IDS'] or '' }}">
 
                             <td>{{ driver["DRIVER_ID"] }}</td>
 
@@ -100,30 +102,30 @@
 
                             <td>{{ driver["EMAIL"] }}</td>
 
-                            <td>{{ driver["SPONSORCOMP_NAME"] }}</td>
-
-                            <td>{{ driver["BALANCE"] }}</td>
+                            <td>{{ driver["SPONSOR_BALANCES"] }}</td>
 
                             <td class="actions-cell" onclick="event.stopPropagation();">
                                 <form
                                     action="{{ url_for('viewAsDriver', driver_id=driver['DRIVER_ID']) }}"
                                     method="POST"
                                     onsubmit="return confirmViewAsDriver(
-                                        '{{ driver['USER_FNAME'] | e }}',
-                                        '{{ driver['USER_LNAME'] | e }}'
+                                        {{ driver['USER_FNAME'] | tojson }},
+                                        {{ driver['USER_LNAME'] | tojson }}
                                     );">
 
                                     <button type="submit" class="view-driver-btn">
                                         View as Driver
                                     </button>
-
                                 </form>
                             </td>
-
                         </tr>
+
                         {% endfor %}
+
                     </tbody>
+
                 </table>
+
             </div>
 
             <p id="no-drivers-message" style="display: none;">
@@ -209,13 +211,19 @@
             let visibleCount = 0;
 
             rows.forEach(row => {
-                const name = row.dataset.name.toLowerCase();
-                const company = row.dataset.sponsor;
+                const firstName = row.dataset.firstName.toLowerCase();
+                const lastName = row.dataset.lastName.toLowerCase();
+                const sponsorIds = row.dataset.sponsorIds
+                    .split(",")
+                    .filter(id => id !== "");
 
-                const matchesName = name.includes(searchInput);
+                const matchesName =
+                    firstName.includes(searchInput) ||
+                    lastName.includes(searchInput);
+
                 const matchesCompany =
                     selectedCompany === "all" ||
-                    company === selectedCompany;
+                    sponsorIds.includes(selectedCompany);
 
                 if (matchesName && matchesCompany) {
                     row.style.display = "";
@@ -225,9 +233,8 @@
                 }
             });
 
-            document.getElementById("no-drivers-message")
-                .style.display =
-                    visibleCount === 0 ? "block" : "none";
+            document.getElementById("no-drivers-message").style.display =
+                visibleCount === 0 ? "block" : "none";
         }
 
         function showDriver(
@@ -235,24 +242,39 @@
             firstName,
             lastName,
             email,
-            company,
-            balance
+            sponsorBalances
         ) {
             document.getElementById("driver-modal-title").textContent =
                 "Driver Information";
 
             document.getElementById("driver-modal-id").textContent = id;
+
             document.getElementById("driver-modal-name").textContent =
                 firstName + " " + lastName;
-            document.getElementById("driver-modal-email").textContent =
-                email;
+
+            document.getElementById("driver-modal-email").textContent = email;
+
             document.getElementById("driver-modal-company").textContent =
-                company;
-            document.getElementById("driver-modal-balance").textContent =
-                balance;
+                sponsorBalances || "No sponsor companies";
+
+            // The balances are already included alongside each sponsor company.
+            document.getElementById("driver-modal-balance")
+                .closest("p").style.display = "none";
 
             document.getElementById("driver-modal").style.display = "flex";
         }
+
+        document.querySelectorAll(".driver-row").forEach(row => {
+            row.addEventListener("click", function () {
+                showDriver(
+                    this.dataset.driverId,
+                    this.dataset.firstName,
+                    this.dataset.lastName,
+                    this.dataset.email,
+                    this.dataset.sponsorBalances
+                );
+            });
+        });
 
         function closeDriverModal() {
             document.getElementById("driver-modal").style.display = "none";

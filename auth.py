@@ -36,6 +36,19 @@ def login():
             cursor.execute("SELECT USER_ID, EMAIL, PASSWORD, ROLE FROM USER WHERE EMAIL = %s", (username,))
             user = cursor.fetchone()
 
+            # Check whether the user exists
+            if user is None:
+                cursor.execute(
+                """
+                INSERT INTO LOGINATTEMPTS (ATTEMPTED_EMAIL, RESULT)
+                VALUES (%s, %s)
+                """,
+                (username, False)
+                )
+                conn.commit()
+
+                return render_template("login.html",error="Invalid username or password")
+
             global USER_ID
             USER_ID= user["USER_ID"]
 
@@ -44,6 +57,16 @@ def login():
                 role = user["ROLE"]
                 session["user_id"] = user["USER_ID"]
                 session["role"] = user["ROLE"]
+
+                cursor.execute(
+                """
+                INSERT INTO LOGINATTEMPTS (ATTEMPTED_EMAIL, RESULT)
+                VALUES (%s, %s)
+                """,
+                (username, True)
+                )
+
+                conn.commit()
 
                 if role == "Driver":
                     return redirect(url_for("driverDash"))
@@ -55,6 +78,15 @@ def login():
                     return redirect(url_for("home"))
 
             # if password doesn't match stay on the page and give an error
+            cursor.execute(
+            """
+            INSERT INTO LOGINATTEMPTS (ATTEMPTED_EMAIL, RESULT)
+            VALUES (%s, %s)
+            """,
+            (username, False)
+            )
+            conn.commit()
+
             return render_template( "login.html", error="Invalid username or password" )
             
         finally:
