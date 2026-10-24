@@ -145,7 +145,7 @@
                             {% for change in password_changes %}
                             <tr>
                                 <td>{{ change.EMAIL or 'N/A' }}</td>
-                                <td>{{ change.REASON or 'N/A' }}</td>
+                                <td>{{ change.PASSWORDCHANGE_REASON or 'N/A' }}</td>
                                 <td>{{ change.DTS or 'N/A' }}</td>
                             </tr>
                             {% else %}

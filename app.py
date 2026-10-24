@@ -153,7 +153,7 @@ def driverDash():
             select
                 pc.POINTCHANGE_ID,
                 pc.POINTCHANGE_AMOUNT,
-                pc.POINTCHANGE_REASON AS REASON,
+                pc.POINTCHANGE_REASON,
                 pc.DTS
             from POINTCHANGES as pc
             where pc.USER_ID =  %s
