@@ -1538,13 +1538,46 @@ def adminAudit():
     
     password_changes = cursor.fetchall()
 
+    cursor.execute("""
+            SELECT
+                SC.SPONSORCOMP_NAME,
+                A.SPONSORCOMP_ID,
+                U.EMAIL AS DRIVER_EMAIL,
+                SU.EMAIL AS SPONSOR_EMAIL,
+                A.STATUS,
+                A.REASON,
+                A.CREATED_DTS,
+                A.UPDATED_DTS
+            FROM APPLICATIONS AS A
+            LEFT JOIN SPONSORCOMP AS SC
+                ON A.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+            LEFT JOIN `USER` AS U
+                ON A.USER_ID = U.USER_ID
+            LEFT JOIN SPONSOR AS S
+                ON A.SPONSOR_ID = S.SPONSOR_ID
+            LEFT JOIN `USER` AS SU
+                ON S.USER_ID = SU.USER_ID
+            ORDER BY A.CREATED_DTS DESC;
+            """)
+        
+    driver_applications = cursor.fetchall()
+
+    cursor.execute("""
+            SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+            FROM SPONSORCOMP
+            ORDER BY SPONSORCOMP_NAME
+            """)
+    sponsor_companies = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
     return render_template(
         'adminAudit.html',
         login_attempts=login_attempts,
-        password_changes=password_changes
+        password_changes=password_changes,
+        driver_applications=driver_applications,
+        sponsor_companies=sponsor_companies
     )
 
 @app.route("/viewAsDriver/<int:driver_id>", methods=["POST"])
