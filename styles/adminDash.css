@@ -337,6 +337,18 @@ h2 {
     padding: 24px;
 }
 
+#driver-search,
+#driver-filter {
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+#driver-search {
+    min-width: 220px;
+}
+
 #sponsor-search,
 #sponsor-filter {
     padding: 8px 10px;
@@ -521,12 +533,12 @@ h2 {
     font-weight: bold;
 }
 
-.login-success {
+.status-success {
     color: #18743a;
     font-weight: bold;
 }
 
-.login-failure {
+.status-failure {
     color: #b42318;
     font-weight: bold;
 }

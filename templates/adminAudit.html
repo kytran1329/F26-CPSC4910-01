@@ -85,8 +85,73 @@
                     View Driver Applications
                 </p>
 
-                <!-- Add application stuff here -->
+                
+                <div class="filter-container">
+                    <label for="applicationSponsorFilter">
+                        Filter by Sponsor Company:
+                    </label>
 
+                    <select id="applicationSponsorFilter">
+                        <option value="all">All Sponsor Companies</option>
+
+                        {% for company in sponsor_companies %}
+                        <option value="{{ company.SPONSORCOMP_ID }}">
+                            {{ company.SPONSORCOMP_NAME }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="audit-actions">
+                    <a href="{{ url_for('export.exportDriverApplicationsCsv') }}"
+                    id="downloadApplicationsCsv"
+                    class="back-link">
+                        Download CSV
+                    </a>
+
+                    <a href="{{ url_for('export.exportDriverApplicationsPdf') }}"
+                    id="downloadApplicationsPdf"
+                    class="back-link">
+                        Download PDF
+                    </a>
+                </div>
+
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Sponsor Company</th>
+                                <th>Driver Email</th>
+                                <th>Sponsor Email</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Created</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="driverApplicationsBody">
+                            {% for application in driver_applications %}
+                            <tr data-sponsorcomp-id="{{ application.SPONSORCOMP_ID }}">
+                                <td>{{ application.SPONSORCOMP_NAME or 'N/A' }}</td>
+                                <td>{{ application.DRIVER_EMAIL or 'N/A' }}</td>
+                                <td>{{ application.SPONSOR_EMAIL or 'N/A' }}</td>
+                                <td>
+                                    <span class="{% if application.STATUS == 'Accepted' %}status-success{% elif application.STATUS == 'Rejected' %}status-failure{% endif %}">
+                                        {{ application.STATUS or 'N/A' }}
+                                    </span></td>
+                                <td>{{ application.REASON or 'N/A' }}</td>
+                                <td>{{ application.CREATED_DTS or 'N/A' }}</td>
+                                <td>{{ application.UPDATED_DTS or 'N/A' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7">No driver applications found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
             <!-- Point Changes -->
@@ -201,9 +266,9 @@
 
                                 <td>
                                     {% if attempt.RESULT %}
-                                        <span class="login-success">Success</span>
+                                        <span class="status-success">Success</span>
                                     {% else %}
-                                        <span class="login-failure">Failure</span>
+                                        <span class="status-failure">Failure</span>
                                     {% endif %}
                                 </td>
 
@@ -259,6 +324,61 @@
             clickedTab.classList.add("active");
             clickedTab.setAttribute("aria-selected", "true");
         }
+    
+        // Getting the HTML elements
+        const sponsorFilter = document.getElementById(
+            "applicationSponsorFilter"
+        );
+
+        const csvLink = document.getElementById(
+            "downloadApplicationsCsv"
+        );
+
+        const pdfLink = document.getElementById(
+            "downloadApplicationsPdf"
+        );
+
+        // Update export link so audit logs match selected company
+        function updateApplicationExportLinks() {
+            const selectedSponsor = sponsorFilter.value;
+
+            [csvLink, pdfLink].forEach(function (link) {
+                const url = new URL(link.href);
+
+                // Example query param = /admin/driver-applications/csv?sponsorcomp_id=1
+                if (selectedSponsor === "all") {
+                    url.searchParams.delete("sponsorcomp_id");
+                } else {
+                    url.searchParams.set("sponsorcomp_id", selectedSponsor);
+                }
+
+                link.href = url.toString();
+            });
+        }
+
+        // Filters table
+        function filterDriverApplications() {
+            const selectedSponsor = sponsorFilter.value;
+
+            // Find the relevant rows
+            const rows = document.querySelectorAll(
+                "#driverApplicationsBody tr[data-sponsorcomp-id]"
+            );
+
+            rows.forEach(function (row) {
+                const sponsorId = row.dataset.sponsorcompId;
+
+                row.style.display =
+                    selectedSponsor === "all" ||
+                    sponsorId === selectedSponsor
+                        ? ""
+                        : "none";
+            });
+
+            updateApplicationExportLinks();
+        }
+
+        sponsorFilter.addEventListener("change", filterDriverApplications);
     </script>
 
 </body>
