@@ -104,6 +104,11 @@
             border-radius: 6px;
         }
 
+        .availability {
+            color: #1a7f37;
+            font-weight: bold;
+        }
+
         #per_page {
             padding: 8px;
             margin: 0 8px;
@@ -186,14 +191,19 @@
 
                     {% if item.price %}
                         <p class="price">
-                            {{ item.price.value }}
-                            {{ item.price.currency }}
+                            {{ item.price.value }} points
                         </p>
                     {% endif %}
 
                     {% if item.condition %}
                         <p class="condition">
                             Condition: {{ item.condition }}
+                        </p>
+                    {% endif %}
+
+                    {% if item.availability %}
+                        <p class="availability">
+                            {{ item.availability }}
                         </p>
                     {% endif %}
 

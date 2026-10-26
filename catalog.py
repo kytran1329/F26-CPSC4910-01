@@ -1,6 +1,7 @@
 
 import requests, base64, os
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
 
 load_dotenv()
 
@@ -42,6 +43,52 @@ def get_access_token():
     return response.json()["access_token"]
 
 
+# helper for search_ebay's availability
+# call getItem for one item and return first estimatedAvailabilities entry
+def get_item_availability(item_id, access_token):
+    url = f"https://api.ebay.com/buy/browse/v1/item/{item_id}"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+    except requests.RequestException:
+        return None
+
+    if response.status_code != 200:
+        return None
+
+    availabilities = response.json().get("estimatedAvailabilities", [])
+    return availabilities[0] if availabilities else None
+
+# helper for search_ebay's availability
+# make availability object readable
+def availability_text(avail):
+    if not avail:
+        return "Availability unknown"
+
+    status = avail.get("estimatedAvailabilityStatus")
+    if status == "OUT_OF_STOCK":
+        return "Out of stock"
+
+    # exact count (eBay only gives for low stock)
+    qty = avail.get("estimatedAvailableQuantity")
+    if qty is not None:
+        return f"{qty} left"
+
+    # otherwise threshold is more than 10 items
+    threshold = avail.get("availabilityThreshold")
+    if threshold is not None:
+        if avail.get("availabilityThresholdType") == "MORE_THAN":
+            return f"More than {threshold} available"
+        return f"{threshold} available"
+
+    return "In stock" if status == "IN_STOCK" else "Availability unknown"
+
+
 # This is used to actually query for ebay items/data
 # It will return items in form of json
 def search_ebay(query, limit=10, offset=0):
@@ -70,4 +117,15 @@ def search_ebay(query, limit=10, offset=0):
         headers=headers
     )
 
-    return response.json(), None
+    data = response.json()
+    items = data.get("itemSummaries", [])
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        results = pool.map(
+            lambda item: get_item_availability(item["itemId"], access_token),
+            items
+        )
+        for item, avail in zip(items, results):
+            item["availability"] = availability_text(avail)
+
+    return data, None
