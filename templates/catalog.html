@@ -75,6 +75,39 @@
             display: inline-block;
             margin-top: 10px;
         }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .pagination a {
+            padding: 10px 16px;
+            background-color: #1f2937;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+        }
+
+        .pagination a:hover {
+            background-color: #374151;
+        }
+
+        .pagination .disabled {
+            padding: 10px 16px;
+            color: #888;
+            background-color: #eee;
+            border-radius: 6px;
+        }
+
+        #per_page {
+            padding: 8px;
+            margin: 0 8px;
+        }
     </style>
 </head>
 
@@ -94,6 +127,25 @@
         <button type="submit">
             Search
         </button>
+
+        <label for="per_page">Items per page:</label>
+
+        <select id="per_page" name="per_page">
+            <option value="10"
+                {% if per_page == 10 %}selected{% endif %}>
+                10
+            </option>
+
+            <option value="25"
+                {% if per_page == 25 %}selected{% endif %}>
+                25
+            </option>
+
+            <option value="50"
+                {% if per_page == 50 %}selected{% endif %}>
+                50
+            </option>
+        </select>
 
     </form>
 
@@ -158,11 +210,49 @@
 
             {% endfor %}
 
+            {% if query %}
+            <div class="pagination">
+
+                {% if page > 1 %}
+                    <a href="{{ url_for(
+                        'catalog',
+                        query=query,
+                        per_page=per_page,
+                        page=page - 1
+                    ) }}">
+                        &laquo; Previous
+                    </a>
+                {% else %}
+                    <span class="disabled">&laquo; Previous</span>
+                {% endif %}
+
+                <span>
+                    Page {{ page }} of {{ total_pages }}
+                    &middot;
+                    {{ total }} results
+                </span>
+
+                {% if page < total_pages %}
+                    <a href="{{ url_for(
+                        'catalog',
+                        query=query,
+                        per_page=per_page,
+                        page=page + 1
+                    ) }}">
+                        Next &raquo;
+                    </a>
+                {% else %}
+                    <span class="disabled">Next &raquo;</span>
+                {% endif %}
+
+            </div>
+            {% endif %}
+
         </div>
 
-    {% elif request.method == "POST" and not error %}
+    {% elif query and not items and not error %}
 
-        <p>No results found.</p>
+        <p>No results found for "{{ query }}".</p>
 
     {% endif %}
 

@@ -188,26 +188,48 @@ def driverDash():
 
 @app.route("/catalog", methods=["GET", "POST"])
 def catalog():
-
+    print("CATALOG ROUTE CALLED:", request.method, flush=True)
     items = []
     error = None
-    query = ""
+    total = 0
 
     if request.method == "POST":
-
         query = request.form.get("query", "").strip()
+        per_page = int(request.form.get("per_page", 10))
+        page = 1
+    else:
+        query = request.form.get("query", "").strip()
+        per_page = int(request.args.get("per_page", 10))
+
+        if per_page not in (10, 25, 50):
+            per_page = 10
+
+        page = max(1, int(request.args.get("page", 1)))
 
         if query:
-            data, error = search_ebay(query)
-
+            offset = (page - 1) * per_page
+            data, error = search_ebay(query, limit=per_page, offset=offset)
+            print("Search query:", query)
+            print("Offset:", offset)
+            print("API error:", error)
+            print("API data:", data)
             if data:
                 items = data.get("itemSummaries", [])
+                total = int(data.get("total", 0))
+            print("Items found:", len(items))
+            print("Total results:", total)
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
 
     return render_template(
         "catalog.html",
         items=items,
         error=error,
-        query=query
+        query=query,
+        per_page=per_page,
+        page=page,
+        total=total,
+        total_pages=total_pages
     )
 
 @app.route("/sponDash/applications")

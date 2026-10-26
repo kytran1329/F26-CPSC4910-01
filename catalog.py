@@ -44,7 +44,7 @@ def get_access_token():
 
 # This is used to actually query for ebay items/data
 # It will return items in form of json
-def search_ebay(query):
+def search_ebay(query, limit=10, offset=0):
     access_token = get_access_token()
 
     if not access_token:
@@ -54,7 +54,8 @@ def search_ebay(query):
 
     params = {
         "q": query,
-        "limit": 10
+        "limit": limit,
+        "offset": offset
     }
 
     headers = {
