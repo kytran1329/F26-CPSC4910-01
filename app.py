@@ -188,7 +188,6 @@ def driverDash():
 
 @app.route("/catalog", methods=["GET", "POST"])
 def catalog():
-    print("CATALOG ROUTE CALLED:", request.method, flush=True)
     items = []
     error = None
     total = 0
@@ -198,26 +197,28 @@ def catalog():
         per_page = int(request.form.get("per_page", 10))
         page = 1
     else:
-        query = request.form.get("query", "").strip()
-        per_page = int(request.args.get("per_page", 10))
+        query = request.args.get("query", "").strip()
+        per_page = request.args.get("per_page", 10)
+        page = request.args.get("page", 1)
 
-        if per_page not in (10, 25, 50):
-            per_page = 10
+    per_page = int(per_page)
+    if per_page not in (10, 25, 50):
+        per_page = 10
 
-        page = max(1, int(request.args.get("page", 1)))
+    page = max(1, int(page))
 
-        if query:
-            offset = (page - 1) * per_page
-            data, error = search_ebay(query, limit=per_page, offset=offset)
-            print("Search query:", query)
-            print("Offset:", offset)
-            print("API error:", error)
-            print("API data:", data)
-            if data:
-                items = data.get("itemSummaries", [])
-                total = int(data.get("total", 0))
-            print("Items found:", len(items))
-            print("Total results:", total)
+    # search for both POST and GET requests
+    if query:
+        offset = (page - 1) * per_page
+        data, error = search_ebay(
+            query,
+            limit=per_page,
+            offset=offset
+        )
+
+        if data:
+            items = data.get("itemSummaries", [])
+            total = int(data.get("total", 0))
 
     total_pages = max(1, (total + per_page - 1) // per_page)
 
