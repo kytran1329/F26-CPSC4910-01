@@ -1491,7 +1491,7 @@ def adminReports():
 
         if request.method == "POST":
             sponsorcomp_id = request.form.get("sponsorcomp_id", "")
-            start_test = request.form.get("start_date", "")
+            start_text = request.form.get("start_date", "")
             end_text = request.form.get("end_date", "")
 
             # validate submitted form
@@ -1527,6 +1527,7 @@ def adminReports():
                 SELECT
                     o.ORDER_ID,
                     o.DRIVER_ID,
+                    o.ORDER_DTS,
                     io.ITEM_NAME,
                     io.ITEM_AMOUNT,
                     io.ITEM_PRICE,
@@ -1534,12 +1535,14 @@ def adminReports():
                 FROM ORDERS AS o
                 JOIN DRIVER AS d
                     ON d.DRIVER_ID = o.DRIVER_ID
+                JOIN BALANCE AS b
+                    ON d.DRIVER_ID = b.DRIVER_ID
                 JOIN ITEMIZEDORDER AS io
                     ON io.ORDER_ID = o.ORDER_ID
-                WHERE d.SPONSORCOMP_ID = %s
-                    AND LOWER(o.ORDER_STATUS) = 'completed'
+                WHERE b.SPONSORCOMP_ID = %s
+                    AND LOWER(o.ORDER_STATUS) = 'done'
                     AND o.ORDER_DTS >= %s
-                    AND o.ORDER_DTE < DATE_ADD(%s, INTERVAL 1 DAY)
+                    AND o.ORDER_DTS < DATE_ADD(%s, INTERVAL 1 DAY)
                 ORDER BY o.DRIVER_ID, o.ORDER_ID, io.ITEMIZED_ID
                 """,
                 (sponsorcomp_id, start_date, end_date)
