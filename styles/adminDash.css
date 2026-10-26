@@ -337,6 +337,18 @@ h2 {
     padding: 24px;
 }
 
+#driver-search,
+#driver-filter {
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+#driver-search {
+    min-width: 220px;
+}
+
 #sponsor-search,
 #sponsor-filter {
     padding: 8px 10px;
@@ -479,4 +491,54 @@ h2 {
 
 .report-content h2 {
     margin-top: 0;
+}
+
+.audit-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.audit-table-container {
+    max-height: 450px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.audit-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: #1f2937;
+    color: white;
+}
+
+.audit-table th,
+.audit-table td {
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.audit-table th {
+    background-color: #f2f4f7;
+    font-weight: bold;
+}
+
+.status-success {
+    color: #18743a;
+    font-weight: bold;
+}
+
+.status-failure {
+    color: #b42318;
+    font-weight: bold;
 }

@@ -21,6 +21,273 @@
 
     <main class="admin-page">
 
+        <div class="report-container">
+
+            <!-- Tabs -->
+            <div class="report-tabs" role="tablist" aria-label="Reports">
+
+                <button
+                    class="report-tab active"
+                    id="tab-driver-applications"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="driver-applications"
+                    onclick="showReport('driver-applications', this)">
+                    Driver Applications Audit Log
+                </button>
+
+                <button
+                    class="report-tab"
+                    id="tab-point-changes"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="point-changes"
+                    onclick="showReport('point-changes', this)">
+                    Point Changes Audit Log
+                </button>
+
+                <button
+                    class="report-tab"
+                    id="tab-password-changes"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="password-changes"
+                    onclick="showReport('password-changes', this)">
+                    Password Changes Audit Log
+                </button>
+
+                <button
+                    class="report-tab"
+                    id="tab-login-attempts"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="login-attempts"
+                    onclick="showReport('login-attempts', this)">
+                    Login Attempts Audit Log
+                </button>
+
+            </div>
+
+            <!-- Driver Applications -->
+            <section
+                class="report-content active"
+                id="driver-applications"
+                role="tabpanel"
+                aria-labelledby="tab-driver-applications">
+
+                <h2>Driver Applications</h2>
+
+                <p>
+                    View Driver Applications
+                </p>
+
+                
+                <div class="filter-container">
+                    <label for="applicationSponsorFilter">
+                        Filter by Sponsor Company:
+                    </label>
+
+                    <select id="applicationSponsorFilter">
+                        <option value="all">All Sponsor Companies</option>
+
+                        {% for company in sponsor_companies %}
+                        <option value="{{ company.SPONSORCOMP_ID }}">
+                            {{ company.SPONSORCOMP_NAME }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="audit-actions">
+                    <a href="{{ url_for('export.exportDriverApplicationsCsv') }}"
+                    id="downloadApplicationsCsv"
+                    class="back-link">
+                        Download CSV
+                    </a>
+
+                    <a href="{{ url_for('export.exportDriverApplicationsPdf') }}"
+                    id="downloadApplicationsPdf"
+                    class="back-link">
+                        Download PDF
+                    </a>
+                </div>
+
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Sponsor Company</th>
+                                <th>Driver Email</th>
+                                <th>Sponsor Email</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Created</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="driverApplicationsBody">
+                            {% for application in driver_applications %}
+                            <tr data-sponsorcomp-id="{{ application.SPONSORCOMP_ID }}">
+                                <td>{{ application.SPONSORCOMP_NAME or 'N/A' }}</td>
+                                <td>{{ application.DRIVER_EMAIL or 'N/A' }}</td>
+                                <td>{{ application.SPONSOR_EMAIL or 'N/A' }}</td>
+                                <td>
+                                    <span class="{% if application.STATUS == 'Accepted' %}status-success{% elif application.STATUS == 'Rejected' %}status-failure{% endif %}">
+                                        {{ application.STATUS or 'N/A' }}
+                                    </span></td>
+                                <td>{{ application.REASON or 'N/A' }}</td>
+                                <td>{{ application.CREATED_DTS or 'N/A' }}</td>
+                                <td>{{ application.UPDATED_DTS or 'N/A' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7">No driver applications found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Point Changes -->
+            <section
+                class="report-content"
+                id="point-changes"
+                role="tabpanel"
+                aria-labelledby="tab-point-changes"
+                hidden>
+
+                <h2>Point Changes</h2>
+
+                <p>
+                    View Point Changes.
+                </p>
+
+                <!-- Add point changes stuff here -->
+
+            </section>
+
+            <!-- Password Changes -->
+            <section
+                class="report-content"
+                id="password-changes"
+                role="tabpanel"
+                aria-labelledby="tab-password-changes"
+                hidden>
+
+                <h2>Password Changes</h2>
+
+                <p>Review password change history.</p>
+
+                <div class="audit-actions">
+                    <a href="{{ url_for('export.exportPasswordChangesCsv') }}"
+                    class="back-link">
+                        Download CSV
+                    </a>
+
+                    <a href="{{ url_for('export.exportPasswordChangesPdf') }}"
+                    class="back-link">
+                        Download PDF
+                    </a>
+                </div>
+
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Reason</th>
+                                <th>Date and Time</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for change in password_changes %}
+                            <tr>
+                                <td>{{ change.EMAIL or 'N/A' }}</td>
+                                <td>{{ change.PASSWORDCHANGE_REASON or 'N/A' }}</td>
+                                <td>{{ change.DTS or 'N/A' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3">
+                                    No password changes found.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Login Attempts -->
+            <section
+                class="report-content"
+                id="login-attempts"
+                role="tabpanel"
+                aria-labelledby="tab-login-attempts"
+                hidden>
+
+                <h2>Login Attempts</h2>
+
+                <p>Review successful and unsuccessful login attempts.</p>
+
+                <div class="audit-actions">
+                    <a href="{{ url_for('export.exportLoginAttemptsCsv') }}"
+                    class="back-link">
+                        Download CSV
+                    </a>
+
+                    <a href="{{ url_for('export.exportLoginAttemptsPdf') }}"
+                    class="back-link">
+                        Download PDF
+                    </a>
+                </div>
+
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Email Attempted</th>
+                                <th>Result</th>
+                                <th>Date and Time</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for attempt in login_attempts %}
+                            <tr>
+                                <td>{{ attempt.ATTEMPTED_EMAIL or 'N/A' }}</td>
+
+                                <td>
+                                    {% if attempt.RESULT %}
+                                        <span class="status-success">Success</span>
+                                    {% else %}
+                                        <span class="status-failure">Failure</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>{{ attempt.DTS }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3">No login attempts found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+
+            </section>
+
+        </div>
+
         <a href="{{ url_for('adminDash') }}" class="back-link">
             Back to Admin Dashboard
         </a>
@@ -32,6 +299,87 @@
         Good (Truck) Driver Incentive Program &mdash; Fall 2026
 
     </footer>
+
+    <script>
+        function showReport(reportId, clickedTab) {
+
+            // Hide all report sections
+            document.querySelectorAll(".report-content").forEach(section => {
+                section.classList.remove("active");
+                section.hidden = true;
+            });
+
+            // Deactivate all tabs
+            document.querySelectorAll(".report-tab").forEach(tab => {
+                tab.classList.remove("active");
+                tab.setAttribute("aria-selected", "false");
+            });
+
+            // Show the selected report
+            const selectedReport = document.getElementById(reportId);
+            selectedReport.classList.add("active");
+            selectedReport.hidden = false;
+
+            // Highlight the selected tab
+            clickedTab.classList.add("active");
+            clickedTab.setAttribute("aria-selected", "true");
+        }
+    
+        // Getting the HTML elements
+        const sponsorFilter = document.getElementById(
+            "applicationSponsorFilter"
+        );
+
+        const csvLink = document.getElementById(
+            "downloadApplicationsCsv"
+        );
+
+        const pdfLink = document.getElementById(
+            "downloadApplicationsPdf"
+        );
+
+        // Update export link so audit logs match selected company
+        function updateApplicationExportLinks() {
+            const selectedSponsor = sponsorFilter.value;
+
+            [csvLink, pdfLink].forEach(function (link) {
+                const url = new URL(link.href);
+
+                // Example query param = /admin/driver-applications/csv?sponsorcomp_id=1
+                if (selectedSponsor === "all") {
+                    url.searchParams.delete("sponsorcomp_id");
+                } else {
+                    url.searchParams.set("sponsorcomp_id", selectedSponsor);
+                }
+
+                link.href = url.toString();
+            });
+        }
+
+        // Filters table
+        function filterDriverApplications() {
+            const selectedSponsor = sponsorFilter.value;
+
+            // Find the relevant rows
+            const rows = document.querySelectorAll(
+                "#driverApplicationsBody tr[data-sponsorcomp-id]"
+            );
+
+            rows.forEach(function (row) {
+                const sponsorId = row.dataset.sponsorcompId;
+
+                row.style.display =
+                    selectedSponsor === "all" ||
+                    sponsorId === selectedSponsor
+                        ? ""
+                        : "none";
+            });
+
+            updateApplicationExportLinks();
+        }
+
+        sponsorFilter.addEventListener("change", filterDriverApplications);
+    </script>
 
 </body>
 </html>
