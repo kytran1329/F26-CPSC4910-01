@@ -1163,108 +1163,18 @@ def adminDash():
     sponsor_companies = cursor.fetchall()
 
     # Get drivers
-    cursor.execute("""
-        SELECT
-            D.DRIVER_ID,
-            U.USER_ID,
-            U.USER_FNAME,
-            U.USER_LNAME,
-            U.EMAIL,
-
-            COALESCE(
-                GROUP_CONCAT(
-                    DISTINCT CONCAT(
-                        SC.SPONSORCOMP_NAME,
-                        ': ',
-                        B.BALANCE,
-                        ' points'
-                    )
-                    ORDER BY SC.SPONSORCOMP_NAME
-                    SEPARATOR '; '
-                ),
-                'None'
-            ) AS SPONSOR_BALANCES,
-
-            COALESCE(PC.POINTS_AWARDED, 0) AS POINTS_AWARDED,
-
-            GROUP_CONCAT(
-                DISTINCT B.SPONSORCOMP_ID
-                SEPARATOR ','
-            ) AS SPONSOR_IDS
-
-        FROM DRIVER D
-
-        INNER JOIN `USER` U
-            ON D.USER_ID = U.USER_ID
-
-        LEFT JOIN `BALANCE` B
-            ON D.DRIVER_ID = B.DRIVER_ID
-
-        LEFT JOIN SPONSORCOMP SC
-            ON B.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
-
-        LEFT JOIN (
-            SELECT
-                USER_ID,
-                SUM(
-                    CASE
-                        WHEN POINTCHANGE_AMOUNT > 0
-                        THEN POINTCHANGE_AMOUNT
-                        ELSE 0
-                    END
-                ) AS POINTS_AWARDED
-            FROM POINTCHANGES
-            GROUP BY USER_ID
-        ) PC
-            ON PC.USER_ID = U.USER_ID
-
-        GROUP BY
-            D.DRIVER_ID,
-            U.USER_ID,
-            U.USER_FNAME,
-            U.USER_LNAME,
-            U.EMAIL,
-            PC.POINTS_AWARDED
-
-        ORDER BY U.USER_LNAME, U.USER_FNAME
-    """)
-
+    cursor.execute("""CALL ADMIN_GET_DRIVERS()""")
     drivers = cursor.fetchall()
+    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    while cursor.nextset():
+        pass
 
     # Get sponsors
-    cursor.execute("""
-        SELECT
-            S.SPONSOR_ID,
-            U.USER_ID,
-            U.USER_FNAME,
-            U.USER_LNAME,
-            U.EMAIL,
-            U.ROLE,
-            SC.SPONSORCOMP_ID,
-            SC.SPONSORCOMP_NAME,
-            COALESCE(PC.POINTS_AWARDED, 0) AS POINTS_AWARDED
-        FROM SPONSOR S
-        INNER JOIN USER U
-            ON S.USER_ID = U.USER_ID
-        INNER JOIN SPONSORCOMP SC
-            ON S.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
-        LEFT JOIN ( 
-            SELECT
-                USER_ID, 
-                SUM( 
-                    CASE 
-                        WHEN POINTCHANGE_AMOUNT > 0 
-                        THEN POINTCHANGE_AMOUNT 
-                        ELSE 0 
-                    END 
-                ) AS POINTS_AWARDED 
-            FROM POINTCHANGES 
-            GROUP BY USER_ID 
-        ) PC ON PC.USER_ID = U.USER_ID
-        ORDER BY U.USER_LNAME, U.USER_FNAME
-    """)
-
+    cursor.execute("""CALL ADMIN_GET_SPONSORS()""")
     sponsors = cursor.fetchall()
+    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    while cursor.nextset():
+        pass
 
     cursor.close()
     conn.close()
@@ -1300,38 +1210,12 @@ def adminSponsors():
     if not user or user['ROLE'] != 'Admin':
         return redirect(url_for('auth.login'))
 
-    cursor.execute("""
-            SELECT
-                S.SPONSOR_ID,
-                U.USER_ID,
-                U.USER_FNAME,
-                U.USER_LNAME,
-                U.EMAIL,
-                SC.SPONSORCOMP_ID,
-                SC.SPONSORCOMP_NAME,
-                COALESCE(PC.POINTS_AWARDED, 0) AS POINTS_AWARDED
-            FROM SPONSOR S
-            JOIN USER U
-                ON S.USER_ID = U.USER_ID
-            JOIN SPONSORCOMP SC
-                ON S.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
-            LEFT JOIN (
-                SELECT
-                    USER_ID,
-                    SUM(
-                        CASE
-                            WHEN POINTCHANGE_AMOUNT > 0
-                            THEN POINTCHANGE_AMOUNT
-                            ELSE 0
-                        END
-                    ) AS POINTS_AWARDED
-                FROM POINTCHANGES
-                GROUP BY USER_ID
-            ) PC
-                ON PC.USER_ID = U.USER_ID
-            ORDER BY U.USER_LNAME, U.USER_FNAME
-        """)
+    # Get sponsors
+    cursor.execute("""CALL ADMIN_GET_SPONSORS()""")
     sponsors = cursor.fetchall()
+    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    while cursor.nextset():
+        pass
     
     cursor.execute("""
             SELECT *
@@ -1384,73 +1268,11 @@ def adminDrivers():
     sponsor_companies = cursor.fetchall()
     
     # Get drivers
-    cursor.execute("""
-        SELECT
-            D.DRIVER_ID,
-            U.USER_ID,
-            U.USER_FNAME,
-            U.USER_LNAME,
-            U.EMAIL,
-
-            COALESCE(
-                GROUP_CONCAT(
-                    DISTINCT CONCAT(
-                        SC.SPONSORCOMP_NAME,
-                        ': ',
-                        B.BALANCE,
-                        ' points'
-                    )
-                    ORDER BY SC.SPONSORCOMP_NAME
-                    SEPARATOR '; '
-                ),
-                'None'
-            ) AS SPONSOR_BALANCES,
-
-            COALESCE(PC.POINTS_AWARDED, 0) AS POINTS_AWARDED,
-
-            GROUP_CONCAT(
-                DISTINCT B.SPONSORCOMP_ID
-                SEPARATOR ','
-            ) AS SPONSOR_IDS
-
-        FROM DRIVER D
-
-        INNER JOIN `USER` U
-            ON D.USER_ID = U.USER_ID
-
-        LEFT JOIN `BALANCE` B
-            ON D.DRIVER_ID = B.DRIVER_ID
-
-        LEFT JOIN SPONSORCOMP SC
-            ON B.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
-
-        LEFT JOIN (
-            SELECT
-                USER_ID,
-                SUM(
-                    CASE
-                        WHEN POINTCHANGE_AMOUNT > 0
-                        THEN POINTCHANGE_AMOUNT
-                        ELSE 0
-                    END
-                ) AS POINTS_AWARDED
-            FROM POINTCHANGES
-            GROUP BY USER_ID
-        ) PC
-            ON PC.USER_ID = U.USER_ID
-
-        GROUP BY
-            D.DRIVER_ID,
-            U.USER_ID,
-            U.USER_FNAME,
-            U.USER_LNAME,
-            U.EMAIL,
-            PC.POINTS_AWARDED
-
-        ORDER BY U.USER_LNAME, U.USER_FNAME
-    """)
-
+    cursor.execute("""CALL ADMIN_GET_DRIVERS()""")
     drivers = cursor.fetchall()
+    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    while cursor.nextset():
+        pass
 
     cursor.close()
     conn.close()
