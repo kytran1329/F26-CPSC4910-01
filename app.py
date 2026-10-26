@@ -139,8 +139,10 @@ def driverDash():
                         u.USER_LNAME,
                         u.ROLE,
                         u.EMAIL,
-                        d.BALANCE
-                    from DRIVER as d
+                        b.BALANCE
+                    from BALANCE as b
+                    join DRIVER as d
+                        on d.DRIVER_ID = b.DRIVER_ID 
                     join `USER` as u
                         on u.USER_ID = d.USER_ID
                     where d.USER_ID  = %s""", (user_id,))
