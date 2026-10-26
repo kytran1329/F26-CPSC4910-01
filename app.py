@@ -186,11 +186,42 @@ def driverDash():
         cursor.close()
         conn.close()
 
+
+# Helper func to get a user's balance based off of their user_id
+def get_user_balance(user_id):
+    # connect to sql database
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT BALANCE
+        FROM DRIVER as d
+        JOIN BALANCE as b ON d.DRIVER_ID = b.DRIVER_ID
+        WHERE USER_ID = %s
+        """,
+        (user_id,)
+    )
+    
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    return float(row["BALANCE"]) if row else 0.0
+
+
 @app.route("/catalog", methods=["GET", "POST"])
 def catalog():
     items = []
     error = None
     total = 0
+
+    user_id = session.get("user_id")
+    balance = get_user_balance(user_id)
 
     if request.method == "POST":
         query = request.form.get("query", "").strip()
@@ -213,7 +244,8 @@ def catalog():
         data, error = search_ebay(
             query,
             limit=per_page,
-            offset=offset
+            offset=offset,
+            max_price=balance
         )
 
         if data:

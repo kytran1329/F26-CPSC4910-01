@@ -114,7 +114,7 @@ def availability_text(avail):
 
 # This is used to actually query for ebay items/data
 # It will return items in form of json
-def search_ebay(query, limit=10, offset=0):
+def search_ebay(query, limit=10, offset=0, max_price=None):
     access_token = get_access_token()
 
     if not access_token:
@@ -127,6 +127,9 @@ def search_ebay(query, limit=10, offset=0):
         "limit": limit,
         "offset": offset
     }
+
+    if max_price is not None:
+        params["filter"] = f"price:[..{max_price:.2f}],priceCurrency:USD"
 
     headers = {
         "Authorization": f"Bearer {access_token}",
