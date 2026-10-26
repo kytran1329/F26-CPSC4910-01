@@ -91,8 +91,10 @@ def driverDash():
                 cursor.execute("""
                     SELECT d.DRIVER_ID, d.USER_ID
                     FROM DRIVER AS d
+                    JOIN BALANCE as b
+                        on b.DRIVER_ID = d.DRIVER_ID
                     JOIN SPONSOR AS s
-                        ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                        ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                     WHERE d.DRIVER_ID = %s
                       AND s.USER_ID = %s
                 """, (driver_id, session["user_id"]))
@@ -674,8 +676,8 @@ def sponDash():
             u.EMAIL,
 
             d.DRIVER_ID,
-            d.SPONSORCOMP_ID,
-            d.BALANCE,
+            b.SPONSORCOMP_ID,
+            b.BALANCE,
 
             coalesce(sum(
                 case
@@ -700,6 +702,9 @@ def sponDash():
         join DRIVER as d
             on u.USER_ID = d.USER_ID
 
+        join BALANCE as b
+            on b.DRIVER_ID = d.DRIVER_ID
+
         left join POINTCHANGES as p
             on p.USER_ID = d.USER_ID
 
@@ -710,8 +715,8 @@ def sponDash():
             u.ROLE,
             u.EMAIL,
             d.DRIVER_ID,
-            d.SPONSORCOMP_ID,
-            d.BALANCE
+            b.SPONSORCOMP_ID,
+            b.BALANCE
 
         order by d.DRIVER_ID
     """)
@@ -747,9 +752,11 @@ def sponDash():
         FROM POINTCHANGES AS p
         JOIN DRIVER AS d
             ON p.DRIVER_ID = d.DRIVER_ID
+        join BALANCE as b
+            on b.DRIVER_ID = d.DRIVER_ID
         JOIN `USER` AS u
             ON d.USER_ID = u.USER_ID
-        WHERE d.SPONSORCOMP_ID IN (
+        WHERE b.SPONSORCOMP_ID IN (
             SELECT s.SPONSORCOMP_ID
             FROM SPONSOR AS s
             WHERE s.USER_ID = %s
@@ -799,8 +806,10 @@ def sponDash():
     cursor.execute("""
         SELECT COALESCE(SUM(p.POINTCHANGE_AMOUNT), 0) AS POINTS_THIS_MONTH
         FROM SPONSOR AS s
+        JOIN BALANCE AS b
+            ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
         JOIN DRIVER AS d
-            ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+            on d.DRIVER_ID = b.DRIVER_ID
         JOIN POINTCHANGES AS p
             ON p.USER_ID = d.USER_ID
         WHERE s.USER_ID = %s
@@ -1690,11 +1699,11 @@ def viewAsDriver(driver_id):
         if session.get("role") == "Sponsor":
             # Sponsors can only view drivers in their company.
             cursor.execute("""
-                SELECT d.DRIVER_ID
-                FROM DRIVER AS d
+                SELECT b.DRIVER_ID
+                FROM BALANCE AS b
                 JOIN SPONSOR AS s
-                    ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
-                WHERE d.DRIVER_ID = %s
+                    ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                WHERE b.DRIVER_ID = %s
                   AND s.USER_ID = %s
             """, (driver_id, session["user_id"]))
         else:
