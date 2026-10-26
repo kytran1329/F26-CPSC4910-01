@@ -2,6 +2,8 @@
 import requests, base64, os
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
+import re
+from html import unescape
 
 load_dotenv()
 
@@ -43,9 +45,8 @@ def get_access_token():
     return response.json()["access_token"]
 
 
-# helper for search_ebay's availability
-# call getItem for one item and return first estimatedAvailabilities entry
-def get_item_availability(item_id, access_token):
+def get_item_details(item_id, access_token):
+    """Call getItem for one item and return the full JSON response."""
     url = f"https://api.ebay.com/buy/browse/v1/item/{item_id}"
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -61,8 +62,30 @@ def get_item_availability(item_id, access_token):
     if response.status_code != 200:
         return None
 
-    availabilities = response.json().get("estimatedAvailabilities", [])
-    return availabilities[0] if availabilities else None
+    return response.json()
+
+
+def clean_description(details, max_length=200):
+    if not details:
+        return ""
+
+    text = details.get("shortDescription")
+
+    if not text:
+        html = details.get("description", "")
+        # drop script/style blocks
+        html = re.sub(r"(?is)<(script|style).*?>.*?</\1>", "", html)
+        # drop tags
+        text = re.sub(r"<[^>]+>", " ", html)
+
+    text = unescape(text)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    if len(text) > max_length:
+        text = text[:max_length].rsplit(" ", 1)[0] + "…"
+
+    return text
+
 
 # helper for search_ebay's availability
 # make availability object readable
@@ -122,10 +145,16 @@ def search_ebay(query, limit=10, offset=0):
 
     with ThreadPoolExecutor(max_workers=10) as pool:
         results = pool.map(
-            lambda item: get_item_availability(item["itemId"], access_token),
+            lambda item: get_item_details(item["itemId"], access_token),
             items
         )
-        for item, avail in zip(items, results):
+        for item, details in zip(items, results):
+            avail = None
+            if details:
+                avail_list = details.get("estimatedAvailabilities", [])
+                avail = avail_list[0] if avail_list else None
+
             item["availability"] = availability_text(avail)
+            item["description"] = clean_description(details)
 
     return data, None

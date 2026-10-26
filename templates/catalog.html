@@ -109,6 +109,11 @@
             font-weight: bold;
         }
 
+        .description {
+            font-size: 14px;
+            color: #444;
+        }
+
         #per_page {
             padding: 8px;
             margin: 0 8px;
@@ -204,6 +209,12 @@
                     {% if item.availability %}
                         <p class="availability">
                             {{ item.availability }}
+                        </p>
+                    {% endif %}
+
+                    {% if item.description %}
+                        <p class="description">
+                            {{ item.description }}
                         </p>
                     {% endif %}
 
