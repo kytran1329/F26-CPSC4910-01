@@ -3,11 +3,10 @@ import mysql.connector
 import os
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
-from catalog import search_ebay
 from datetime import date
 
 from export import export
-
+from catalog import cat
 from auth import auth
 
 load_dotenv()
@@ -23,6 +22,7 @@ app = Flask(__name__, static_folder= "styles")
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 app.register_blueprint(auth)
+app.register_blueprint(cat)
 app.register_blueprint(export)
 
 # THIS STOPS SOMEONE FROM LOGGIN BACK IN BY HITTING THE BACK BUTTON AFTER THEY HAVE LOGGED OUT
@@ -186,84 +186,6 @@ def driverDash():
         cursor.close()
         conn.close()
 
-
-# Helper func to get a user's balance based off of their user_id
-def get_user_balance(user_id):
-    # connect to sql database
-    conn = mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password= DB_PASSWORD,
-        database= DB_NAME
-    )
-    cursor = conn.cursor(dictionary=True)
-
-    cursor.execute("""
-        SELECT BALANCE
-        FROM DRIVER as d
-        JOIN BALANCE as b ON d.DRIVER_ID = b.DRIVER_ID
-        WHERE USER_ID = %s
-        """,
-        (user_id,)
-    )
-    
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
-
-    return float(row["BALANCE"]) if row else 0.0
-
-
-@app.route("/catalog", methods=["GET", "POST"])
-def catalog():
-    items = []
-    error = None
-    total = 0
-
-    user_id = session.get("user_id")
-    balance = get_user_balance(user_id)
-
-    if request.method == "POST":
-        query = request.form.get("query", "").strip()
-        per_page = int(request.form.get("per_page", 10))
-        page = 1
-    else:
-        query = request.args.get("query", "").strip()
-        per_page = request.args.get("per_page", 10)
-        page = request.args.get("page", 1)
-
-    per_page = int(per_page)
-    if per_page not in (10, 25, 50):
-        per_page = 10
-
-    page = max(1, int(page))
-
-    # search for both POST and GET requests
-    if query:
-        offset = (page - 1) * per_page
-        data, error = search_ebay(
-            query,
-            limit=per_page,
-            offset=offset,
-            max_price=balance
-        )
-
-        if data:
-            items = data.get("itemSummaries", [])
-            total = int(data.get("total", 0))
-
-    total_pages = max(1, (total + per_page - 1) // per_page)
-
-    return render_template(
-        "catalog.html",
-        items=items,
-        error=error,
-        query=query,
-        per_page=per_page,
-        page=page,
-        total=total,
-        total_pages=total_pages
-    )
 
 @app.route("/sponDash/applications")
 def applications():

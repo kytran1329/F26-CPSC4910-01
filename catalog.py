@@ -1,11 +1,19 @@
-
-import requests, base64, os
+from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, flash, current_app
+from dotenv import load_dotenv
+import requests, base64, os, mysql.connector 
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
 import re
 from html import unescape
 
 load_dotenv()
+
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_NAME = os.getenv("DB_NAME")
+
+cat = Blueprint("cat", __name__)
 
 CLIENT_ID = os.getenv("EBAY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET")
@@ -161,3 +169,82 @@ def search_ebay(query, limit=10, offset=0, max_price=None):
             item["description"] = clean_description(details)
 
     return data, None
+
+
+# Helper func to get a user's balance based off of their user_id
+def get_user_balance(user_id):
+    # connect to sql database
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT BALANCE
+        FROM DRIVER as d
+        JOIN BALANCE as b ON d.DRIVER_ID = b.DRIVER_ID
+        WHERE USER_ID = %s
+        """,
+        (user_id,)
+    )
+    
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    return float(row["BALANCE"]) if row else 0.0
+
+
+@cat.route("/catalog", methods=["GET", "POST"])
+def catalog():
+    items = []
+    error = None
+    total = 0
+
+    user_id = session.get("user_id")
+    balance = get_user_balance(user_id)
+
+    if request.method == "POST":
+        query = request.form.get("query", "").strip()
+        per_page = int(request.form.get("per_page", 10))
+        page = 1
+    else:
+        query = request.args.get("query", "").strip()
+        per_page = request.args.get("per_page", 10)
+        page = request.args.get("page", 1)
+
+    per_page = int(per_page)
+    if per_page not in (10, 25, 50):
+        per_page = 10
+
+    page = max(1, int(page))
+
+    # search for both POST and GET requests
+    if query:
+        offset = (page - 1) * per_page
+        data, error = search_ebay(
+            query,
+            limit=per_page,
+            offset=offset,
+            max_price=balance
+        )
+
+        if data:
+            items = data.get("itemSummaries", [])
+            total = int(data.get("total", 0))
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    return render_template(
+        "catalog.html",
+        items=items,
+        error=error,
+        query=query,
+        per_page=per_page,
+        page=page,
+        total=total,
+        total_pages=total_pages
+    )

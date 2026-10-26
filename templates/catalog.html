@@ -236,7 +236,7 @@
 
                 {% if page > 1 %}
                     <a href="{{ url_for(
-                        'catalog',
+                        'cat.catalog',
                         query=query,
                         per_page=per_page,
                         page=page - 1
@@ -255,7 +255,7 @@
 
                 {% if page < total_pages %}
                     <a href="{{ url_for(
-                        'catalog',
+                        'cat.catalog',
                         query=query,
                         per_page=per_page,
                         page=page + 1
