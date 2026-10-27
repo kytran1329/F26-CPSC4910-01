@@ -50,23 +50,3 @@
     color: #4b5563;
     margin-bottom: 10px;
 }
-
-/* Mobile screens */
-@media (max-width: 650px) {
-
-    .home-name {
-        font-size: 1.6rem;
-    }
-
-    .home-links {
-        flex-wrap: wrap;
-    }
-
-    .home-links .button {
-        padding: 8px 12px;
-    }
-
-    .home-card {
-        padding: 25px;
-    }
-}

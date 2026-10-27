@@ -39,6 +39,17 @@ def add_no_cache_headers(response):
 def home():
     return render_template("home.html")
 
+@app.route("/backToDash")
+def backToDash():
+    if session.get("role") == "Driver":
+        return redirect(url_for("driverDash"))
+    elif session.get("role") == "Sponsor":
+        return redirect(url_for("sponDash"))
+    elif session.get("role") == "Admin":
+        return redirect(url_for("adminDash"))
+    else:
+        return redirect(url_for("home"))
+
 @app.route("/about")
 def about():
     conn = mysql.connector.connect(

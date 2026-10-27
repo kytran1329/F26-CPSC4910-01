@@ -29,10 +29,14 @@
                 Good Driving. Better Rewards.
             </div>
 
-            <a href="{{ url_for('auth.logout') }}" class="logout-button">
-                Logout
-            </a>
-
+            <div class="header-links">
+                <a href="{{ url_for('adminSponsors') }}" class="nav-link">Sponsors</a>
+                <a href="{{ url_for('adminDrivers') }}" class="nav-link">Drivers</a>
+                <a href="{{ url_for('adminReports') }}" class="nav-link">Reports</a>
+                <a href="{{ url_for('adminAudit') }}" class="nav-link">Audit Logs</a>
+                <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
+            </div>
         </div>
 
     </header>
@@ -319,31 +323,6 @@
 
         </section>
         </div>
-
-        <!-- New right-side navigation -->
-        <aside class="admin-sidebar">
-            <h2>Admin Tools</h2>
-
-            <a href="{{ url_for('adminSponsors') }}"
-            class="admin-nav-button">
-                Sponsors
-            </a>
-
-            <a href="{{ url_for('adminDrivers') }}"
-            class="admin-nav-button">
-                Drivers
-            </a>
-
-            <a href="{{ url_for('adminReports') }}"
-            class="admin-nav-button">
-                Reports
-            </a>
-
-            <a href="{{ url_for('adminAudit') }}"
-            class="admin-nav-button">
-                Audit Logs
-            </a>
-        </aside>
         </div>
 
         <!-- Back -->
