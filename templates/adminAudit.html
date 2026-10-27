@@ -131,15 +131,27 @@
                                 <th>Sponsor Email</th>
                                 <th>Status</th>
                                 <th>Reason</th>
-                                <th>Created</th>
-                                <th>Updated</th>
+                                <th aria-sort="none">
+                                    <button type="button" class="audit-date-sort"
+                                            onclick="sortAuditTable(this, 'driverApplicationsBody', 'sortCreated')">
+                                        Created <span class="sort-indicator" aria-hidden="true"></span>
+                                    </button>
+                                </th>
+                                <th aria-sort="none">
+                                    <button type="button" class="audit-date-sort"
+                                            onclick="sortAuditTable(this, 'driverApplicationsBody', 'sortUpdated')">
+                                        Updated <span class="sort-indicator" aria-hidden="true"></span>
+                                    </button>
+                                </th>
                             </tr>
                         </thead>
 
                         <tbody id="driverApplicationsBody">
                             {% for application in driver_applications %}
                             <tr data-sponsorcomp-id="{{ application.SPONSORCOMP_ID }}"
-                            data-created-date="{{ application.CREATED_DTS.strftime('%Y-%m-%d') if application.CREATED_DTS else '' }}">
+                            data-created-date="{{ application.CREATED_DTS.strftime('%Y-%m-%d') if application.CREATED_DTS else '' }}"
+                            data-sort-created="{{ application.CREATED_DTS.isoformat() if application.CREATED_DTS else '' }}"
+                            data-sort-updated="{{ application.UPDATED_DTS.isoformat() if application.UPDATED_DTS else '' }}">
                                 <td>{{ application.SPONSORCOMP_NAME or 'N/A' }}</td>
                                 <td>{{ application.DRIVER_EMAIL or 'N/A' }}</td>
                                 <td>{{ application.SPONSOR_EMAIL or 'N/A' }}</td>
@@ -217,13 +229,19 @@
                             <tr>
                                 <th>Email</th>
                                 <th>Reason</th>
-                                <th>Date and Time</th>
+                                <th aria-sort="none">
+                                    <button type="button" class="audit-date-sort"
+                                            onclick="sortAuditTable(this, 'passwordChangesBody', 'sortDate')">
+                                        Date and Time <span class="sort-indicator" aria-hidden="true"></span>
+                                    </button>
+                                </th>
                             </tr>
                         </thead>
 
                         <tbody id="passwordChangesBody">
                             {% for change in password_changes %}
-                            <tr data-date="{{ change.DTS.strftime('%Y-%m-%d') if change.DTS else '' }}">
+                            <tr data-date="{{ change.DTS.strftime('%Y-%m-%d') if change.DTS else '' }}"
+                                data-sort-date="{{ change.DTS.isoformat() if change.DTS else '' }}">
                                 <td>{{ change.EMAIL or 'N/A' }}</td>
                                 <td>{{ change.PASSWORDCHANGE_REASON or 'N/A' }}</td>
                                 <td>{{ change.DTS or 'N/A' }}</td>
@@ -279,13 +297,19 @@
                             <tr>
                                 <th>Email Attempted</th>
                                 <th>Result</th>
-                                <th>Date and Time</th>
+                                <th aria-sort="none">
+                                    <button type="button" class="audit-date-sort"
+                                            onclick="sortAuditTable(this, 'loginAttemptsBody', 'sortDate')">
+                                        Date and Time <span class="sort-indicator" aria-hidden="true"></span>
+                                    </button>
+                                </th>
                             </tr>
                         </thead>
 
                         <tbody id="loginAttemptsBody">
                             {% for attempt in login_attempts %}
-                            <tr data-date="{{ attempt.DTS.strftime('%Y-%m-%d') if attempt.DTS else '' }}">
+                            <tr data-date="{{ attempt.DTS.strftime('%Y-%m-%d') if attempt.DTS else '' }}"
+                                data-sort-date="{{ attempt.DTS.isoformat() if attempt.DTS else '' }}">
                                 <td>{{ attempt.ATTEMPTED_EMAIL or 'N/A' }}</td>
 
                                 <td>
@@ -515,6 +539,55 @@
                 "loginEndDate",
                 ["loginAttemptsCsv", "loginAttemptsPdf"]
             );
+        }
+
+        function sortAuditTable(button, tbodyId, dateProperty) {
+            const tableBody = document.getElementById(tbodyId);
+            const direction = button.dataset.sortDirection === "descending"
+                ? "ascending"
+                : "descending";
+            const rows = Array.from(tableBody.rows).filter(
+                row => row.dataset[dateProperty] !== undefined
+            );
+            const datedRows = rows.map((row, index) => ({
+                row,
+                index,
+                timestamp: Date.parse(row.dataset[dateProperty])
+            }));
+
+            datedRows.sort((first, second) => {
+                const firstHasDate = Number.isFinite(first.timestamp);
+                const secondHasDate = Number.isFinite(second.timestamp);
+
+                if (firstHasDate !== secondHasDate) {
+                    return firstHasDate ? -1 : 1;
+                }
+
+                if (!firstHasDate) {
+                    return first.index - second.index;
+                }
+
+                const difference = first.timestamp - second.timestamp;
+                return direction === "descending"
+                    ? -difference || first.index - second.index
+                    : difference || first.index - second.index;
+            });
+
+            tableBody.append(
+                ...datedRows.map(item => item.row),
+                ...Array.from(tableBody.rows).filter(row => !rows.includes(row))
+            );
+
+            button.closest("table").querySelectorAll(".audit-date-sort").forEach(
+                sortButton => {
+                    sortButton.closest("th").removeAttribute("aria-sort");
+                    sortButton.querySelector(".sort-indicator").textContent = "";
+                }
+            );
+            button.dataset.sortDirection = direction;
+            button.querySelector(".sort-indicator").textContent =
+                direction === "descending" ? "↓" : "↑";
+            button.closest("th").setAttribute("aria-sort", direction);
         }
 
         passwordStartDate.addEventListener("change", filterPasswordChanges);

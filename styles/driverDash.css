@@ -158,6 +158,30 @@ h2 {
     padding: 14px 16px;
 }
 
+.date-sort-button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.date-sort-button:hover {
+    text-decoration: underline;
+}
+
+.sort-indicator {
+    display: inline-block;
+    margin-left: 4px;
+}
+
+.date-sort-button:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 3px;
+}
+
 .history-table td {
     padding: 14px 16px;
     border-bottom: 1px solid #e5e7eb;

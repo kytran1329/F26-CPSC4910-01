@@ -258,7 +258,7 @@
 
                 <div class="table-container">
                     
-                    <table class="history-table">
+                    <table class="history-table" id="point-history-table">
 
                         <thead>
 
@@ -268,7 +268,12 @@
                                 <th>Driver</th>
                                 <th>Points</th>
                                 <th>Reason</th>
-                                <th>Date & Time</th>
+                                <th aria-sort="descending">
+                                    <button type="button" class="date-sort-button"
+                                            onclick="sortPointHistoryByDate()">
+                                        Date &amp; Time <span class="sort-indicator" aria-hidden="true">↓</span>
+                                    </button>
+                                </th>
                             </tr>
 
                         </thead>
@@ -278,7 +283,7 @@
 
                             {% for row in point_history %}
 
-                            <tr>
+                            <tr data-sort-date="{{ row['DTS'] }}">
 
                                 <td>
                                     {{ row["POINTCHANGE_ID"] }}
@@ -351,6 +356,39 @@
 
             }
 
+        }
+
+        let nextPointHistorySortDirection = "descending";
+
+        function sortPointHistoryByDate() {
+            const tableBody = document.querySelector(
+                "#point-history-table tbody"
+            );
+            const dateHeader = document.querySelector(
+                "#point-history-table th[aria-sort]"
+            );
+            const rows = Array.from(tableBody.rows);
+
+            rows.sort((first, second) => {
+                const firstDate = Date.parse(
+                    first.dataset.sortDate.replace(" ", "T")
+                );
+                const secondDate = Date.parse(
+                    second.dataset.sortDate.replace(" ", "T")
+                );
+                return nextPointHistorySortDirection === "descending"
+                    ? secondDate - firstDate
+                    : firstDate - secondDate;
+            });
+
+            tableBody.append(...rows);
+            dateHeader.setAttribute("aria-sort", nextPointHistorySortDirection);
+            dateHeader.querySelector(".sort-indicator").textContent =
+                nextPointHistorySortDirection === "descending" ? "↓" : "↑";
+            nextPointHistorySortDirection =
+                nextPointHistorySortDirection === "descending"
+                    ? "ascending"
+                    : "descending";
         }
 
     </script>

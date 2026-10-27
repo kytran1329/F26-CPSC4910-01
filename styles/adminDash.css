@@ -540,6 +540,30 @@ h2 {
     font-weight: bold;
 }
 
+.audit-date-sort {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.audit-date-sort:hover {
+    text-decoration: underline;
+}
+
+.sort-indicator {
+    display: inline-block;
+    margin-left: 4px;
+}
+
+.audit-date-sort:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+}
+
 .status-success {
     color: #18743a;
     font-weight: bold;
