@@ -781,21 +781,24 @@ def sponDash():
 
     # Points given to all drivers this month
     cursor.execute("""
-        SELECT COALESCE(SUM(p.POINTCHANGE_AMOUNT), 0) AS POINTS_THIS_MONTH
+        SELECT COALESCE(
+            SUM(p.POINTCHANGE_AMOUNT), 0) AS POINTS_THIS_MONTH
+
         FROM SPONSOR AS s
-        JOIN BALANCE AS b
+        JOIN BALANCE as b
             ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
         JOIN DRIVER AS d
-            on d.DRIVER_ID = b.DRIVER_ID
+            ON b.DRIVER_ID = d.DRIVER_ID
         JOIN POINTCHANGES AS p
-            ON p.USER_ID = d.USER_ID
+            ON p.DRIVER_ID = d.DRIVER_ID
+
         WHERE s.USER_ID = %s
             AND p.POINTCHANGE_AMOUNT > 0
             AND p.DTS >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
             AND p.DTS < DATE_ADD(
                 DATE_FORMAT(CURDATE(), '%Y-%m-01'),
                 INTERVAL 1 MONTH
-            )
+            );
     """, (sponsor_user_id,))
 
     points_this_month = cursor.fetchone()["POINTS_THIS_MONTH"]
