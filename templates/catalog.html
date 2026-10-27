@@ -75,6 +75,49 @@
             display: inline-block;
             margin-top: 10px;
         }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .pagination a {
+            padding: 10px 16px;
+            background-color: #1f2937;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+        }
+
+        .pagination a:hover {
+            background-color: #374151;
+        }
+
+        .pagination .disabled {
+            padding: 10px 16px;
+            color: #888;
+            background-color: #eee;
+            border-radius: 6px;
+        }
+
+        .availability {
+            color: #1a7f37;
+            font-weight: bold;
+        }
+
+        .description {
+            font-size: 14px;
+            color: #444;
+        }
+
+        #per_page {
+            padding: 8px;
+            margin: 0 8px;
+        }
     </style>
 </head>
 
@@ -82,20 +125,47 @@
 
     <h1>Product Search</h1>
 
-    <form method="POST">
+<form method="POST">
 
-        <input
-            type="text"
-            name="query"
-            placeholder="Search eBay..."
-            value="{{ query }}"
-        >
+    <label for="comp_id">Sponsor:</label>
+    <select id="comp_id" name="comp_id"
+        onchange="window.location='{{ url_for('cat.catalog') }}?comp_id=' + this.value + '&per_page={{ per_page }}'">
+        {% for c in companies %}
+            <option value="{{ c.SPONSORCOMP_ID }}"
+                {% if c.SPONSORCOMP_ID == comp_id %}selected{% endif %}>
+                {{ c.SPONSORCOMP_NAME }}
+            </option>
+        {% endfor %}
+    </select>
 
-        <button type="submit">
-            Search
-        </button>
+    <select name="query">
+        <option value="">Choose a category...</option>
+        {% for term in allowed_terms %}
+            <option value="{{ term }}" {% if term == query %}selected{% endif %}>
+                {{ term }}
+            </option>
+        {% endfor %}
+    </select>
 
-    </form>
+    <button type="submit">Search</button>
+
+    <label for="per_page">Items per page:</label>
+    <select id="per_page" name="per_page">
+        {% for n in [10, 25, 50] %}
+            <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>
+                {{ n }}
+            </option>
+        {% endfor %}
+    </select>
+
+</form>
+
+{% if companies %}
+    <p>Your balance: <strong>{{ balance }}</strong> points</p>
+{% endif %}
+{% if companies and not allowed_terms %}
+    <p>This sponsor hasn't approved any searches yet.</p>
+{% endif %}
 
     <!-- 
     Jinja code is bridge between Python and html rather than JavaScript.
@@ -134,14 +204,25 @@
 
                     {% if item.price %}
                         <p class="price">
-                            {{ item.price.value }}
-                            {{ item.price.currency }}
+                            {{ item.price.value }} points
                         </p>
                     {% endif %}
 
                     {% if item.condition %}
                         <p class="condition">
                             Condition: {{ item.condition }}
+                        </p>
+                    {% endif %}
+
+                    {% if item.availability %}
+                        <p class="availability">
+                            {{ item.availability }}
+                        </p>
+                    {% endif %}
+
+                    {% if item.description %}
+                        <p class="description">
+                            {{ item.description }}
                         </p>
                     {% endif %}
 
@@ -158,11 +239,51 @@
 
             {% endfor %}
 
+            {% if query %}
+            <div class="pagination">
+
+                {% if page > 1 %}
+                    <a href="{{ url_for(
+                        'cat.catalog',
+                        query=query,
+                        per_page=per_page,
+                        page=page - 1,
+                        comp_id=comp_id
+                    ) }}">
+                        &laquo; Previous
+                    </a>
+                {% else %}
+                    <span class="disabled">&laquo; Previous</span>
+                {% endif %}
+
+                <span>
+                    Page {{ page }} of {{ total_pages }}
+                    &middot;
+                    {{ total }} results
+                </span>
+
+                {% if page < total_pages %}
+                    <a href="{{ url_for(
+                        'cat.catalog',
+                        query=query,
+                        per_page=per_page,
+                        page=page + 1,
+                        comp_id=comp_id
+                    ) }}">
+                        Next &raquo;
+                    </a>
+                {% else %}
+                    <span class="disabled">Next &raquo;</span>
+                {% endif %}
+
+            </div>
+            {% endif %}
+
         </div>
 
-    {% elif request.method == "POST" and not error %}
+    {% elif query and not items and not error %}
 
-        <p>No results found.</p>
+        <p>No results found for "{{ query }}".</p>
 
     {% endif %}
 

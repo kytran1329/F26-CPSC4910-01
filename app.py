@@ -3,12 +3,11 @@ import mysql.connector
 import os
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
-from catalog import search_ebay
 from datetime import date
 from decimal import Decimal
 
 from export import export
-
+from catalog import cat
 from auth import auth
 
 load_dotenv()
@@ -24,6 +23,7 @@ app = Flask(__name__, static_folder= "styles")
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 app.register_blueprint(auth)
+app.register_blueprint(cat)
 app.register_blueprint(export)
 
 # THIS STOPS SOMEONE FROM LOGGIN BACK IN BY HITTING THE BACK BUTTON AFTER THEY HAVE LOGGED OUT
@@ -187,29 +187,6 @@ def driverDash():
         cursor.close()
         conn.close()
 
-@app.route("/catalog", methods=["GET", "POST"])
-def catalog():
-
-    items = []
-    error = None
-    query = ""
-
-    if request.method == "POST":
-
-        query = request.form.get("query", "").strip()
-
-        if query:
-            data, error = search_ebay(query)
-
-            if data:
-                items = data.get("itemSummaries", [])
-
-    return render_template(
-        "catalog.html",
-        items=items,
-        error=error,
-        query=query
-    )
 
 @app.route("/sponDash/applications")
 def applications():
