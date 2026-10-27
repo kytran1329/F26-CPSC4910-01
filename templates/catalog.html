@@ -125,39 +125,47 @@
 
     <h1>Product Search</h1>
 
-    <form method="POST">
+<form method="POST">
 
-        <input
-            type="text"
-            name="query"
-            placeholder="Search eBay..."
-            value="{{ query }}"
-        >
-
-        <button type="submit">
-            Search
-        </button>
-
-        <label for="per_page">Items per page:</label>
-
-        <select id="per_page" name="per_page">
-            <option value="10"
-                {% if per_page == 10 %}selected{% endif %}>
-                10
+    <label for="comp_id">Sponsor:</label>
+    <select id="comp_id" name="comp_id"
+        onchange="window.location='{{ url_for('cat.catalog') }}?comp_id=' + this.value + '&per_page={{ per_page }}'">
+        {% for c in companies %}
+            <option value="{{ c.SPONSORCOMP_ID }}"
+                {% if c.SPONSORCOMP_ID == comp_id %}selected{% endif %}>
+                {{ c.SPONSORCOMP_NAME }}
             </option>
+        {% endfor %}
+    </select>
 
-            <option value="25"
-                {% if per_page == 25 %}selected{% endif %}>
-                25
+    <select name="query">
+        <option value="">Choose a category...</option>
+        {% for term in allowed_terms %}
+            <option value="{{ term }}" {% if term == query %}selected{% endif %}>
+                {{ term }}
             </option>
+        {% endfor %}
+    </select>
 
-            <option value="50"
-                {% if per_page == 50 %}selected{% endif %}>
-                50
+    <button type="submit">Search</button>
+
+    <label for="per_page">Items per page:</label>
+    <select id="per_page" name="per_page">
+        {% for n in [10, 25, 50] %}
+            <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>
+                {{ n }}
             </option>
-        </select>
+        {% endfor %}
+    </select>
 
-    </form>
+</form>
+
+{% if companies %}
+    <p>Your balance: <strong>{{ balance }}</strong> points</p>
+{% endif %}
+{% if companies and not allowed_terms %}
+    <p>This sponsor hasn't approved any searches yet.</p>
+{% endif %}
 
     <!-- 
     Jinja code is bridge between Python and html rather than JavaScript.
@@ -239,7 +247,8 @@
                         'cat.catalog',
                         query=query,
                         per_page=per_page,
-                        page=page - 1
+                        page=page - 1,
+                        comp_id=comp_id
                     ) }}">
                         &laquo; Previous
                     </a>
@@ -258,7 +267,8 @@
                         'cat.catalog',
                         query=query,
                         per_page=per_page,
-                        page=page + 1
+                        page=page + 1,
+                        comp_id=comp_id
                     ) }}">
                         Next &raquo;
                     </a>

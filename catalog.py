@@ -172,8 +172,7 @@ def search_ebay(query, limit=10, offset=0, max_price=None):
 
 
 # Helper func to get a user's balance based off of their user_id
-def get_user_balance(user_id):
-    # connect to sql database
+def get_user_balance(user_id, comp_id):
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -181,21 +180,82 @@ def get_user_balance(user_id):
         database= DB_NAME
     )
     cursor = conn.cursor(dictionary=True)
-
     cursor.execute("""
-        SELECT BALANCE
-        FROM DRIVER as d
-        JOIN BALANCE as b ON d.DRIVER_ID = b.DRIVER_ID
-        WHERE USER_ID = %s
+        SELECT b.BALANCE
+        FROM DRIVER d
+        JOIN BALANCE b ON d.DRIVER_ID = b.DRIVER_ID
+        WHERE d.USER_ID = %s AND b.SPONSORCOMP_ID = %s
         """,
-        (user_id,)
+        (user_id, comp_id)
     )
-    
     row = cursor.fetchone()
     cursor.close()
     conn.close()
-
     return float(row["BALANCE"]) if row else 0.0
+
+
+# Helper function to get the companies a driver belongs to
+def get_driver_companies(user_id):
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT DISTINCT sc.SPONSORCOMP_ID, sc.SPONSORCOMP_NAME
+        FROM DRIVER d
+        JOIN BALANCE b ON b.DRIVER_ID = d.DRIVER_ID
+        JOIN SPONSORCOMP sc ON sc.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+        WHERE d.USER_ID = %s
+        ORDER BY sc.SPONSORCOMP_NAME
+        """,
+        (user_id,)
+    )
+    return cursor.fetchall()
+
+
+# helper function to get the allowed search queries for a driver based on the comany they belong to
+def get_allowed_terms(user_id, comp_id):
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT DISTINCT so.`QUERY`
+        FROM DRIVER d
+        JOIN BALANCE b ON b.DRIVER_ID = d.DRIVER_ID
+        JOIN SPONSORORDERS so ON so.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+        WHERE d.USER_ID = %s AND b.SPONSORCOMP_ID = %s
+        ORDER BY so.`QUERY`
+        """,
+        (user_id, comp_id)
+    )
+    return [row["QUERY"].lower() for row in cursor.fetchall()]
+
+
+# helper function to get sponsor and sponsor company ids
+def get_sponsor_info(user_id):
+    """Returns (sponsor_id, sponsorcomp_id) for a sponsor user, or (None, None)."""
+    conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT SPONSOR_ID, SPONSORCOMP_ID FROM SPONSOR WHERE USER_ID = %s",
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return (row["SPONSOR_ID"], row["SPONSORCOMP_ID"]) if row else (None, None)
 
 
 @cat.route("/catalog", methods=["GET", "POST"])
@@ -205,22 +265,47 @@ def catalog():
     total = 0
 
     user_id = session.get("user_id")
-    balance = get_user_balance(user_id)
+    # balance = get_user_balance(user_id)
 
-    if request.method == "POST":
-        query = request.form.get("query", "").strip()
-        per_page = int(request.form.get("per_page", 10))
-        page = 1
-    else:
-        query = request.args.get("query", "").strip()
-        per_page = request.args.get("per_page", 10)
-        page = request.args.get("page", 1)
+    source = request.form if request.method == "POST" else request.args
+    page = 1 if request.method == "POST" else source.get("page", 1)
 
-    per_page = int(per_page)
+    query = source.get("query", "").strip()
+
+    try:
+        per_page = int(source.get("per_page", 10))
+    except ValueError:
+        per_page = 10
     if per_page not in (10, 25, 50):
         per_page = 10
 
     page = max(1, int(page))
+
+    # Companies this driver can choose from
+    companies = get_driver_companies(user_id)
+    valid_ids = {c["SPONSORCOMP_ID"] for c in companies}
+
+    comp_id = None
+    allowed_terms = []
+    balance = 0.0
+
+    if not companies:
+        error = "You aren't assigned to any sponsor company yet."
+        query = ""
+    else:
+        try:
+            comp_id = int(source.get("comp_id", ""))
+        except ValueError:
+            comp_id = None
+        if comp_id not in valid_ids:
+            comp_id = companies[0]["SPONSORCOMP_ID"]   # default to the first company
+
+        allowed_terms = get_allowed_terms(user_id, comp_id)
+        balance = get_user_balance(user_id, comp_id)
+
+        if query and query.lower() not in allowed_terms:
+            error = "That search isn't approved by this sponsor."
+            query = ""
 
     # search for both POST and GET requests
     if query:
@@ -246,5 +331,62 @@ def catalog():
         per_page=per_page,
         page=page,
         total=total,
-        total_pages=total_pages
+        total_pages=total_pages,
+        companies=companies,
+        comp_id=comp_id,
+        allowed_terms=allowed_terms,
+        balance=balance
+    )
+
+
+@cat.route("/catalog-items", methods=["GET", "POST"])
+def sponsor_catalog_items():
+    user_id = session.get("user_id")
+    sponsor_id, comp_id = get_sponsor_info(user_id)
+
+    message = None
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password= DB_PASSWORD,
+        database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        term = request.form.get("term", "").strip().lower()
+
+        if action == "add":
+            if not term or len(term) > 100:
+                message = "Enter a term up to 100 characters."
+            else:
+                cursor.execute("""
+                    INSERT IGNORE INTO SPONSORORDERS
+                        (`QUERY`, SPONSORCOMP_ID, USER_ID, SPONSOR_ID)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (term, comp_id, user_id, sponsor_id)
+                )
+                conn.commit()
+
+        elif action == "delete":
+            cursor.execute(
+                "DELETE FROM SPONSORORDERS WHERE SPONSORCOMP_ID = %s AND `QUERY` = %s",
+                (comp_id, term)
+            )
+            conn.commit()
+
+    cursor.execute(
+        "SELECT `QUERY` FROM SPONSORORDERS WHERE SPONSORCOMP_ID = %s ORDER BY `QUERY`",
+        (comp_id,)
+    )
+    terms = [row["QUERY"] for row in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "sponsor_catalog_terms.html", 
+        terms=terms, 
+        message=message
     )

@@ -1,0 +1,26 @@
+<h1>Allowed Catalog Searches</h1>
+
+{% if message %}<p class="error">{{ message }}</p>{% endif %}
+
+<form method="POST">
+    <input type="hidden" name="action" value="add">
+    <input type="text" name="term" placeholder="e.g. headphones" maxlength="100" required>
+    <button type="submit">Add</button>
+</form>
+
+{% if terms %}
+<ul>
+    {% for term in terms %}
+    <li>
+        {{ term }}
+        <form method="POST" style="display:inline">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="term" value="{{ term }}">
+            <button type="submit">Remove</button>
+        </form>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>No terms yet. Your drivers won't be able to search until you add some.</p>
+{% endif %}
