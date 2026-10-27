@@ -45,29 +45,17 @@ def getLoginAttempts(start_date=None, end_date=None):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        query = """
-            SELECT
-                ATTEMPTED_EMAIL,
-                RESULT,
-                DTS
-            FROM LOGINATTEMPTS
-            WHERE 1=1
-        """
+        cursor.callproc(
+            "GET_LOGIN_ATTEMPTS_AUDIT",
+            (start_date, end_date)
+        )
 
-        params = []
+        login_attempts = []
 
-        if start_date:
-            query += " AND DTS >= %s"
-            params.append(start_date)
+        for result in cursor.stored_results():
+            login_attempts.extend(result.fetchall())
 
-        if end_date:
-            query += " AND DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
-            params.append(end_date)
-
-        query += " ORDER BY DTS DESC"
-
-        cursor.execute(query, tuple(params))
-        return cursor.fetchall()
+        return login_attempts
 
     finally:
         cursor.close()
@@ -83,31 +71,17 @@ def getPasswordChanges(start_date=None, end_date=None):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        query = """
-            SELECT
-                U.EMAIL,
-                PC.PASSWORDCHANGE_REASON AS REASON,
-                PC.DTS
-            FROM PASSWORDCHANGES AS PC
-            JOIN `USER` AS U
-                ON PC.USER_ID = U.USER_ID
-            WHERE 1=1
-        """
+        cursor.callproc(
+            "GET_PASSWORD_CHANGES_AUDIT",
+            (start_date, end_date)
+        )
 
-        params = []
+        password_changes = []
 
-        if start_date:
-            query += " AND PC.DTS >= %s"
-            params.append(start_date)
+        for result in cursor.stored_results():
+            password_changes.extend(result.fetchall())
 
-        if end_date:
-            query += " AND PC.DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
-            params.append(end_date)
-
-        query += " ORDER BY PC.DTS DESC"
-
-        cursor.execute(query, tuple(params))
-        return cursor.fetchall()
+        return password_changes
 
     finally:
         cursor.close()
@@ -126,57 +100,28 @@ def getDriverApplications(
                 )
     cursor = conn.cursor(dictionary=True)
 
-    query = """
-        SELECT
-            A.SPONSORCOMP_ID,
-            SC.SPONSORCOMP_NAME,
-            U.EMAIL AS DRIVER_EMAIL,
-            SU.EMAIL AS SPONSOR_EMAIL,
-            A.STATUS,
-            A.REASON,
-            A.CREATED_DTS,
-            A.UPDATED_DTS
-        FROM APPLICATIONS AS A
-        LEFT JOIN SPONSORCOMP AS SC
-            ON A.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
-        LEFT JOIN `USER` AS U
-            ON A.USER_ID = U.USER_ID
-        LEFT JOIN SPONSOR AS S
-            ON A.SPONSOR_ID = S.SPONSOR_ID
-        LEFT JOIN `USER` AS SU
-            ON S.USER_ID = SU.USER_ID
-        WHERE 1=1
-    """
+    try:
+        cursor.callproc(
+            "GET_DRIVER_APPLICATIONS_AUDIT",
+            (sponsorcomp_id, start_date, end_date)
+        )
 
-    params = []
+        applications = []
 
-    if sponsorcomp_id is not None:
-        query += " AND A.SPONSORCOMP_ID = %s"
-        params.append(sponsorcomp_id)
+        for result in cursor.stored_results():
+            applications.extend(result.fetchall())
 
-    if start_date:
-        query += " AND A.CREATED_DTS >= %s"
-        params.append(start_date)
-
-    if end_date:
-        query += " AND A.CREATED_DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
-        params.append(end_date)
-
-    query += " ORDER BY A.CREATED_DTS DESC"
-
-    cursor.execute(query, tuple(params))
-    applications = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-
-    return applications
+        return applications
+    
+    finally:
+            cursor.close()
+            conn.close()
 
 #Export CSV
 @export.route("/login-attempts/csv")
 def exportLoginAttemptsCsv():
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
     login_attempts = getLoginAttempts(start_date, end_date)
 
     output = io.StringIO()
@@ -207,8 +152,8 @@ def exportLoginAttemptsCsv():
 #Export PDF
 @export.route("/login-attempts/pdf")
 def exportLoginAttemptsPdf():
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
     login_attempts = getLoginAttempts(start_date, end_date)
 
     pdf_buffer = io.BytesIO()
@@ -257,8 +202,8 @@ def exportLoginAttemptsPdf():
 
 @export.route('/password-changes/csv')
 def exportPasswordChangesCsv():
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
     password_changes = getPasswordChanges(start_date, end_date)
     output = io.StringIO()
     writer = csv.writer(output)
@@ -287,8 +232,8 @@ def exportPasswordChangesCsv():
 
 @export.route('/password-changes/pdf')
 def exportPasswordChangesPdf():
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
     password_changes = getPasswordChanges(start_date, end_date)
     
     pdf_buffer = io.BytesIO()
@@ -339,8 +284,8 @@ def exportPasswordChangesPdf():
 @export.route("/driver-applications/csv")
 def exportDriverApplicationsCsv():
     sponsorcomp_id = request.args.get("sponsorcomp_id", type=int)
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
     
     applications = getDriverApplications(sponsorcomp_id,start_date,end_date)
 
@@ -379,8 +324,8 @@ def exportDriverApplicationsCsv():
 @export.route("/driver-applications/pdf")
 def exportDriverApplicationsPdf():
     sponsorcomp_id = request.args.get("sponsorcomp_id", type=int)
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
 
     applications = getDriverApplications(sponsorcomp_id,start_date,end_date)
 
