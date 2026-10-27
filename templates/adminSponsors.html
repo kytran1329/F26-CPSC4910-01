@@ -16,6 +16,14 @@
                 <h1 class="dashboard-name">Manage Sponsors</h1>
                 <p class="tagline">Good Driving. Better Rewards.</p>
             </div>
+            <div class="header-links">
+                <a href="{{ url_for('adminSponsors') }}" class="nav-link">Sponsors</a>
+                <a href="{{ url_for('adminDrivers') }}" class="nav-link">Drivers</a>
+                <a href="{{ url_for('adminReports') }}" class="nav-link">Reports</a>
+                <a href="{{ url_for('adminAudit') }}" class="nav-link">Audit Logs</a>
+                <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
+            </div>
         </div>
     </header>
 

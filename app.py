@@ -39,6 +39,17 @@ def add_no_cache_headers(response):
 def home():
     return render_template("home.html")
 
+@app.route("/backToDash")
+def backToDash():
+    if session.get("role") == "Driver":
+        return redirect(url_for("driverDash"))
+    elif session.get("role") == "Sponsor":
+        return redirect(url_for("sponDash"))
+    elif session.get("role") == "Admin":
+        return redirect(url_for("adminDash"))
+    else:
+        return redirect(url_for("home"))
+
 @app.route("/about")
 def about():
     conn = mysql.connector.connect(
@@ -91,8 +102,10 @@ def driverDash():
                 cursor.execute("""
                     SELECT d.DRIVER_ID, d.USER_ID
                     FROM DRIVER AS d
+                    JOIN BALANCE as b
+                        on b.DRIVER_ID = d.DRIVER_ID
                     JOIN SPONSOR AS s
-                        ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                        ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                     WHERE d.DRIVER_ID = %s
                       AND s.USER_ID = %s
                 """, (driver_id, session["user_id"]))
@@ -139,8 +152,10 @@ def driverDash():
                         u.USER_LNAME,
                         u.ROLE,
                         u.EMAIL,
-                        d.BALANCE
-                    from DRIVER as d
+                        b.BALANCE
+                    from BALANCE as b
+                    join DRIVER as d
+                        on d.DRIVER_ID = b.DRIVER_ID 
                     join `USER` as u
                         on u.USER_ID = d.USER_ID
                     where d.USER_ID  = %s""", (user_id,))
@@ -649,8 +664,8 @@ def sponDash():
             u.EMAIL,
 
             d.DRIVER_ID,
-            d.SPONSORCOMP_ID,
-            d.BALANCE,
+            b.SPONSORCOMP_ID,
+            b.BALANCE,
 
             coalesce(sum(
                 case
@@ -675,6 +690,9 @@ def sponDash():
         join DRIVER as d
             on u.USER_ID = d.USER_ID
 
+        join BALANCE as b
+            on b.DRIVER_ID = d.DRIVER_ID
+
         left join POINTCHANGES as p
             on p.USER_ID = d.USER_ID
 
@@ -685,8 +703,8 @@ def sponDash():
             u.ROLE,
             u.EMAIL,
             d.DRIVER_ID,
-            d.SPONSORCOMP_ID,
-            d.BALANCE
+            b.SPONSORCOMP_ID,
+            b.BALANCE
 
         order by d.DRIVER_ID
     """)
@@ -722,9 +740,11 @@ def sponDash():
         FROM POINTCHANGES AS p
         JOIN DRIVER AS d
             ON p.DRIVER_ID = d.DRIVER_ID
+        join BALANCE as b
+            on b.DRIVER_ID = d.DRIVER_ID
         JOIN `USER` AS u
             ON d.USER_ID = u.USER_ID
-        WHERE d.SPONSORCOMP_ID IN (
+        WHERE b.SPONSORCOMP_ID IN (
             SELECT s.SPONSORCOMP_ID
             FROM SPONSOR AS s
             WHERE s.USER_ID = %s
@@ -772,19 +792,24 @@ def sponDash():
 
     # Points given to all drivers this month
     cursor.execute("""
-        SELECT COALESCE(SUM(p.POINTCHANGE_AMOUNT), 0) AS POINTS_THIS_MONTH
+        SELECT COALESCE(
+            SUM(p.POINTCHANGE_AMOUNT), 0) AS POINTS_THIS_MONTH
+
         FROM SPONSOR AS s
+        JOIN BALANCE as b
+            ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
         JOIN DRIVER AS d
-            ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+            ON b.DRIVER_ID = d.DRIVER_ID
         JOIN POINTCHANGES AS p
-            ON p.USER_ID = d.USER_ID
+            ON p.DRIVER_ID = d.DRIVER_ID
+
         WHERE s.USER_ID = %s
             AND p.POINTCHANGE_AMOUNT > 0
             AND p.DTS >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
             AND p.DTS < DATE_ADD(
                 DATE_FORMAT(CURDATE(), '%Y-%m-01'),
                 INTERVAL 1 MONTH
-            )
+            );
     """, (sponsor_user_id,))
 
     points_this_month = cursor.fetchone()["POINTS_THIS_MONTH"]
@@ -855,13 +880,15 @@ def assignPoints():
 
                 # lock sponsor company's driver balances before checking
                 cursor.execute("""
-                    SELECT d.DRIVER_ID, d.BALANCE
+                    SELECT d.DRIVER_ID, b.BALANCE
                     FROM DRIVER AS d
+                    JOIN BALANCE as b
+                        on b.DRIVER_ID = d.DRIVER_ID
                     WHERE EXISTS (
                         SELECT 1
                         FROM SPONSOR AS s
                         WHERE s.USER_ID = %s
-                            AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                            AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                     )
                     FOR UPDATE
                     """, 
@@ -888,13 +915,13 @@ def assignPoints():
 
                 # update all drivers belonging to the sponsor's company
                 cursor.execute("""
-                    UPDATE DRIVER AS d
+                    UPDATE BALANCE AS b
                     SET BALANCE = BALANCE + %s
                     WHERE EXISTS (
                         SELECT 1
                         FROM SPONSOR AS s
                         WHERE s.USER_ID = %s
-                            AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                            AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                     )
                     """,
                     (signed_amount, sponsor_user_id)
@@ -907,8 +934,10 @@ def assignPoints():
                     SELECT 
                         d.DRIVER_ID, %s, %s, s.USER_ID
                     FROM DRIVER AS d
+                    JOIN BALANCE as b
+                        on b.DRIVER_ID = d.DRIVER_ID
                     JOIN SPONSOR AS s
-                        ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                        ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                     WHERE s.USER_ID = %s
                     """,
                     (signed_amount, bulk_reason, sponsor_user_id)
@@ -954,8 +983,10 @@ def assignPoints():
 
             if is_admin:
                 cursor.execute("""
-                    SELECT DRIVER_ID, BALANCE
-                    FROM DRIVER
+                    SELECT d.DRIVER_ID, b.BALANCE
+                    FROM DRIVER as d
+                    JOIN BALANCE as b
+                        on b.DRIVER_ID = d.DRIVER_ID
                     WHERE DRIVER_ID = %s
                     FOR UPDATE
                     """,
@@ -965,14 +996,16 @@ def assignPoints():
                 # lock the driver's balance while checking and updating it
                 # condition to ensure the sponsor owns the driver
                 cursor.execute("""
-                    SELECT d.DRIVER_ID, d.BALANCE
+                    SELECT d.DRIVER_ID, b.BALANCE
                     FROM DRIVER AS d
+                    JOIN BALANCE as b
+                        on b.DRIVER_ID = d.DRIVER_ID
                     WHERE d.DRIVER_ID = %s
                         AND EXISTS (
                             SELECT 1
                             FROM SPONSOR AS s
                             WHERE s.USER_ID = %s
-                                AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                                AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                         )
                     FOR UPDATE
                     """,
@@ -1000,7 +1033,7 @@ def assignPoints():
                 return redirect(url_for("assignPoints"))
 
             cursor.execute(
-                "UPDATE DRIVER SET BALANCE = %s WHERE DRIVER_ID = %s",
+                "UPDATE BALANCE SET BALANCE = %s WHERE DRIVER_ID = %s",
                 (new_balance, driver_id),
             )
             cursor.execute("""
@@ -1021,8 +1054,8 @@ def assignPoints():
             SELECT
                 d.DRIVER_ID,
                 d.USER_ID,
-                d.BALANCE,
-                d.SPONSORCOMP_ID,
+                b.BALANCE,
+                b.SPONSORCOMP_ID,
                 u.USER_FNAME,
                 u.USER_LNAME,
                 u.EMAIL,
@@ -1030,6 +1063,7 @@ def assignPoints():
                 latest.POINTCHANGE_REASON AS LAST_CHANGE_REASON,
                 latest.DTS AS LAST_CHANGE_DTS
             FROM DRIVER AS d
+            JOIN BALANCE as b on b.DRIVER_ID = d.DRIVER_ID
             JOIN `USER` AS u ON u.USER_ID = d.USER_ID
             LEFT JOIN POINTCHANGES AS latest
                 ON latest.POINTCHANGE_ID = (
@@ -1051,7 +1085,7 @@ def assignPoints():
                     SELECT 1
                     FROM SPONSOR AS s
                     WHERE s.USER_ID = %s
-                        AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                        AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                 )
                 ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
                 """,
@@ -1068,6 +1102,8 @@ def assignPoints():
                 p.DTS
             FROM POINTCHANGES AS p
             JOIN DRIVER AS d ON d.DRIVER_ID = p.DRIVER_ID
+            JOIN BALANCE as b 
+                on b.DRIVER_ID = d.DRIVER_ID
             """
         if is_admin:
             cursor.execute(history_query + """
@@ -1079,7 +1115,7 @@ def assignPoints():
                     SELECT 1
                     FROM SPONSOR AS s
                     WHERE s.USER_ID = %s
-                        AND s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
+                        AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                 )
                 ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
                 """,
@@ -1665,11 +1701,11 @@ def viewAsDriver(driver_id):
         if session.get("role") == "Sponsor":
             # Sponsors can only view drivers in their company.
             cursor.execute("""
-                SELECT d.DRIVER_ID
-                FROM DRIVER AS d
+                SELECT b.DRIVER_ID
+                FROM BALANCE AS b
                 JOIN SPONSOR AS s
-                    ON s.SPONSORCOMP_ID = d.SPONSORCOMP_ID
-                WHERE d.DRIVER_ID = %s
+                    ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                WHERE b.DRIVER_ID = %s
                   AND s.USER_ID = %s
             """, (driver_id, session["user_id"]))
         else:
