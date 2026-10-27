@@ -283,14 +283,13 @@ h2 {
 
 
 .admin-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 220px;
-    gap: 24px;
-    align-items: start;
-    padding: 24px;
+    display: block;
+    width: 100%;
+    padding: 0;
 }
 
 .admin-tables {
+    width: 100%;
     min-width: 0;
 }
 
@@ -327,18 +326,6 @@ h2 {
 .admin-nav-button:hover {
     background: #374151;
 }
-
-@media (max-width: 800px) {
-    .admin-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .admin-sidebar {
-        position: static;
-        grid-row: 1;
-    }
-}
-
 
 .admin-page {
     padding: 24px;
