@@ -35,7 +35,7 @@ export = Blueprint(
 )
 
 # SELECT * from LOGINATTEMPTS for audit log
-def getLoginAttempts():
+def getLoginAttempts(start_date=None, end_date=None):
     conn = mysql.connector.connect(
                     host=DB_HOST,
                     user=DB_USER,
@@ -45,19 +45,35 @@ def getLoginAttempts():
     cursor = conn.cursor(dictionary=True)
 
     try:
-        cursor.execute("""
-            SELECT ATTEMPTED_EMAIL, RESULT, DTS
+        query = """
+            SELECT
+                ATTEMPTED_EMAIL,
+                RESULT,
+                DTS
             FROM LOGINATTEMPTS
-            ORDER BY DTS DESC
-        """)
+            WHERE 1=1
+        """
 
+        params = []
+
+        if start_date:
+            query += " AND DTS >= %s"
+            params.append(start_date)
+
+        if end_date:
+            query += " AND DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
+            params.append(end_date)
+
+        query += " ORDER BY DTS DESC"
+
+        cursor.execute(query, tuple(params))
         return cursor.fetchall()
 
     finally:
         cursor.close()
         conn.close()
 
-def getPasswordChanges():
+def getPasswordChanges(start_date=None, end_date=None):
     conn = mysql.connector.connect(
                         host=DB_HOST,
                         user=DB_USER,
@@ -67,65 +83,101 @@ def getPasswordChanges():
     cursor = conn.cursor(dictionary=True)
 
     try:
-        cursor.execute("""
+        query = """
             SELECT
                 U.EMAIL,
                 PC.PASSWORDCHANGE_REASON AS REASON,
                 PC.DTS
             FROM PASSWORDCHANGES AS PC
-            INNER JOIN `USER` AS U
+            JOIN `USER` AS U
                 ON PC.USER_ID = U.USER_ID
-            ORDER BY PC.DTS DESC
-        """)
+            WHERE 1=1
+        """
 
+        params = []
+
+        if start_date:
+            query += " AND PC.DTS >= %s"
+            params.append(start_date)
+
+        if end_date:
+            query += " AND PC.DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
+            params.append(end_date)
+
+        query += " ORDER BY PC.DTS DESC"
+
+        cursor.execute(query, tuple(params))
         return cursor.fetchall()
 
     finally:
         cursor.close()
         conn.close()
 
-def getDriverApplications(sponsorcomp_id=None):
+def getDriverApplications(
+    sponsorcomp_id=None,
+    start_date=None,
+    end_date=None
+):
     conn = mysql.connector.connect(
-                            host=DB_HOST,
-                            user=DB_USER,
-                            password=DB_PASSWORD,
-                            database=DB_NAME
-                        )
+                    host=DB_HOST,
+                    user=DB_USER,
+                    password=DB_PASSWORD,
+                    database=DB_NAME
+                )
     cursor = conn.cursor(dictionary=True)
 
-    try:
-        cursor.execute("""
-            SELECT
-                SC.SPONSORCOMP_NAME,
-                U.EMAIL AS DRIVER_EMAIL,
-                SU.EMAIL AS SPONSOR_EMAIL,
-                A.STATUS,
-                A.REASON,
-                A.CREATED_DTS,
-                A.UPDATED_DTS
-            FROM APPLICATIONS AS A
-            LEFT JOIN SPONSORCOMP AS SC
-                ON A.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
-            LEFT JOIN `USER` AS U
-                ON A.USER_ID = U.USER_ID
-            LEFT JOIN SPONSOR AS S
-                ON A.SPONSOR_ID = S.SPONSOR_ID
-            LEFT JOIN `USER` AS SU
-                ON S.USER_ID = SU.USER_ID
-            WHERE (%s IS NULL OR A.SPONSORCOMP_ID = %s)
-            ORDER BY A.CREATED_DTS DESC
-            """, (sponsorcomp_id, sponsorcomp_id))
+    query = """
+        SELECT
+            A.SPONSORCOMP_ID,
+            SC.SPONSORCOMP_NAME,
+            U.EMAIL AS DRIVER_EMAIL,
+            SU.EMAIL AS SPONSOR_EMAIL,
+            A.STATUS,
+            A.REASON,
+            A.CREATED_DTS,
+            A.UPDATED_DTS
+        FROM APPLICATIONS AS A
+        LEFT JOIN SPONSORCOMP AS SC
+            ON A.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
+        LEFT JOIN `USER` AS U
+            ON A.USER_ID = U.USER_ID
+        LEFT JOIN SPONSOR AS S
+            ON A.SPONSOR_ID = S.SPONSOR_ID
+        LEFT JOIN `USER` AS SU
+            ON S.USER_ID = SU.USER_ID
+        WHERE 1=1
+    """
 
-        return cursor.fetchall()
+    params = []
 
-    finally:
-        cursor.close()
-        conn.close()
+    if sponsorcomp_id is not None:
+        query += " AND A.SPONSORCOMP_ID = %s"
+        params.append(sponsorcomp_id)
+
+    if start_date:
+        query += " AND A.CREATED_DTS >= %s"
+        params.append(start_date)
+
+    if end_date:
+        query += " AND A.CREATED_DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
+        params.append(end_date)
+
+    query += " ORDER BY A.CREATED_DTS DESC"
+
+    cursor.execute(query, tuple(params))
+    applications = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return applications
 
 #Export CSV
 @export.route("/login-attempts/csv")
 def exportLoginAttemptsCsv():
-    login_attempts = getLoginAttempts()
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    login_attempts = getLoginAttempts(start_date, end_date)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -155,7 +207,9 @@ def exportLoginAttemptsCsv():
 #Export PDF
 @export.route("/login-attempts/pdf")
 def exportLoginAttemptsPdf():
-    login_attempts = getLoginAttempts()
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    login_attempts = getLoginAttempts(start_date, end_date)
 
     pdf_buffer = io.BytesIO()
 
@@ -203,7 +257,9 @@ def exportLoginAttemptsPdf():
 
 @export.route('/password-changes/csv')
 def exportPasswordChangesCsv():
-    password_changes = getPasswordChanges()
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    password_changes = getPasswordChanges(start_date, end_date)
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -231,7 +287,9 @@ def exportPasswordChangesCsv():
 
 @export.route('/password-changes/pdf')
 def exportPasswordChangesPdf():
-    password_changes = getPasswordChanges()
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    password_changes = getPasswordChanges(start_date, end_date)
     
     pdf_buffer = io.BytesIO()
 
@@ -281,7 +339,10 @@ def exportPasswordChangesPdf():
 @export.route("/driver-applications/csv")
 def exportDriverApplicationsCsv():
     sponsorcomp_id = request.args.get("sponsorcomp_id", type=int)
-    applications = getDriverApplications(sponsorcomp_id)
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    
+    applications = getDriverApplications(sponsorcomp_id,start_date,end_date)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -318,7 +379,10 @@ def exportDriverApplicationsCsv():
 @export.route("/driver-applications/pdf")
 def exportDriverApplicationsPdf():
     sponsorcomp_id = request.args.get("sponsorcomp_id", type=int)
-    applications = getDriverApplications(sponsorcomp_id)
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+
+    applications = getDriverApplications(sponsorcomp_id,start_date,end_date)
 
     pdf_buffer = io.BytesIO()
 
@@ -381,4 +445,3 @@ def exportDriverApplicationsPdf():
         as_attachment=True,
         download_name="driver_applications_audit.pdf"
     )
-

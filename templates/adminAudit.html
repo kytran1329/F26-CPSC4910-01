@@ -100,6 +100,12 @@
                         </option>
                         {% endfor %}
                     </select>
+
+                    <label for="applicationStartDate">From:</label>
+                    <input type="date" id="applicationStartDate">
+
+                    <label for="applicationEndDate">To:</label>
+                    <input type="date" id="applicationEndDate">
                 </div>
 
                 <div class="audit-actions">
@@ -132,7 +138,8 @@
 
                         <tbody id="driverApplicationsBody">
                             {% for application in driver_applications %}
-                            <tr data-sponsorcomp-id="{{ application.SPONSORCOMP_ID }}">
+                            <tr data-sponsorcomp-id="{{ application.SPONSORCOMP_ID }}"
+                            data-created-date="{{ application.CREATED_DTS.strftime('%Y-%m-%d') if application.CREATED_DTS else '' }}">
                                 <td>{{ application.SPONSORCOMP_NAME or 'N/A' }}</td>
                                 <td>{{ application.DRIVER_EMAIL or 'N/A' }}</td>
                                 <td>{{ application.SPONSOR_EMAIL or 'N/A' }}</td>
@@ -184,14 +191,22 @@
 
                 <p>Review password change history.</p>
 
+                <div class="filter-container">
+                    <label for="passwordStartDate">From:</label>
+                    <input type="date" id="passwordStartDate">
+
+                    <label for="passwordEndDate">To:</label>
+                    <input type="date" id="passwordEndDate">
+                </div>
+
                 <div class="audit-actions">
                     <a href="{{ url_for('export.exportPasswordChangesCsv') }}"
-                    class="back-link">
+                    id="passwordChangesCsv" class="back-link">
                         Download CSV
                     </a>
 
                     <a href="{{ url_for('export.exportPasswordChangesPdf') }}"
-                    class="back-link">
+                    id="passwordChangesPdf" class="back-link">
                         Download PDF
                     </a>
                 </div>
@@ -206,9 +221,9 @@
                             </tr>
                         </thead>
 
-                        <tbody>
+                        <tbody id="passwordChangesBody">
                             {% for change in password_changes %}
-                            <tr>
+                            <tr data-date="{{ change.DTS.strftime('%Y-%m-%d') if change.DTS else '' }}">
                                 <td>{{ change.EMAIL or 'N/A' }}</td>
                                 <td>{{ change.PASSWORDCHANGE_REASON or 'N/A' }}</td>
                                 <td>{{ change.DTS or 'N/A' }}</td>
@@ -237,14 +252,23 @@
 
                 <p>Review successful and unsuccessful login attempts.</p>
 
+                <div class="filter-container">
+                    <label for="loginStartDate">From:</label>
+                    <input type="date" id="loginStartDate">
+
+                    <label for="loginEndDate">To:</label>
+                    <input type="date" id="loginEndDate">
+                </div>
+
                 <div class="audit-actions">
+
                     <a href="{{ url_for('export.exportLoginAttemptsCsv') }}"
-                    class="back-link">
+                    id="loginAttemptsCsv" class="back-link">
                         Download CSV
                     </a>
 
                     <a href="{{ url_for('export.exportLoginAttemptsPdf') }}"
-                    class="back-link">
+                    id="loginAttemptsPdf" class="back-link">
                         Download PDF
                     </a>
                 </div>
@@ -259,9 +283,9 @@
                             </tr>
                         </thead>
 
-                        <tbody>
+                        <tbody id="loginAttemptsBody">
                             {% for attempt in login_attempts %}
-                            <tr>
+                            <tr data-date="{{ attempt.DTS.strftime('%Y-%m-%d') if attempt.DTS else '' }}">
                                 <td>{{ attempt.ATTEMPTED_EMAIL or 'N/A' }}</td>
 
                                 <td>
@@ -301,6 +325,25 @@
     </footer>
 
     <script>
+        // Getting the HTML elements
+        const sponsorFilter = document.getElementById("applicationSponsorFilter");
+
+        const csvLink = document.getElementById("downloadApplicationsCsv");
+
+        const pdfLink = document.getElementById("downloadApplicationsPdf");
+
+        const startDateFilter = document.getElementById("applicationStartDate");
+
+        const endDateFilter = document.getElementById("applicationEndDate");
+
+        const passwordStartDate = document.getElementById("passwordStartDate");
+
+        const passwordEndDate = document.getElementById("passwordEndDate");
+
+        const loginStartDate = document.getElementById("loginStartDate");
+
+        const loginEndDate = document.getElementById("loginEndDate");
+
         function showReport(reportId, clickedTab) {
 
             // Hide all report sections
@@ -324,53 +367,69 @@
             clickedTab.classList.add("active");
             clickedTab.setAttribute("aria-selected", "true");
         }
-    
-        // Getting the HTML elements
-        const sponsorFilter = document.getElementById(
-            "applicationSponsorFilter"
-        );
 
-        const csvLink = document.getElementById(
-            "downloadApplicationsCsv"
-        );
-
-        const pdfLink = document.getElementById(
-            "downloadApplicationsPdf"
-        );
-
-        // Update export link so audit logs match selected company
         function updateApplicationExportLinks() {
             const selectedSponsor = sponsorFilter.value;
+            const startDate = startDateFilter.value;
+            const endDate = endDateFilter.value;
 
             [csvLink, pdfLink].forEach(function (link) {
                 const url = new URL(link.href);
 
-                // Example query param = /admin/driver-applications/csv?sponsorcomp_id=1
                 if (selectedSponsor === "all") {
                     url.searchParams.delete("sponsorcomp_id");
                 } else {
-                    url.searchParams.set("sponsorcomp_id", selectedSponsor);
+                    url.searchParams.set(
+                        "sponsorcomp_id",
+                        selectedSponsor
+                    );
+                }
+
+                if (startDate) {
+                    url.searchParams.set("start_date", startDate);
+                } else {
+                    url.searchParams.delete("start_date");
+                }
+
+                if (endDate) {
+                    url.searchParams.set("end_date", endDate);
+                } else {
+                    url.searchParams.delete("end_date");
                 }
 
                 link.href = url.toString();
             });
         }
 
-        // Filters table
         function filterDriverApplications() {
             const selectedSponsor = sponsorFilter.value;
+            const startDate = startDateFilter.value;
+            const endDate = endDateFilter.value;
 
-            // Find the relevant rows
             const rows = document.querySelectorAll(
                 "#driverApplicationsBody tr[data-sponsorcomp-id]"
             );
 
             rows.forEach(function (row) {
                 const sponsorId = row.dataset.sponsorcompId;
+                const createdDate = row.dataset.createdDate;
+
+                const matchesSponsor =
+                    selectedSponsor === "all" ||
+                    sponsorId === selectedSponsor;
+
+                const matchesStartDate =
+                    !startDate ||
+                    (createdDate && createdDate >= startDate);
+
+                const matchesEndDate =
+                    !endDate ||
+                    (createdDate && createdDate <= endDate);
 
                 row.style.display =
-                    selectedSponsor === "all" ||
-                    sponsorId === selectedSponsor
+                    matchesSponsor &&
+                    matchesStartDate &&
+                    matchesEndDate
                         ? ""
                         : "none";
             });
@@ -379,6 +438,90 @@
         }
 
         sponsorFilter.addEventListener("change", filterDriverApplications);
+
+        startDateFilter.addEventListener("change",filterDriverApplications);
+
+        endDateFilter.addEventListener("change",filterDriverApplications);
+
+        function updateAuditExportLinks(startInputId, endInputId, linkIds) {
+            const startDate = document.getElementById(startInputId).value;
+            const endDate = document.getElementById(endInputId).value;
+
+            linkIds.forEach(function (id) {
+                const link = document.getElementById(id);
+                const url = new URL(link.href);
+
+                if (startDate) {
+                    url.searchParams.set("start_date", startDate);
+                } else {
+                    url.searchParams.delete("start_date");
+                }
+
+                if (endDate) {
+                    url.searchParams.set("end_date", endDate);
+                } else {
+                    url.searchParams.delete("end_date");
+                }
+
+                link.href = url.toString();
+            });
+        }
+        
+        function filterAuditTable(startInputId, endInputId, tbodyId) {
+            const startDate = document.getElementById(startInputId).value;
+            const endDate = document.getElementById(endInputId).value;
+
+            const rows = document.querySelectorAll(
+                `#${tbodyId} tr[data-date]`
+            );
+
+            rows.forEach(function (row) {
+                const rowDate = row.dataset.date;
+
+                const matchesStart =
+                    !startDate || (rowDate && rowDate >= startDate);
+
+                const matchesEnd =
+                    !endDate || (rowDate && rowDate <= endDate);
+
+                row.style.display =
+                    matchesStart && matchesEnd ? "" : "none";
+            });
+        }
+
+        function filterPasswordChanges() {
+            filterAuditTable(
+                "passwordStartDate",
+                "passwordEndDate",
+                "passwordChangesBody"
+            );
+
+            updateAuditExportLinks(
+                "passwordStartDate",
+                "passwordEndDate",
+                ["passwordChangesCsv", "passwordChangesPdf"]
+            );
+        }
+
+        function filterLoginAttempts() {
+            filterAuditTable(
+                "loginStartDate",
+                "loginEndDate",
+                "loginAttemptsBody"
+            );
+
+            updateAuditExportLinks(
+                "loginStartDate",
+                "loginEndDate",
+                ["loginAttemptsCsv", "loginAttemptsPdf"]
+            );
+        }
+
+        passwordStartDate.addEventListener("change", filterPasswordChanges);
+        passwordEndDate.addEventListener("change", filterPasswordChanges);
+
+        loginStartDate.addEventListener("change", filterLoginAttempts);
+        loginEndDate.addEventListener("change", filterLoginAttempts);
     </script>
 
 </body>
