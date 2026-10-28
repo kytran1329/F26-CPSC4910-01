@@ -861,25 +861,6 @@ def assignPoints():
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # Load the company dropdown/filter
-        if is_admin:
-            cursor.execute("""
-                SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
-                FROM SPONSORCOMP
-                ORDER BY SPONSORCOMP_NAME
-            """)
-        else:
-            cursor.execute("""
-                SELECT DISTINCT sc.SPONSORCOMP_ID, sc.SPONSORCOMP_NAME
-                FROM SPONSOR AS s
-                JOIN SPONSORCOMP AS sc
-                    ON sc.SPONSORCOMP_ID = s.SPONSORCOMP_ID
-                WHERE s.USER_ID = %s
-                ORDER BY sc.SPONSORCOMP_NAME
-            """, (actor_user_id,))
-
-        sponsor_companies = cursor.fetchall()
-
         if request.method == "POST":
             # Bulk Add or Subtract
             bulk_action = request.form.get("bulk_action")
@@ -888,10 +869,7 @@ def assignPoints():
                 try:
                     bulk_amount = int(request.form.get("bulk_amount", ""))
                 except (TypeError, ValueError):
-                    flash(
-                        "Enter a valid whole-number point amount.",
-                        "error"
-                    )
+                    flash("Enter a valid whole-number point amount.","error")
                     return redirect(url_for(
                         "assignPoints",
                         sponsorcomp_id=selected_company_raw
@@ -900,20 +878,14 @@ def assignPoints():
                 bulk_reason = request.form.get("bulk_reason", "").strip()
 
                 if bulk_amount <= 0:
-                    flash(
-                        "The point amount must be greater than zero.",
-                        "error"
-                    )
+                    flash("The point amount must be greater than zero.","error")
                     return redirect(url_for(
                         "assignPoints",
                         sponsorcomp_id=selected_company_raw
                     ))
 
                 if not bulk_reason:
-                    flash(
-                        "Please enter a reason for the point change.",
-                        "error"
-                    )
+                    flash("Please enter a reason for the point change.","error")
                     return redirect(url_for(
                         "assignPoints",
                         sponsorcomp_id=selected_company_raw
@@ -966,10 +938,7 @@ def assignPoints():
 
                     if not balances:
                         conn.rollback()
-                        flash(
-                            "There are no balances to update.",
-                            "error"
-                        )
+                        flash("There are no balances to update.","error")
                         return redirect(url_for(
                             "assignPoints",
                             sponsorcomp_id=selected_company_raw
@@ -1061,8 +1030,7 @@ def assignPoints():
 
             except (TypeError, ValueError):
                 flash(
-                    "Select a valid driver and enter a whole-number "
-                    "point amount.",
+                    "Select a valid driver and enter a whole-number point amount.",
                     "error"
                 )
                 return redirect(url_for(
@@ -1071,20 +1039,14 @@ def assignPoints():
                 ))
 
             if amount <= 0:
-                flash(
-                    "The point amount must be greater than zero.",
-                    "error"
-                )
+                flash("The point amount must be greater than zero.","error")
                 return redirect(url_for(
                     "assignPoints",
                     sponsorcomp_id=selected_company_raw
                 ))
 
             if action not in ("add", "subtract"):
-                flash(
-                    "Choose whether to add or subtract points.",
-                    "error"
-                )
+                flash("Choose whether to add or subtract points.","error")
                 return redirect(url_for(
                     "assignPoints",
                     sponsorcomp_id=selected_company_raw
@@ -1092,9 +1054,7 @@ def assignPoints():
 
             if not reason:
                 flash(
-                    "Please enter a reason for the point change.",
-                    "error"
-                )
+                    "Please enter a reason for the point change.","error")
                 return redirect(url_for(
                     "assignPoints",
                     sponsorcomp_id=selected_company_raw
@@ -1132,8 +1092,7 @@ def assignPoints():
 
             if balance is None:
                 conn.rollback()
-                flash(
-                    "That driver/company balance was not found or you "
+                flash("That driver/company balance was not found or you "
                     "are not authorized to change it.",
                     "error"
                 )
@@ -1311,6 +1270,25 @@ def assignPoints():
             history_by_driver.setdefault(
                 change["DRIVER_ID"], []
             ).append(change)
+
+        # Load the company dropdown/filter
+        if is_admin:
+            cursor.execute("""
+                SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+                FROM SPONSORCOMP
+                ORDER BY SPONSORCOMP_NAME
+            """)
+        else:
+            cursor.execute("""
+                SELECT DISTINCT sc.SPONSORCOMP_ID, sc.SPONSORCOMP_NAME
+                FROM SPONSOR AS s
+                JOIN SPONSORCOMP AS sc
+                    ON sc.SPONSORCOMP_ID = s.SPONSORCOMP_ID
+                WHERE s.USER_ID = %s
+                ORDER BY sc.SPONSORCOMP_NAME
+            """, (actor_user_id,))
+
+        sponsor_companies = cursor.fetchall()
 
         return render_template(
             "assignPoints.html",
