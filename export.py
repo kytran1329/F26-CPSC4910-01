@@ -87,11 +87,7 @@ def getPasswordChanges(start_date=None, end_date=None):
         cursor.close()
         conn.close()
 
-def getDriverApplications(
-    sponsorcomp_id=None,
-    start_date=None,
-    end_date=None
-):
+def getDriverApplications(sponsorcomp_id=None,start_date=None,end_date=None):
     conn = mysql.connector.connect(
                     host=DB_HOST,
                     user=DB_USER,
@@ -116,6 +112,32 @@ def getDriverApplications(
     finally:
             cursor.close()
             conn.close()
+
+def getPointChangesForExport(sponsorcomp_id=None,start_date=None,end_date=None):
+    conn = mysql.connector.connect(
+                        host=DB_HOST,
+                        user=DB_USER,
+                        password=DB_PASSWORD,
+                        database=DB_NAME
+                    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.callproc(
+            "GET_POINT_CHANGES_AUDIT", # Tried making GET_POINT_CHANGES_AUDIT
+            (sponsorcomp_id, start_date, end_date)
+        )
+
+        point_changes = []
+
+        for result in cursor.stored_results():
+            point_changes.extend(result.fetchall())
+
+        return point_changes
+
+    finally:
+        cursor.close()
+        conn.close()
 
 #Export CSV
 @export.route("/login-attempts/csv")
@@ -389,4 +411,120 @@ def exportDriverApplicationsPdf():
         mimetype="application/pdf",
         as_attachment=True,
         download_name="driver_applications_audit.pdf"
+    )
+
+@export.route("/point-changes/csv")
+def exportPointChangesCsv():
+    sponsorcomp_id = request.args.get("sponsorcomp_id", type=int)
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
+
+    point_changes = getPointChangesForExport(
+        sponsorcomp_id,
+        start_date,
+        end_date
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Driver Email",
+        "Changed By",
+        "Points Changed",
+        "Reason",
+        "Balance ID",
+        "Sponsor Company",
+        "Date and Time"
+    ])
+
+    for change in point_changes:
+        writer.writerow([
+            change["DRIVER_EMAIL"] or "N/A",
+            change["CHANGED_BY_EMAIL"] or "N/A",
+            change["POINTCHANGE_AMOUNT"],
+            change["POINTCHANGE_REASON"] or "N/A",
+            change["BALANCE_ID"] or "N/A",
+            change["SPONSORCOMP_NAME"] or "N/A",
+            change["DTS"] or "N/A"
+        ])
+
+    response = Response(
+        output.getvalue(),
+        mimetype="text/csv"
+    )
+
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=point_changes_audit.csv"
+    )
+
+    return response
+
+@export.route("/point-changes/pdf")
+def exportPointChangesPdf():
+    sponsorcomp_id = request.args.get("sponsorcomp_id", type=int)
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
+
+    point_changes = getPointChangesForExport(
+        sponsorcomp_id,
+        start_date,
+        end_date
+    )
+
+    pdf_buffer = io.BytesIO()
+
+    document = SimpleDocTemplate(
+        pdf_buffer,
+        pagesize=landscape(letter)
+    )
+
+    pdf_style = RoadRewardsPDF()
+
+    elements = pdf_style.createHeader(
+        "Point Changes Audit Log",
+        len(point_changes)
+    )
+
+    data = [[
+        "Driver Email",
+        "Changed By",
+        "Points Changed",
+        "Reason",
+        "Balance ID",
+        "Sponsor Company",
+        "Date and Time"
+    ]]
+
+    for change in point_changes:
+
+        change_date = (
+            change["DTS"].strftime("%Y-%m-%d %H:%M:%S")
+            if change["DTS"] else "N/A"
+        )
+
+        data.append([
+            change["DRIVER_EMAIL"] or "N/A",
+            change["CHANGED_BY_EMAIL"] or "N/A",
+            str(change["POINTCHANGE_AMOUNT"]),
+            change["POINTCHANGE_REASON"] or "N/A",
+            str(change["BALANCE_ID"] or "N/A"),
+            change["SPONSORCOMP_NAME"] or "N/A",
+            change_date
+        ])
+
+    table = pdf_style.createTable(
+        data,
+        column_proportions=[1.8, 1.8, 0.9, 1.8, 0.9, 1.5, 1.5]
+    )
+
+    elements.append(table)
+    document.build(elements)
+    pdf_buffer.seek(0)
+
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="point_changes_audit.pdf"
     )

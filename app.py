@@ -1663,6 +1663,16 @@ def adminAudit():
         
     driver_applications = cursor.fetchall()
 
+    cursor.callproc(
+        "GET_POINT_CHANGES_AUDIT",
+        (None, None, None)
+    )
+
+    point_changes = []
+
+    for result in cursor.stored_results():
+        point_changes.extend(result.fetchall())
+
     cursor.execute("""
             SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
             FROM SPONSORCOMP
@@ -1678,6 +1688,7 @@ def adminAudit():
         login_attempts=login_attempts,
         password_changes=password_changes,
         driver_applications=driver_applications,
+        point_changes=point_changes,
         sponsor_companies=sponsor_companies
     )
 
