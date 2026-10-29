@@ -1925,7 +1925,7 @@ def adminAudit():
 
     cursor.callproc(
         "GET_POINT_CHANGES_AUDIT",
-        (None, None, None)
+        (None, None, None, None)
     )
 
     point_changes = []
@@ -2043,11 +2043,28 @@ def sponsorAudit():
 
         point_changes = cursor.fetchall()
 
+        # Get drivers associated with this sponsor company.
+        cursor.execute("""
+            SELECT DISTINCT
+                d.DRIVER_ID,
+                u.EMAIL AS DRIVER_EMAIL
+            FROM DRIVER d
+            JOIN USER u
+                ON u.USER_ID = d.USER_ID
+            JOIN BALANCE b
+                ON b.DRIVER_ID = d.DRIVER_ID
+            WHERE b.SPONSORCOMP_ID = %s
+            ORDER BY u.EMAIL
+        """, (sponsorcomp_id,))
+
+        drivers = cursor.fetchall()
+
         return render_template(
             "sponsorAudit.html",
             sponsor=sponsor,
             applications=applications,
-            point_changes=point_changes
+            point_changes=point_changes,
+            drivers=drivers
         )
 
     finally:

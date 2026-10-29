@@ -145,7 +145,7 @@ def getDriverApplications(sponsorcomp_id=None,start_date=None,end_date=None):
             cursor.close()
             conn.close()
 
-def getPointChangesForExport(sponsorcomp_id=None,start_date=None,end_date=None):
+def getPointChanges(sponsorcomp_id=None,start_date=None,end_date=None,driver_id=None):
     conn = mysql.connector.connect(
                         host=DB_HOST,
                         user=DB_USER,
@@ -156,8 +156,8 @@ def getPointChangesForExport(sponsorcomp_id=None,start_date=None,end_date=None):
 
     try:
         cursor.callproc(
-            "GET_POINT_CHANGES_AUDIT", # Tried making GET_POINT_CHANGES_AUDIT
-            (sponsorcomp_id, start_date, end_date)
+            "GET_POINT_CHANGES_AUDIT",
+            (sponsorcomp_id, start_date, end_date, driver_id)
         )
 
         point_changes = []
@@ -451,10 +451,11 @@ def exportPointChangesCsv():
     start_date = request.args.get("start_date") or None
     end_date = request.args.get("end_date") or None
 
-    point_changes = getPointChangesForExport(
+    point_changes = getPointChanges(
         sponsorcomp_id,
         start_date,
-        end_date
+        end_date,
+        None
     )
 
     output = io.StringIO()
@@ -498,10 +499,11 @@ def exportPointChangesPdf():
     start_date = request.args.get("start_date") or None
     end_date = request.args.get("end_date") or None
 
-    point_changes = getPointChangesForExport(
+    point_changes = getPointChanges(
         sponsorcomp_id,
         start_date,
-        end_date
+        end_date,
+        None
     )
 
     pdf_buffer = io.BytesIO()
@@ -605,7 +607,9 @@ def exportSponsorApplicationsPdf():
     end_date = request.args.get("end_date") or None
 
     applications = getDriverApplications(
-        sponsorcomp_id, start_date, end_date
+        sponsorcomp_id,
+        start_date,
+        end_date
     )
 
     pdf_buffer = io.BytesIO()
@@ -655,9 +659,13 @@ def exportSponsorPointChangesCsv():
     sponsorcomp_id = getLoggedInSponsorCompanyId()
     start_date = request.args.get("start_date") or None
     end_date = request.args.get("end_date") or None
+    driver_id = request.args.get("driver_id", type=int)
 
-    changes = getPointChangesForExport(
-        sponsorcomp_id, start_date, end_date
+    changes = getPointChanges(
+        sponsorcomp_id,
+        start_date,
+        end_date,
+        driver_id
     )
 
     output = io.StringIO()
@@ -691,9 +699,10 @@ def exportSponsorPointChangesPdf():
     sponsorcomp_id = getLoggedInSponsorCompanyId()
     start_date = request.args.get("start_date") or None
     end_date = request.args.get("end_date") or None
+    driver_id = request.args.get("driver_id", type=int)
 
-    changes = getPointChangesForExport(
-        sponsorcomp_id, start_date, end_date
+    changes = getPointChanges(
+        sponsorcomp_id, start_date, end_date, driver_id
     )
 
     pdf_buffer = io.BytesIO()
