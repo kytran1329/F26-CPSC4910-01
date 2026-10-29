@@ -105,12 +105,29 @@ def logout():
 
 @auth.route("/signup", methods=["GET", "POST"])
 def signup():
+    # connect to sql database
+    conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+        )
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute("""
+                SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+                FROM SPONSORCOMP
+                ORDER BY SPONSORCOMP_NAME
+                """)
+    sponsor_companies = cursor.fetchall()
+    
     if request.method == "POST":
         # get user info to create an account
         first_name = request.form.get("first_name") 
         last_name = request.form.get("last_name") 
         email = request.form.get("email") 
         pwd = request.form.get("password")
+        sponsorcomp_id = request.form.get("sponsorcomp_id")
         role = "Driver"
 
         # connect to sql database
@@ -122,18 +139,41 @@ def signup():
         )
         cursor = conn.cursor(dictionary=True)
 
+        cursor.execute("""
+                    SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+                    FROM SPONSORCOMP
+                    ORDER BY SPONSORCOMP_NAME
+                    """)
+        sponsor_companies = cursor.fetchall()
+
         try:
             # check if email already exists 
             cursor.execute( "SELECT USER_ID FROM `USER` WHERE EMAIL = %s", (email,) )
             if cursor.fetchone(): 
                 return render_template( 
                     "signup.html", 
-                    error="An account with this email already exists." 
+                    error="An account with this email already exists.",
+                    sponsor_companies=sponsor_companies 
+                )
+
+            # Verify that the selected sponsor company exists
+            cursor.execute("""
+                SELECT SPONSORCOMP_ID
+                FROM SPONSORCOMP
+                WHERE SPONSORCOMP_ID = %s
+            """, (sponsorcomp_id,))
+
+            if not cursor.fetchone():
+                return render_template(
+                    "signup.html",
+                    error="Please select a valid sponsor company.",
+                    sponsor_companies=sponsor_companies
                 )
 
             # hash the password
             hashed_password = generate_password_hash(pwd)
 
+            # Insert the new driver
             cursor.execute(""" 
                 INSERT INTO `USER` 
                 (USER_FNAME, USER_LNAME, EMAIL, PASSWORD, ROLE) 
@@ -141,6 +181,16 @@ def signup():
                 (first_name, last_name, email, hashed_password, "Driver")
             )
 
+            user_id = cursor.lastrowid
+
+            # Insert the sponsor application without an assigned sponsor user
+            cursor.execute("""
+                INSERT INTO APPLICATIONS
+                    (USER_ID, SPONSORCOMP_ID, SPONSOR_ID)
+                VALUES (%s, %s, NULL)
+            """, (user_id, sponsorcomp_id))
+
+            # Commit only after both inserts succeed
             conn.commit()
 
             return redirect(url_for("auth.login"))
@@ -150,10 +200,11 @@ def signup():
             current_app.logger.exception("Error creating user account") 
             return render_template( 
                 "signup.html", 
-                error="Unable to create your account. Please try again." 
+                error="Unable to create your account. Please try again.",
+                sponsor_companies=sponsor_companies 
             )
             
         finally:
             cursor.close()
             conn.close()
-    return render_template("signup.html")
+    return render_template("signup.html", sponsor_companies=sponsor_companies)

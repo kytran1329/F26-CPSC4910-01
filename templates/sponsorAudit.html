@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sponsor Audit Logs</title>
+
+    <link rel="stylesheet"href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet"href="{{ url_for('static', filename='adminDash.css') }}">
+
+    <style>
+        .report-container[hidden],
+        .audit-table tbody tr[hidden] {
+            display: none;
+        }
+
+        .report-tab.active {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+
+            <div class="dashboard-name">
+                Sponsor Dashboard
+            </div>
+
+            <div class="tagline">
+                Good Driving. Better Rewards.
+            </div>
+
+            <div class="header-links">
+                <a href="{{ url_for('sponDash') }}" class="nav-link">
+                    Dashboard
+                </a>
+
+                <a href="{{ url_for('sponsorAudit') }}" class="nav-link">
+                    Audit Logs
+                </a>
+
+                <a href="{{ url_for('userProfile',
+                                    user_id=session['user_id']) }}"
+                   class="nav-link">
+                    Profile
+                </a>
+
+                <a href="{{ url_for('auth.logout') }}"
+                   class="logout-button">
+                    Logout
+                </a>
+            </div>
+
+        </div>
+    </header>
+
+
+    <!-- Main Content -->
+    <main>
+        <div class="admin-layout">
+            <div class="admin-tables">
+
+                <section class="admin-card">
+
+                    <h2>Manage Audit Logs</h2>
+
+                    <p>
+                        Review driver applications and point changes
+                        for {{ sponsor.SPONSORCOMP_NAME }}.
+                    </p>
+
+
+                    <!-- Date Filters -->
+                    <div class="filter-container">
+
+                        <label for="auditStartDate">From:</label>
+                        <input type="date" id="auditStartDate">
+
+                        <label for="auditEndDate">To:</label>
+                        <input type="date" id="auditEndDate">
+
+                    </div>
+
+
+                    <!-- Audit Tabs -->
+                    <div class="report-tabs">
+
+                        <button type="button"
+                                class="report-tab active"
+                                data-tab="applications">
+                            Driver Applications
+                        </button>
+
+                        <button type="button"
+                                class="report-tab"
+                                data-tab="points">
+                            Point Changes
+                        </button>
+
+                    </div>
+
+
+                    <!-- DRIVER APPLICATIONS -->
+                    <div id="applications"
+                         class="report-container">
+
+                        <h3>Driver Applications</h3>
+                        
+                        <div class="audit-actions">
+                            <a href="{{ url_for('export.exportSponsorApplicationsCsv') }}"
+                            id="sponsorApplicationsCsv"
+                            class="back-link">Download CSV</a>
+
+                            <a href="{{ url_for('export.exportSponsorApplicationsPdf') }}"
+                            id="sponsorApplicationsPdf"
+                            class="back-link">Download PDF</a>
+                        </div>
+
+                        <div class="audit-table-container">
+
+                            <table class="audit-table">
+
+                                <thead>
+                                    <tr>
+                                        <th>Driver Email</th>
+                                        <th>Status</th>
+                                        <th>Reason</th>
+                                        <th>Reviewed By</th>
+                                        <th>Created</th>
+                                        <th>Last Updated</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+
+                                    {% for application in applications %}
+
+                                    <tr data-date="{{
+                                        (application.UPDATED_DTS or application.CREATED_DTS)
+                                        .strftime('%Y-%m-%d')
+                                        if (application.UPDATED_DTS or application.CREATED_DTS)
+                                        else ''
+                                    }}">
+
+                                        <td>
+                                            {{ application.DRIVER_EMAIL }}
+                                        </td>
+
+                                        <td>
+                                            {% set status =
+                                                application.STATUS or '' %}
+
+                                            <span class="{{
+                                                'status-success'
+                                                if status|lower == 'accepted'
+                                                else 'status-failure'
+                                                if status|lower == 'rejected'
+                                                else ''
+                                            }}">
+                                                {{ status }}
+                                            </span>
+                                        </td>
+
+                                        <td>
+                                            {{ application.REASON or 'N/A' }}
+                                        </td>
+
+                                        <td>
+                                            {{ application.REVIEWED_BY_EMAIL or 'N/A' }}
+                                        </td>
+
+                                        <td>
+                                            {% if application.CREATED_DTS %}
+                                                {{ application.CREATED_DTS.strftime(
+                                                    '%Y-%m-%d %H:%M'
+                                                ) }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+
+                                        <td>
+                                            {% if application.UPDATED_DTS %}
+                                                {{ application.UPDATED_DTS.strftime(
+                                                    '%Y-%m-%d %H:%M'
+                                                ) }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+
+                                    </tr>
+
+                                    {% endfor %}
+
+                                    <tr class="no-results" hidden>
+                                        <td colspan="6">
+                                            No applications match the selected dates.
+                                        </td>
+                                    </tr>
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+                    </div>
+
+
+                    <!-- POINT CHANGES -->
+                    <div id="points"
+                         class="report-container"
+                         hidden>
+
+                        <h3>Point Changes</h3>
+             
+                        <div class="audit-actions">
+                            <a href="{{ url_for('export.exportSponsorPointChangesCsv') }}"
+                            id="sponsorPointChangesCsv"
+                            class="back-link">Download CSV</a>
+
+                            <a href="{{ url_for('export.exportSponsorPointChangesPdf') }}"
+                            id="sponsorPointChangesPdf"
+                            class="back-link">Download PDF</a>
+                        </div>
+
+                        <div class="audit-table-container">
+
+                            <table class="audit-table">
+
+                                <thead>
+                                    <tr>
+                                        <th>Driver Email</th>
+                                        <th>Changed By</th>
+                                        <th>Points Changed</th>
+                                        <th>Reason</th>
+                                        <th>Date and Time</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+
+                                    {% for change in point_changes %}
+
+                                    <tr data-date="{{
+                                        change.DTS.strftime('%Y-%m-%d')
+                                        if change.DTS else ''
+                                    }}">
+
+                                        <td>
+                                            {{ change.DRIVER_EMAIL }}
+                                        </td>
+
+                                        <td>
+                                            {{ change.CHANGED_BY_EMAIL or 'N/A' }}
+                                        </td>
+
+                                        <td>
+                                            {{ change.POINTCHANGE_AMOUNT }}
+                                        </td>
+
+                                        <td>
+                                            {{ change.POINTCHANGE_REASON }}
+                                        </td>
+
+                                        <td>
+                                            {% if change.DTS %}
+                                                {{ change.DTS.strftime(
+                                                    '%Y-%m-%d %H:%M:%S'
+                                                ) }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+
+                                    </tr>
+
+                                    {% endfor %}
+
+                                    <tr class="no-results" hidden>
+                                        <td colspan="5">
+                                            No point changes match the selected dates.
+                                        </td>
+                                    </tr>
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+                    </div>
+
+                </section>
+            </div>
+        </div>
+    </main>
+
+
+    <!-- JavaScript -->
+    <script>
+
+        // Script for switching tabs
+        document.querySelectorAll(".report-tab").forEach(button => {
+            button.addEventListener("click", () => {
+                const selectedTab = button.dataset.tab;
+
+                document.querySelectorAll(".report-tab").forEach(tab => {
+                    tab.classList.toggle("active", tab === button);
+                });
+
+                document.querySelectorAll(".report-container").forEach(
+                    container => {
+                        container.hidden = container.id !== selectedTab;
+                    }
+                );
+            });
+        });
+
+        // Filter tables by date
+        const startInput = document.getElementById("auditStartDate");
+        const endInput = document.getElementById("auditEndDate");
+
+        function filterAuditRows() {
+            const startDate = startInput.value;
+            const endDate = endInput.value;
+
+            // Validate the selected date range.
+            startInput.setCustomValidity("");
+            endInput.setCustomValidity("");
+
+            if (startDate && endDate && startDate > endDate) {
+                endInput.setCustomValidity(
+                    "End date must be on or after the start date."
+                );
+                endInput.reportValidity();
+                return;
+            }
+
+            document.querySelectorAll(
+                "#applications, #points"
+            ).forEach(container => {
+
+                const rows = Array.from(
+                    container.querySelectorAll("tbody tr[data-date]")
+                );
+
+                let visibleCount = 0;
+
+                rows.forEach(row => {
+                    const rowDate = row.dataset.date;
+
+                    const matchesStart =
+                        !startDate || (rowDate && rowDate >= startDate);
+
+                    const matchesEnd =
+                        !endDate || (rowDate && rowDate <= endDate);
+
+                    const matches =
+                        rowDate !== "" && matchesStart && matchesEnd;
+
+                    row.hidden = !matches;
+
+                    if (matches) {
+                        visibleCount++;
+                    }
+                });
+
+                const noResults = container.querySelector(".no-results");
+
+                if (noResults) {
+                    noResults.hidden = visibleCount > 0;
+                }
+            });
+        }
+
+        // Automatically filter when either date changes.
+        startInput.addEventListener("change", filterAuditRows);
+        endInput.addEventListener("change", filterAuditRows);
+
+        // Initialize the tables when the page loads.
+        filterAuditRows();
+         
+        function updateSponsorExportLinks() {
+            const startDate = startInput.value;
+            const endDate = endInput.value;
+
+            const linkIds = [
+                "sponsorApplicationsCsv",
+                "sponsorApplicationsPdf",
+                "sponsorPointChangesCsv",
+                "sponsorPointChangesPdf"
+            ];
+
+            linkIds.forEach(id => {
+                const link = document.getElementById(id);
+                const url = new URL(link.href, window.location.origin);
+
+                url.searchParams.delete("start_date");
+                url.searchParams.delete("end_date");
+
+                if (startDate) {
+                    url.searchParams.set("start_date", startDate);
+                }
+
+                if (endDate) {
+                    url.searchParams.set("end_date", endDate);
+                }
+
+                link.href = url.pathname + url.search;
+            });
+        }
+
+        // Automatically filter and update export links.
+        startInput.addEventListener("change", () => {
+            filterAuditRows();
+            updateSponsorExportLinks();
+        });
+
+        endInput.addEventListener("change", () => {
+            filterAuditRows();
+            updateSponsorExportLinks();
+        });
+    </script>
+
+</body>
+</html>

@@ -93,7 +93,6 @@
                                 <th>Email</th>
                                 <th>Application Date</th>
                                 <th>Status</th>
-                                <th>Balance</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -118,7 +117,6 @@
                                 <td>{{ row["EMAIL"] }}</td>
                                 <td>{{ row["CREATED_DTS"] }}</td>
                                 <td>{{ row["STATUS"] }}</td>
-                                <td>{{ row["BALANCE"] }}</td>
                                 <td>
                                     <form method="POST"
                                           action="{{ url_for(

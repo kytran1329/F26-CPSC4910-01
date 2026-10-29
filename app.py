@@ -252,7 +252,6 @@ def applications():
             u.EMAIL, 
             a.CREATED_DTS, 
             a.STATUS, 
-            d.BALANCE, 
             u.USER_ID
         FROM USER as u
         JOIN APPLICATIONS as a ON u.USER_ID = a.USER_ID
@@ -1894,6 +1893,108 @@ def adminAudit():
         point_changes=point_changes,
         sponsor_companies=sponsor_companies
     )
+
+@app.route("/sponDash/audit")
+def sponsorAudit():
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    user_id = session["user_id"]
+
+    conn = mysql.connector.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME
+            )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # Get the sponsor company associated with the logged-in user.
+        cursor.execute("""
+            SELECT
+                s.SPONSOR_ID,
+                s.SPONSORCOMP_ID,
+                sc.SPONSORCOMP_NAME
+            FROM SPONSOR s
+            JOIN USER u
+                ON u.USER_ID = s.USER_ID
+            JOIN SPONSORCOMP sc
+                ON sc.SPONSORCOMP_ID = s.SPONSORCOMP_ID
+            WHERE s.USER_ID = %s
+              AND u.ROLE = 'Sponsor'
+        """, (user_id,))
+
+        sponsor = cursor.fetchone()
+
+        if not sponsor:
+            flash("You are not authorized to view these audit logs.", "error")
+            return redirect(url_for("sponDash"))
+
+        sponsorcomp_id = sponsor["SPONSORCOMP_ID"]
+
+        # Get all driver application data for sponsor company
+        cursor.execute("""
+            SELECT
+                a.CREATED_DTS,
+                a.UPDATED_DTS,
+                du.EMAIL AS DRIVER_EMAIL,
+                a.STATUS,
+                a.REASON,
+                su.EMAIL AS REVIEWED_BY_EMAIL
+            FROM APPLICATIONS a
+            JOIN USER du
+                ON du.USER_ID = a.USER_ID
+            LEFT JOIN SPONSOR reviewer
+                ON reviewer.SPONSOR_ID = a.SPONSOR_ID
+            LEFT JOIN USER su
+                ON su.USER_ID = reviewer.USER_ID
+            WHERE a.SPONSORCOMP_ID = %s
+            ORDER BY
+                COALESCE(a.UPDATED_DTS, a.CREATED_DTS) DESC
+        """, (sponsorcomp_id,))
+
+        applications = cursor.fetchall()
+
+        # grab all point changes for sponsor company
+        cursor.execute("""
+            SELECT
+                pc.POINTCHANGE_ID,
+                pc.DRIVER_ID,
+                du.EMAIL AS DRIVER_EMAIL,
+                actor.EMAIL AS CHANGED_BY_EMAIL,
+                pc.POINTCHANGE_AMOUNT,
+                pc.POINTCHANGE_REASON,
+                pc.DTS,
+                b.BALANCE_ID,
+                sc.SPONSORCOMP_NAME
+            FROM POINTCHANGES pc
+            JOIN BALANCE b
+                ON b.BALANCE_ID = pc.BALANCE_ID
+            JOIN SPONSORCOMP sc
+                ON sc.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+            JOIN DRIVER d
+                ON d.DRIVER_ID = pc.DRIVER_ID
+            JOIN USER du
+                ON du.USER_ID = d.USER_ID
+            LEFT JOIN USER actor
+                ON actor.USER_ID = pc.USER_ID
+            WHERE b.SPONSORCOMP_ID = %s
+            ORDER BY pc.DTS DESC
+        """, (sponsorcomp_id,))
+
+        point_changes = cursor.fetchall()
+
+        return render_template(
+            "sponsorAudit.html",
+            sponsor=sponsor,
+            applications=applications,
+            point_changes=point_changes
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
 
 @app.route("/viewAsDriver/<int:driver_id>", methods=["POST"])
 def viewAsDriver(driver_id):

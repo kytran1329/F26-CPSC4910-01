@@ -77,36 +77,6 @@ h2 {
     margin-bottom: 20px;
 }
 
-
-/* Filter */
-
-.filter-container {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-
-    margin-bottom: 20px;
-}
-
-.filter-container label {
-    font-weight: bold;
-}
-
-.filter-container select {
-    padding: 8px 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 5px;
-    font-size: 1rem;
-}
-
-.filter-container input[type="date"] {
-    padding: 8px 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 5px;
-    font-size: 1rem;
-}
-
-
 /* Tables */
 
 .table-container {
