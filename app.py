@@ -209,9 +209,6 @@ def applications():
     start_date = request.args.get("start_date", "")
     end_date = request.args.get("end_date", "")
 
-    print("Start date:", start_date)
-    print("End date:", end_date)
-
     # Validate the selected dates
     try:
         if start_date:
@@ -244,22 +241,26 @@ def applications():
     cursor = conn.cursor(dictionary=True)
 
     # grab correct data about each applicant
+    # Get pending applications for the logged-in sponsor's company
     query = """
-        SELECT 
-            a.APPLICATION_ID, 
-            u.USER_FNAME, 
-            u.USER_LNAME, 
-            u.EMAIL, 
-            a.CREATED_DTS, 
-            a.STATUS, 
-            u.USER_ID
-        FROM USER as u
-        JOIN APPLICATIONS as a ON u.USER_ID = a.USER_ID
-        JOIN DRIVER as d on u.USER_ID = d.USER_ID
-        WHERE a.STATUS = 'Pending'
-    """
+            SELECT
+                a.APPLICATION_ID,
+                u.USER_FNAME,
+                u.USER_LNAME,
+                u.EMAIL,
+                a.CREATED_DTS,
+                a.STATUS,
+                u.USER_ID
+            FROM APPLICATIONS AS a
+            JOIN USER AS u
+                ON u.USER_ID = a.USER_ID
+            JOIN SPONSOR AS s
+                ON s.SPONSORCOMP_ID = a.SPONSORCOMP_ID
+            WHERE a.STATUS = 'Pending'
+              AND s.USER_ID = %s
+        """
 
-    params = []
+    params = [session["user_id"]]
 
     if start_date:
         query += " AND a.CREATED_DTS >= %s"
