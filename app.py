@@ -1,4 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import (
+    Flask,
+    render_template,
+    request, 
+    redirect, 
+    url_for, 
+    session, 
+    flash,
+    current_app)
 import mysql.connector 
 import os
 from dotenv import load_dotenv
@@ -209,9 +217,6 @@ def applications():
     start_date = request.args.get("start_date", "")
     end_date = request.args.get("end_date", "")
 
-    print("Start date:", start_date)
-    print("End date:", end_date)
-
     # Validate the selected dates
     try:
         if start_date:
@@ -244,15 +249,26 @@ def applications():
     cursor = conn.cursor(dictionary=True)
 
     # grab correct data about each applicant
+    # Get pending applications for the logged-in sponsor's company
     query = """
-        SELECT a.APPLICATION_ID, u.USER_FNAME, u.USER_LNAME, u.EMAIL, a.CREATED_DTS, a.STATUS, d.BALANCE, u.USER_ID
-        FROM USER as u
-        JOIN APPLICATIONS as a ON u.USER_ID = a.USER_ID
-        JOIN DRIVER as d on u.USER_ID = d.USER_ID
-        WHERE a.STATUS = 'Pending'
-    """
+            SELECT
+                a.APPLICATION_ID,
+                u.USER_FNAME,
+                u.USER_LNAME,
+                u.EMAIL,
+                a.CREATED_DTS,
+                a.STATUS,
+                u.USER_ID
+            FROM APPLICATIONS AS a
+            JOIN USER AS u
+                ON u.USER_ID = a.USER_ID
+            JOIN SPONSOR AS s
+                ON s.SPONSORCOMP_ID = a.SPONSORCOMP_ID
+            WHERE a.STATUS = 'Pending'
+              AND s.USER_ID = %s
+        """
 
-    params = []
+    params = [session["user_id"]]
 
     if start_date:
         query += " AND a.CREATED_DTS >= %s"
@@ -323,85 +339,134 @@ def bulk_update_applications():
 
     placeholders = ", ".join(["%s"] * len(application_ids))
 
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
-    query = f"""
-        UPDATE APPLICATIONS
-        SET STATUS = %s,
-            UPDATED_DTS = NOW()
-        WHERE STATUS = 'Pending'
-            AND APPLICATION_ID IN ({placeholders})
-    """
+    # Get the logged-in sponsor's information
+    cursor.execute("""
+        SELECT SPONSOR_ID, SPONSORCOMP_ID
+        FROM SPONSOR
+        WHERE USER_ID = %s
+    """, (session["user_id"],))
 
-    cursor.execute(query, [action] + application_ids)
-    conn.commit()
+    sponsor = cursor.fetchone()
+
+    cursor.execute(f"""
+        SELECT APPLICATION_ID, USER_ID, SPONSORCOMP_ID
+        FROM APPLICATIONS
+        WHERE APPLICATION_ID IN ({placeholders})
+            AND SPONSORCOMP_ID = %s
+            AND STATUS = 'Pending'
+        FOR UPDATE
+    """, tuple(application_ids) + (sponsor["SPONSORCOMP_ID"],))
+
+    applications = cursor.fetchall()
+
+    if not applications:
+        return redirect(url_for(
+            "applications",
+            start_date=start_date,
+            end_date=end_date
+        ))
+
+    # Update the selected applications
+    valid_ids = [app["APPLICATION_ID"] for app in applications]
+    valid_placeholders = ", ".join(["%s"] * len(valid_ids))
+    try:
+        if action == "Accepted":
+            # Update the selected applications
+            cursor.execute(f"""
+                UPDATE APPLICATIONS
+                SET STATUS = 'Accepted',
+                    SPONSOR_ID = %s,
+                    UPDATED_DTS = NOW()
+                WHERE APPLICATION_ID IN ({valid_placeholders})
+                AND STATUS = 'Pending'
+                AND SPONSORCOMP_ID = %s
+            """, (
+                sponsor["SPONSOR_ID"],
+                *valid_ids,
+                sponsor["SPONSORCOMP_ID"]
+            ))
+
+            # Create driver and balance records as needed
+            for application in applications:
+                user_id = application["USER_ID"]
+                sponsorcomp_id = application["SPONSORCOMP_ID"]
+
+                # Check whether this user already has a DRIVER record
+                cursor.execute("""
+                    SELECT DRIVER_ID
+                    FROM DRIVER
+                    WHERE USER_ID = %s
+                """, (user_id,))
+
+                driver = cursor.fetchone()
+
+                # Create the DRIVER record only if one doesn't exist
+                if driver:
+                    driver_id = driver["DRIVER_ID"]
+                else:
+                    cursor.execute("""
+                        INSERT INTO DRIVER (USER_ID)
+                        VALUES (%s)
+                    """, (user_id,))
+
+                    driver_id = cursor.lastrowid
+
+                # Check whether this driver already has a balance
+                # for this sponsor company
+                cursor.execute("""
+                    SELECT DRIVER_ID
+                    FROM BALANCE
+                    WHERE DRIVER_ID = %s
+                    AND SPONSORCOMP_ID = %s
+                """, (driver_id, sponsorcomp_id))
+
+                balance_record = cursor.fetchone()
+
+                # Create an initial zero balance only if needed
+                if not balance_record:
+                    cursor.execute("""
+                        INSERT INTO BALANCE
+                            (DRIVER_ID, SPONSORCOMP_ID, BALANCE)
+                        VALUES (%s, %s, %s)
+                    """, (
+                        driver_id,
+                        sponsorcomp_id,
+                        0
+                    ))
+
+        else:
+            # Reject applications without creating driver records
+            cursor.execute(f"""
+                UPDATE APPLICATIONS
+                SET STATUS = 'Rejected',
+                    UPDATED_DTS = NOW()
+                WHERE APPLICATION_ID IN ({valid_placeholders})
+                  AND STATUS = 'Pending'
+                  AND SPONSORCOMP_ID = %s
+            """, (
+                *valid_ids,
+                sponsor["SPONSORCOMP_ID"]
+            ))
+
+        conn.commit()
+
+    except mysql.connector.Error:
+        conn.rollback()
+        current_app.logger.exception(
+            "Error processing sponsor applications"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
 
     return redirect(url_for(
         "applications",
         start_date=start_date,
         end_date=end_date
     ))
-
-
-@app.route("/accept_application/<int:application_id>", methods=["POST"])
-def accept_application(application_id):
-
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-    conn = mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME
-    )
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE APPLICATIONS
-        SET STATUS = 'Accepted',
-            UPDATED_DTS = NOW()
-        WHERE APPLICATION_ID = %s
-    """, (application_id,))
-
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-    return redirect(url_for("applications"))
-
-
-@app.route("/reject_application/<int:application_id>", methods=["POST"])
-def reject_application(application_id):
-
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-    conn = mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME
-    )
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE APPLICATIONS
-        SET STATUS = 'Rejected',
-            UPDATED_DTS = NOW()
-        WHERE APPLICATION_ID = %s
-    """, (application_id,))
-
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-    return redirect(url_for("applications"))
-
 
 @app.route("/userProfile/<int:user_id>")
 def userProfile(user_id):
@@ -434,7 +499,11 @@ def userProfile(user_id):
     cursor.close()
     conn.close()
 
-    return render_template("userProfile.html", user_id=user_id, user=user,error=error,
+    return render_template(
+        "userProfile.html", 
+        user_id=user_id, 
+        user=user,
+        error=error,
         success=success)
 
 @app.route("/updateFirstName", methods=["POST"])
@@ -445,10 +514,18 @@ def updateFirstName():
     first_name = request.form["first_name"].strip()
 
     if not first_name:
-        return redirect(url_for("userProfile", user_id=user_id, error="First name cannot be empty."))
+        return redirect(url_for(
+            "userProfile", 
+            user_id=user_id, 
+            error="First name cannot be empty."
+            ))
 
     if not first_name.isalpha():
-        return redirect(url_for("userProfile", user_id=user_id, error="First name can only contain letters."))
+        return redirect(url_for(
+            "userProfile", 
+            user_id=user_id, 
+            error="First name can only contain letters."
+        ))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -473,7 +550,10 @@ def updateFirstName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile", user_id=user_id, success="First name updated successfully!"))
+    return redirect(url_for(
+        "userProfile", 
+        user_id=user_id, 
+        success="First name updated successfully!"))
 
 @app.route("/updateLastName", methods=["POST"])
 def updateLastName():
@@ -483,12 +563,17 @@ def updateLastName():
     last_name = request.form["last_name"].strip()
 
     if not last_name:
-        return redirect(
-            url_for("userProfile", user_id=user_id, error="Last name cannot be empty."))
+        return redirect(url_for(
+                "userProfile",
+                user_id=user_id, 
+                error="Last name cannot be empty."
+            ))
 
     if not last_name.isalpha():
-        return redirect(
-            url_for("userProfile", user_id=user_id, error="Last name can only contain letters."))
+        return redirect(url_for(
+            "userProfile",
+            user_id=user_id,
+            error="Last name can only contain letters."))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -513,7 +598,11 @@ def updateLastName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile", user_id=user_id, success="Last name updated successfully!"))
+    return redirect(url_for(
+        "userProfile", 
+        user_id=user_id, 
+        success="Last name updated successfully!"
+    ))
 
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
@@ -830,14 +919,28 @@ def sponDash():
 def assignPoints():
     if "user_id" not in session:
         return redirect(url_for("login"))
-    
+
     role = session.get("role")
     if role not in ("Sponsor", "Admin"):
         return "Unauthorized", 403
 
     is_admin = role == "Admin"
     actor_user_id = session["user_id"]
-    sponsor_user_id = actor_user_id
+
+    # Admins may choose one company or all companies.
+    # Sponsors' company is determined from their logged-in account.
+    selected_company_raw = request.values.get("sponsorcomp_id", "all")
+    selected_company_id = None
+
+    if is_admin and selected_company_raw != "all":
+        try:
+            selected_company_id = int(selected_company_raw)
+            if selected_company_id <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            flash("Please select a valid sponsor company.", "error")
+            return redirect(url_for("assignPoints"))
+
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -848,214 +951,313 @@ def assignPoints():
 
     try:
         if request.method == "POST":
-
-            # handle the bulk changes for all drivers
+            # Bulk Add or Subtract
             bulk_action = request.form.get("bulk_action")
 
             if bulk_action in ("add_all", "subtract_all"):
-                if is_admin:
-                    return "Unauthorized", 403
-
                 try:
                     bulk_amount = int(request.form.get("bulk_amount", ""))
                 except (TypeError, ValueError):
-                    flash("Enter a valid whole-number point amount.", "error")
-                    return redirect(url_for("assignPoints"))
+                    flash("Enter a valid whole-number point amount.","error")
+                    return redirect(url_for(
+                        "assignPoints",
+                        sponsorcomp_id=selected_company_raw
+                    ))
 
                 bulk_reason = request.form.get("bulk_reason", "").strip()
 
                 if bulk_amount <= 0:
-                    flash("The point amount must be greater than zero.", "error")
-                    return redirect(url_for("assignPoints"))
+                    flash("The point amount must be greater than zero.","error")
+                    return redirect(url_for(
+                        "assignPoints",
+                        sponsorcomp_id=selected_company_raw
+                    ))
 
                 if not bulk_reason:
-                    flash("Please enter a reason for the point change.", "error")
-                    return redirect(url_for("assignPoints"))
+                    flash("Please enter a reason for the point change.","error")
+                    return redirect(url_for(
+                        "assignPoints",
+                        sponsorcomp_id=selected_company_raw
+                    ))
 
-                # negative amount means points are being subtracted
-                signed_amount = (
-                    bulk_amount if bulk_action == "add_all" 
+                signed_amount = (bulk_amount
+                    if bulk_action == "add_all"
                     else -bulk_amount
                 )
 
-                # lock sponsor company's driver balances before checking
-                cursor.execute("""
-                    SELECT d.DRIVER_ID, b.BALANCE
-                    FROM DRIVER AS d
-                    JOIN BALANCE as b
-                        on b.DRIVER_ID = d.DRIVER_ID
-                    WHERE EXISTS (
-                        SELECT 1
-                        FROM SPONSOR AS s
-                        WHERE s.USER_ID = %s
-                            AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
-                    )
-                    FOR UPDATE
-                    """, 
-                    (sponsor_user_id,)
-                )
-                company_drivers = cursor.fetchall()
+                # Apply the same company restriction when selecting
+                # balances and when updating them.
+                company_condition = ""
+                company_params = []
 
-                if not company_drivers:
-                    conn.rollback()
-                    flash("There are no drivers to update.", "error")
-                    return redirect(url_for("assignPoints"))
-
-                # reject the whole subtraction is any driver would go negative
-                if bulk_action == "subtract_all":
-                    drivers_without_enough_points = [
-                        driver for driver in company_drivers
-                        if float(driver["BALANCE"] or 0) < bulk_amount
-                    ]
-
-                    if drivers_without_enough_points:
-                        conn.rollback()
-                        flash("Bulk subtraction cancelled: at least one driver does not have enough points. No balances were changes.", "error")
-                        return redirect(url_for("assignPoints"))
-
-                # update all drivers belonging to the sponsor's company
-                cursor.execute("""
-                    UPDATE BALANCE AS b
-                    SET BALANCE = BALANCE + %s
-                    WHERE EXISTS (
-                        SELECT 1
-                        FROM SPONSOR AS s
-                        WHERE s.USER_ID = %s
-                            AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
-                    )
-                    """,
-                    (signed_amount, sponsor_user_id)
-                )
-
-                # record the change separately for each affected driver
-                cursor.execute("""
-                    INSERT INTO POINTCHANGES
-                        (DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON, USER_ID)
-                    SELECT 
-                        d.DRIVER_ID, %s, %s, s.USER_ID
-                    FROM DRIVER AS d
-                    JOIN BALANCE as b
-                        on b.DRIVER_ID = d.DRIVER_ID
-                    JOIN SPONSOR AS s
-                        ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
-                    WHERE s.USER_ID = %s
-                    """,
-                    (signed_amount, bulk_reason, sponsor_user_id)
-                )
-
-                conn.commit()
-
-                operation = (
-                    "added to" if bulk_action == "add_all" 
-                    else "subtracted from"
-                )
-                flash(
-                    f"{bulk_amount} points successfully {operation} "
-                    f"all {len(company_drivers)} drivers.",
-                    "success"
-                )
-                return redirect(url_for("assignPoints"))
-
-            driver_id_raw = request.form.get("driver_id", "")
-            action = request.form.get("action", "")
-            amount_raw = request.form.get("amount", "")
-            reason = request.form.get("reason", "").strip()
-
-            # validate the form before making database changes
-            try:
-                driver_id = int(driver_id_raw)
-                amount = int(amount_raw)
-            except (TypeError, ValueError):
-                flash("Enter a valid driver and a whole-number point amount.", "error")
-                return redirect(url_for("assignPoints"))
-
-            if amount <= 0:
-                flash("The point amount must be greater than zero.", "error")
-                return redirect(url_for("assignPoints"))
-            
-            if action not in ("add", "subtract"):
-                flash("Choose whether to add or subtract points.", "error")
-                return redirect(url_for("assignPoints"))
-
-            if not reason:
-                flash("Please enter a reason for the point change.", "error")
-                return redirect(url_for("assignPoints"))
-
-            if is_admin:
-                cursor.execute("""
-                    SELECT d.DRIVER_ID, b.BALANCE
-                    FROM DRIVER as d
-                    JOIN BALANCE as b
-                        on b.DRIVER_ID = d.DRIVER_ID
-                    WHERE DRIVER_ID = %s
-                    FOR UPDATE
-                    """,
-                    (driver_id,),
-                )
-            else:
-                # lock the driver's balance while checking and updating it
-                # condition to ensure the sponsor owns the driver
-                cursor.execute("""
-                    SELECT d.DRIVER_ID, b.BALANCE
-                    FROM DRIVER AS d
-                    JOIN BALANCE as b
-                        on b.DRIVER_ID = d.DRIVER_ID
-                    WHERE d.DRIVER_ID = %s
+                if is_admin:
+                    # A selected company; otherwise, all companies.
+                    if selected_company_id is not None:
+                        company_condition = """
+                            AND b.SPONSORCOMP_ID = %s
+                        """
+                        company_params.append(selected_company_id)
+                else:
+                    # Sponsors can only affect their own company.
+                    company_condition = """
                         AND EXISTS (
                             SELECT 1
                             FROM SPONSOR AS s
                             WHERE s.USER_ID = %s
-                                AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                              AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                         )
-                    FOR UPDATE
-                    """,
-                    (driver_id, sponsor_user_id),
-                )
-            driver = cursor.fetchone()
+                    """
+                    company_params.append(actor_user_id)
 
-            if driver is None:
+                try:
+                    # Lock the balances before validating them.
+                    cursor.execute("""
+                        SELECT
+                            b.BALANCE_ID,
+                            b.DRIVER_ID,
+                            b.SPONSORCOMP_ID,
+                            b.BALANCE
+                        FROM BALANCE AS b
+                        WHERE 1 = 1
+                    """ + company_condition + """
+                        FOR UPDATE
+                    """, tuple(company_params))
+
+                    balances = cursor.fetchall()
+
+                    if not balances:
+                        conn.rollback()
+                        flash("There are no balances to update.","error")
+                        return redirect(url_for(
+                            "assignPoints",
+                            sponsorcomp_id=selected_company_raw
+                        ))
+
+                    # Prevent a bulk subtraction if one balance goes negative.
+                    if bulk_action == "subtract_all":
+                        insufficient = any(
+                            float(balance["BALANCE"] or 0) < bulk_amount
+                            for balance in balances
+                        )
+
+                        if insufficient:
+                            conn.rollback()
+                            flash(
+                                "Bulk subtraction cancelled: at least "
+                                "one balance does not have enough points. "
+                                "No balances were changed.",
+                                "error"
+                            )
+                            return redirect(url_for(
+                                "assignPoints",
+                                sponsorcomp_id=selected_company_raw
+                            ))
+
+                    # Update only the balances selected above.
+                    cursor.execute("""
+                        UPDATE BALANCE AS b
+                        SET BALANCE = BALANCE + %s
+                        WHERE 1 = 1
+                    """ + company_condition,
+                    tuple([signed_amount] + company_params))
+
+                    for balance in balances:
+                        cursor.execute("""
+                            INSERT INTO POINTCHANGES (
+                                BALANCE_ID,
+                                DRIVER_ID,
+                                POINTCHANGE_AMOUNT,
+                                POINTCHANGE_REASON,
+                                USER_ID
+                            )
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (
+                            balance["BALANCE_ID"],
+                            balance["DRIVER_ID"],
+                            signed_amount,
+                            bulk_reason,
+                            actor_user_id
+                        ))
+
+                    conn.commit()
+
+                    operation = (
+                        "added to"
+                        if bulk_action == "add_all"
+                        else "subtracted from"
+                    )
+
+                    flash(
+                        f"{bulk_amount} points successfully {operation} "
+                        f"{len(balances)} balances.",
+                        "success"
+                    )
+
+                except Exception:
+                    conn.rollback()
+                    raise
+
+                return redirect(url_for(
+                    "assignPoints",
+                    sponsorcomp_id=selected_company_raw
+                ))
+
+            # Add or Subtract Individually
+            driver_id_raw = request.form.get("driver_id", "")
+            balance_company_raw = request.form.get("sponsorcomp_id", "")
+            action = request.form.get("action", "")
+            amount_raw = request.form.get("amount", "")
+            reason = request.form.get("reason", "").strip()
+
+            try:
+                driver_id = int(driver_id_raw)
+                balance_company_id = int(balance_company_raw)
+                amount = int(amount_raw)
+
+                if driver_id <= 0 or balance_company_id <= 0:
+                    raise ValueError
+
+            except (TypeError, ValueError):
+                flash(
+                    "Select a valid driver and enter a whole-number point amount.",
+                    "error"
+                )
+                return redirect(url_for(
+                    "assignPoints",
+                    sponsorcomp_id=selected_company_raw
+                ))
+
+            if amount <= 0:
+                flash("The point amount must be greater than zero.","error")
+                return redirect(url_for(
+                    "assignPoints",
+                    sponsorcomp_id=selected_company_raw
+                ))
+
+            if action not in ("add", "subtract"):
+                flash("Choose whether to add or subtract points.","error")
+                return redirect(url_for(
+                    "assignPoints",
+                    sponsorcomp_id=selected_company_raw
+                ))
+
+            if not reason:
+                flash(
+                    "Please enter a reason for the point change.","error")
+                return redirect(url_for(
+                    "assignPoints",
+                    sponsorcomp_id=selected_company_raw
+                ))
+
+            # Look up and lock exactly one driver/company balance.
+            # EXISTS Prevents sponsors from changing another company's balance
+            cursor.execute("""
+                SELECT
+                    b.BALANCE_ID
+                    b.DRIVER_ID,
+                    b.SPONSORCOMP_ID,
+                    b.BALANCE
+                FROM BALANCE AS b
+                WHERE b.DRIVER_ID = %s
+                  AND b.SPONSORCOMP_ID = %s
+                  AND (
+                      %s = 1
+                      OR EXISTS (
+                          SELECT 1
+                          FROM SPONSOR AS s
+                          WHERE s.USER_ID = %s
+                            AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                      )
+                  )
+                FOR UPDATE
+            """, (
+                driver_id,
+                balance_company_id,
+                1 if is_admin else 0,
+                actor_user_id
+            ))
+
+            balance = cursor.fetchone()
+
+            if balance is None:
                 conn.rollback()
-                message = (
-                    "That driver was not found."
-                    if is_admin
-                    else "That driver was not found or is not assigned to your company."
+                flash("That driver/company balance was not found or you "
+                    "are not authorized to change it.",
+                    "error"
                 )
-                flash(message, "error")
-                return redirect(url_for("assignPoints"))
+                return redirect(url_for(
+                    "assignPoints",
+                    sponsorcomp_id=selected_company_raw
+                ))
 
-            current_balance = float(driver["BALANCE"] or 0)
-            signed_amount = amount if action == "add" else -amount
+            current_balance = float(balance["BALANCE"] or 0)
+            signed_amount = (
+                amount if action == "add" else -amount
+            )
             new_balance = current_balance + signed_amount
 
             if new_balance < 0:
                 conn.rollback()
-                flash(f"This driver only has {current_balance:g} points. You cannot subtract {amount} points.", "error")
-                return redirect(url_for("assignPoints"))
+                flash(
+                    f"This balance has {current_balance:g} points. "
+                    f"You cannot subtract {amount} points.",
+                    "error"
+                )
+                return redirect(url_for(
+                    "assignPoints",
+                    sponsorcomp_id=selected_company_raw
+                ))
 
-            cursor.execute(
-                "UPDATE BALANCE SET BALANCE = %s WHERE DRIVER_ID = %s",
-                (new_balance, driver_id),
-            )
             cursor.execute("""
-                INSERT INTO POINTCHANGES
-                (DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON, USER_ID)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (driver_id, signed_amount, reason, actor_user_id),
-            )
-            conn.commit()
-            flash(
-                f"Successfully {'added' if action == 'add' else 'subtracted'} {amount} points.",
-                "success",
-            )
-            return redirect(url_for("assignPoints"))
+                UPDATE BALANCE
+                SET BALANCE = %s
+                WHERE DRIVER_ID = %s
+                  AND SPONSORCOMP_ID = %s
+            """, (
+                new_balance,
+                driver_id,
+                balance_company_id
+            ))
 
+            cursor.execute("""
+                INSERT INTO POINTCHANGES (
+                    BALANCE_ID,
+                    DRIVER_ID,
+                    POINTCHANGE_AMOUNT,
+                    POINTCHANGE_REASON,
+                    USER_ID
+                )
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                driver["BALANCE_ID"],
+                driver["DRIVER_ID"],
+                signed_amount,
+                reason,
+                actor_user_id
+            ))
+
+            conn.commit()
+
+            flash(
+                f"Successfully "
+                f"{'added' if action == 'add' else 'subtracted'} "
+                f"{amount} points.",
+                "success"
+            )
+
+            return redirect(url_for(
+                "assignPoints",
+                sponsorcomp_id=selected_company_raw
+            ))
+
+        # Load driver balances
         driver_query = """
             SELECT
                 d.DRIVER_ID,
                 d.USER_ID,
                 b.BALANCE,
                 b.SPONSORCOMP_ID,
+                sc.SPONSORCOMP_NAME,
                 u.USER_FNAME,
                 u.USER_LNAME,
                 u.EMAIL,
@@ -1063,8 +1265,12 @@ def assignPoints():
                 latest.POINTCHANGE_REASON AS LAST_CHANGE_REASON,
                 latest.DTS AS LAST_CHANGE_DTS
             FROM DRIVER AS d
-            JOIN BALANCE as b on b.DRIVER_ID = d.DRIVER_ID
-            JOIN `USER` AS u ON u.USER_ID = d.USER_ID
+            JOIN BALANCE AS b
+                ON b.DRIVER_ID = d.DRIVER_ID
+            JOIN SPONSORCOMP AS sc
+                ON sc.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+            JOIN `USER` AS u
+                ON u.USER_ID = d.USER_ID
             LEFT JOIN POINTCHANGES AS latest
                 ON latest.POINTCHANGE_ID = (
                     SELECT p.POINTCHANGE_ID
@@ -1073,26 +1279,40 @@ def assignPoints():
                     ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
                     LIMIT 1
                 )
-            """
+        """
+
         if is_admin:
-            cursor.execute(driver_query + """
-                ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
-                """)
-        else:
-            # list only drivers belonging to one of the logged-in sponsor's companies
-            cursor.execute(driver_query + """
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM SPONSOR AS s
-                    WHERE s.USER_ID = %s
-                        AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+            if selected_company_id is not None:
+                cursor.execute(
+                    driver_query + """
+                        WHERE b.SPONSORCOMP_ID = %s
+                        ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
+                    """,
+                    (selected_company_id,)
                 )
-                ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
+            else:
+                cursor.execute(
+                    driver_query + """
+                        ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
+                    """
+                )
+        else:
+            cursor.execute(
+                driver_query + """
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM SPONSOR AS s
+                        WHERE s.USER_ID = %s
+                          AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                    )
+                    ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
                 """,
-                (sponsor_user_id,),
+                (actor_user_id,)
             )
+
         drivers = cursor.fetchall()
 
+        # Load point change history
         history_query = """
             SELECT
                 p.POINTCHANGE_ID,
@@ -1101,41 +1321,77 @@ def assignPoints():
                 p.POINTCHANGE_REASON,
                 p.DTS
             FROM POINTCHANGES AS p
-            JOIN DRIVER AS d ON d.DRIVER_ID = p.DRIVER_ID
-            JOIN BALANCE as b 
-                on b.DRIVER_ID = d.DRIVER_ID
+            WHERE EXISTS (
+                SELECT 1
+                FROM BALANCE AS b
+                WHERE b.DRIVER_ID = p.DRIVER_ID
+        """
+
+        history_params = []
+
+        if is_admin and selected_company_id is not None:
+            history_query += """
+                  AND b.SPONSORCOMP_ID = %s
             """
-        if is_admin:
-            cursor.execute(history_query + """
-                ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
-                """)
-        else:
-            cursor.execute(history_query + """
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM SPONSOR AS s
-                    WHERE s.USER_ID = %s
+            history_params.append(selected_company_id)
+
+        elif not is_admin:
+            history_query += """
+                  AND EXISTS (
+                      SELECT 1
+                      FROM SPONSOR AS s
+                      WHERE s.USER_ID = %s
                         AND s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
-                )
-                ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
-                """,
-                (sponsor_user_id,),
+                  )
+            """
+            history_params.append(actor_user_id)
+
+        history_query += """
             )
+            ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
+        """
+
+        cursor.execute(history_query, tuple(history_params))
         history_rows = cursor.fetchall()
 
         history_by_driver = {}
         for change in history_rows:
-            history_by_driver.setdefault(change["DRIVER_ID"], []).append(change)
+            history_by_driver.setdefault(
+                change["DRIVER_ID"], []
+            ).append(change)
+
+        # Load the company dropdown/filter
+        if is_admin:
+            cursor.execute("""
+                SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+                FROM SPONSORCOMP
+                ORDER BY SPONSORCOMP_NAME
+            """)
+        else:
+            cursor.execute("""
+                SELECT DISTINCT sc.SPONSORCOMP_ID, sc.SPONSORCOMP_NAME
+                FROM SPONSOR AS s
+                JOIN SPONSORCOMP AS sc
+                    ON sc.SPONSORCOMP_ID = s.SPONSORCOMP_ID
+                WHERE s.USER_ID = %s
+                ORDER BY sc.SPONSORCOMP_NAME
+            """, (actor_user_id,))
+
+        sponsor_companies = cursor.fetchall()
 
         return render_template(
             "assignPoints.html",
             drivers=drivers,
             history_by_driver=history_by_driver,
             is_admin=is_admin,
+            sponsor_companies=sponsor_companies,
+            selected_company_id=selected_company_id
         )
+
     except Exception:
         conn.rollback()
         raise
+
     finally:
         cursor.close()
         conn.close()
@@ -1179,14 +1435,16 @@ def adminDash():
     # Get drivers
     cursor.execute("""CALL ADMIN_GET_DRIVERS()""")
     drivers = cursor.fetchall()
-    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    # Pass cursor to next set because stored procedure returns results 
+    # and status of stored proecure
     while cursor.nextset():
         pass
 
     # Get sponsors
     cursor.execute("""CALL ADMIN_GET_SPONSORS()""")
     sponsors = cursor.fetchall()
-    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    # Pass cursor to next set because stored procedure returns results 
+    # and status of stored proecure
     while cursor.nextset():
         pass
 
@@ -1227,7 +1485,8 @@ def adminSponsors():
     # Get sponsors
     cursor.execute("""CALL ADMIN_GET_SPONSORS()""")
     sponsors = cursor.fetchall()
-    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    # Pass cursor to next set because stored procedure returns results 
+    # and status of stored proecure
     while cursor.nextset():
         pass
     
@@ -1284,7 +1543,8 @@ def adminDrivers():
     # Get drivers
     cursor.execute("""CALL ADMIN_GET_DRIVERS()""")
     drivers = cursor.fetchall()
-    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    # Pass cursor to next set because stored procedure returns results 
+    # and status of stored proecure
     while cursor.nextset():
         pass
 
@@ -1663,6 +1923,16 @@ def adminAudit():
         
     driver_applications = cursor.fetchall()
 
+    cursor.callproc(
+        "GET_POINT_CHANGES_AUDIT",
+        (None, None, None)
+    )
+
+    point_changes = []
+
+    for result in cursor.stored_results():
+        point_changes.extend(result.fetchall())
+
     cursor.execute("""
             SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
             FROM SPONSORCOMP
@@ -1678,8 +1948,111 @@ def adminAudit():
         login_attempts=login_attempts,
         password_changes=password_changes,
         driver_applications=driver_applications,
+        point_changes=point_changes,
         sponsor_companies=sponsor_companies
     )
+
+@app.route("/sponDash/audit")
+def sponsorAudit():
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    user_id = session["user_id"]
+
+    conn = mysql.connector.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME
+            )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # Get the sponsor company associated with the logged-in user.
+        cursor.execute("""
+            SELECT
+                s.SPONSOR_ID,
+                s.SPONSORCOMP_ID,
+                sc.SPONSORCOMP_NAME
+            FROM SPONSOR s
+            JOIN USER u
+                ON u.USER_ID = s.USER_ID
+            JOIN SPONSORCOMP sc
+                ON sc.SPONSORCOMP_ID = s.SPONSORCOMP_ID
+            WHERE s.USER_ID = %s
+              AND u.ROLE = 'Sponsor'
+        """, (user_id,))
+
+        sponsor = cursor.fetchone()
+
+        if not sponsor:
+            flash("You are not authorized to view these audit logs.", "error")
+            return redirect(url_for("sponDash"))
+
+        sponsorcomp_id = sponsor["SPONSORCOMP_ID"]
+
+        # Get all driver application data for sponsor company
+        cursor.execute("""
+            SELECT
+                a.CREATED_DTS,
+                a.UPDATED_DTS,
+                du.EMAIL AS DRIVER_EMAIL,
+                a.STATUS,
+                a.REASON,
+                su.EMAIL AS REVIEWED_BY_EMAIL
+            FROM APPLICATIONS a
+            JOIN USER du
+                ON du.USER_ID = a.USER_ID
+            LEFT JOIN SPONSOR reviewer
+                ON reviewer.SPONSOR_ID = a.SPONSOR_ID
+            LEFT JOIN USER su
+                ON su.USER_ID = reviewer.USER_ID
+            WHERE a.SPONSORCOMP_ID = %s
+            ORDER BY
+                COALESCE(a.UPDATED_DTS, a.CREATED_DTS) DESC
+        """, (sponsorcomp_id,))
+
+        applications = cursor.fetchall()
+
+        # grab all point changes for sponsor company
+        cursor.execute("""
+            SELECT
+                pc.POINTCHANGE_ID,
+                pc.DRIVER_ID,
+                du.EMAIL AS DRIVER_EMAIL,
+                actor.EMAIL AS CHANGED_BY_EMAIL,
+                pc.POINTCHANGE_AMOUNT,
+                pc.POINTCHANGE_REASON,
+                pc.DTS,
+                b.BALANCE_ID,
+                sc.SPONSORCOMP_NAME
+            FROM POINTCHANGES pc
+            JOIN BALANCE b
+                ON b.BALANCE_ID = pc.BALANCE_ID
+            JOIN SPONSORCOMP sc
+                ON sc.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+            JOIN DRIVER d
+                ON d.DRIVER_ID = pc.DRIVER_ID
+            JOIN USER du
+                ON du.USER_ID = d.USER_ID
+            LEFT JOIN USER actor
+                ON actor.USER_ID = pc.USER_ID
+            WHERE b.SPONSORCOMP_ID = %s
+            ORDER BY pc.DTS DESC
+        """, (sponsorcomp_id,))
+
+        point_changes = cursor.fetchall()
+
+        return render_template(
+            "sponsorAudit.html",
+            sponsor=sponsor,
+            applications=applications,
+            point_changes=point_changes
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
 
 @app.route("/viewAsDriver/<int:driver_id>", methods=["POST"])
 def viewAsDriver(driver_id):

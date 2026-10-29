@@ -195,8 +195,95 @@
                     View Point Changes.
                 </p>
 
-                <!-- Add point changes stuff here -->
+                <div class="filter-container">
+                    <label for="pointSponsorFilter">Filter by Sponsor Company:</label>
+                    <select id="pointSponsorFilter">
+                        <option value="">All Sponsor Companies</option>
+                        {% for company in sponsor_companies %}
+                            <option value="{{ company.SPONSORCOMP_ID }}">
+                                {{ company.SPONSORCOMP_NAME }}
+                            </option>
+                        {% endfor %}
+                    </select>
 
+                    <label for="pointStartDate">From:</label>
+                    <input type="date" id="pointStartDate">
+
+                    <label for="pointEndDate">To:</label>
+                    <input type="date" id="pointEndDate">
+                </div>
+
+                <div class="audit-actions">
+                    <a
+                        href="{{ url_for('export.exportPointChangesCsv') }}"
+                        id="pointChangesCsv"
+                        class="back-link"
+                    >
+                        Download CSV
+                    </a>
+
+                    <a
+                        href="{{ url_for('export.exportPointChangesPdf') }}"
+                        id="pointChangesPdf"
+                        class="back-link"
+                    >
+                        Download PDF
+                    </a>
+                </div>
+
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Driver Email</th>
+                                <th>Changed By</th>
+                                <th>Points Changed</th>
+                                <th>Reason</th>
+                                <th>Balance ID</th>
+                                <th>Sponsor Company</th>
+                                <th>
+                                    <button
+                                        type="button"
+                                        class="audit-date-sort"
+                                        onclick="sortAuditTable(
+                                            this,
+                                            'pointChangesBody',
+                                            'sortDate'
+                                        )"
+                                    >
+                                        Date and Time
+                                        <span
+                                            class="sort-indicator"
+                                            aria-hidden="true"
+                                        ></span>
+                                    </button>
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="pointChangesBody">
+                            {% for change in point_changes %}
+                                <tr
+                                    data-sponsorcomp-id="{{ change.SPONSORCOMP_ID if change.SPONSORCOMP_ID is not none else '' }}"
+                                    data-date="{{ change.DTS.strftime('%Y-%m-%d') if change.DTS else '' }}"
+                                    data-sort-date="{{ change.DTS.isoformat() if change.DTS else '' }}"
+                                >
+                                    <td>{{ change.DRIVER_EMAIL or 'N/A' }}</td>
+                                    <td>{{ change.CHANGED_BY_EMAIL or 'N/A' }}</td>
+                                    <td>{{ change.POINTCHANGE_AMOUNT }}</td>
+                                    <td>{{ change.POINTCHANGE_REASON or 'N/A' }}</td>
+                                    <td>{{ change.BALANCE_ID or 'N/A' }}</td>
+                                    <td>{{ change.SPONSORCOMP_NAME or 'N/A' }}</td>
+                                    <td>{{ change.DTS or 'N/A' }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7">No point changes found.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
             <!-- Password Changes -->
@@ -376,6 +463,12 @@
 
         const loginEndDate = document.getElementById("loginEndDate");
 
+        const pointSponsorFilter =document.getElementById("pointSponsorFilter");
+
+        const pointStartDate =document.getElementById("pointStartDate");
+
+        const pointEndDate =document.getElementById("pointEndDate");
+
         function showReport(reportId, clickedTab) {
 
             // Hide all report sections
@@ -498,6 +591,81 @@
                 link.href = url.toString();
             });
         }
+
+        function filterPointChanges() {
+            const sponsorId = pointSponsorFilter.value;
+            const startDate = pointStartDate.value;
+            const endDate = pointEndDate.value;
+
+            const rows = document.querySelectorAll(
+                "#pointChangesBody tr[data-date]"
+            );
+
+            rows.forEach(row => {
+                const rowSponsorId = row.dataset.sponsorcompId;
+                const rowDate = row.dataset.date;
+
+                const matchesSponsor =
+                    !sponsorId || rowSponsorId === sponsorId;
+
+                const matchesStart =
+                    !startDate || (rowDate && rowDate >= startDate);
+
+                const matchesEnd =
+                    !endDate || (rowDate && rowDate <= endDate);
+
+                row.hidden = !(
+                    matchesSponsor &&
+                    matchesStart &&
+                    matchesEnd
+                );
+            });
+
+            updatePointChangeExportLinks();
+        }
+
+
+        function updatePointChangeExportLinks() {
+            const sponsorId = pointSponsorFilter.value;
+            const startDate = pointStartDate.value;
+            const endDate = pointEndDate.value;
+
+            const linkIds = [
+                "pointChangesCsv",
+                "pointChangesPdf"
+            ];
+
+            linkIds.forEach(id => {
+                const link = document.getElementById(id);
+
+                // Rebuild from the route URL to prevent duplicate parameters.
+                const url = new URL(link.href, window.location.origin);
+
+                url.searchParams.delete("sponsorcomp_id");
+                url.searchParams.delete("start_date");
+                url.searchParams.delete("end_date");
+
+                if (sponsorId) {
+                    url.searchParams.set("sponsorcomp_id", sponsorId);
+                }
+
+                if (startDate) {
+                    url.searchParams.set("start_date", startDate);
+                }
+
+                if (endDate) {
+                    url.searchParams.set("end_date", endDate);
+                }
+
+                link.href = url.pathname + url.search;
+            });
+        }
+
+        pointSponsorFilter.addEventListener("change",filterPointChanges);
+
+        pointStartDate.addEventListener("change",filterPointChanges);
+
+        pointEndDate.addEventListener("change",filterPointChanges);
         
         function filterAuditTable(startInputId, endInputId, tbodyId) {
             const startDate = document.getElementById(startInputId).value;

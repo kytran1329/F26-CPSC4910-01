@@ -6,6 +6,7 @@
 
     <title>Assign Points</title>
 
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='assignPoints.css') }}">
 </head>
 
@@ -58,12 +59,46 @@
                 {% endif %}
             {% endwith %}
 
+            {% if is_admin %}
+                <form method="GET"
+                    action="{{ url_for('assignPoints') }}"
+                    class="company-filter">
+
+                    <label for="sponsorcomp_id">Sponsor Company</label>
+
+                    <select id="sponsorcomp_id" name="sponsorcomp_id"
+                            onchange="this.form.submit()">
+
+                        <option value="all"
+                            {% if selected_company_id is none %}selected{% endif %}>
+                            All Sponsor Companies
+                        </option>
+
+                        {% for company in sponsor_companies %}
+                            <option value="{{ company['SPONSORCOMP_ID'] }}"
+                                {% if selected_company_id == company['SPONSORCOMP_ID'] %}
+                                    selected
+                                {% endif %}>
+                                {{ company['SPONSORCOMP_NAME'] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <noscript>
+                        <button type="submit">Filter</button>
+                    </noscript>
+                </form>
+            {% endif %}
+
             {% if drivers %}
                 <div class="table-container">
                     <table class="drivers-table">
                         <thead>
                             <tr>
                                 <th>Driver</th>
+                                {% if is_admin %}
+                                    <th>Sponsor Company</th>
+                                {% endif %}
                                 <th>Current Points</th>
                                 <th>Last Change</th>
                                 <th>Last Reason</th>
@@ -106,6 +141,10 @@
                                         </div>
                                     </td>
 
+                                    {% if is_admin %}
+                                        <td>{{ driver['SPONSORCOMP_NAME'] }}</td>
+                                    {% endif %}
+
                                     <td class="balance">{{ driver['BALANCE'] }}</td>
                                     <td>
                                         {% if driver['LAST_CHANGE_DTS'] %}
@@ -143,6 +182,9 @@
                                                 onclick="return confirmPointChange(this, '{{ driver['USER_FNAME'] }} {{ driver['USER_LNAME'] }}');">
                                                 - Subtract
                                             </button>
+                                            <input type="hidden"
+                                                name="sponsorcomp_id"
+                                                value="{{ driver['SPONSORCOMP_ID'] }}">
                                         </div>
                                         </form>
                                     </td>
@@ -159,30 +201,62 @@
                 {% endif %}
             {% endif %}
 
-            {% if not is_admin %}
-                <div class="bulk-points-section">
-                    <h2>Assign Points to All Drivers</h2>
-                    <p>Add or subtract the same number of points from every driver in your sponsor company.</p>
+            <div class="bulk-points-section">
+                <h2>
+                    {% if is_admin %}
+                        Assign Points to Drivers
+                    {% else %}
+                        Assign Points to All Drivers
+                    {% endif %}
+                </h2>
 
-                    <form method="POST" action="{{ url_for('assignPoints') }}">
-                        <div class="bulk-form-fields">
-                            <div>
-                                <label for="bulk-amount">Point Amount</label>
-                                <input type="number" id="bulk-amount" name="bulk_amount" min="1" step="1" required placeholder="Enter points">
-                            </div>
-                            <div>
-                                <label for="bulk-reason">Reason for Change</label>
-                                <input type="text" id="bulk-reason" name="bulk_reason" maxlength="255" required placeholder="Enter reason">
-                            </div>
+                <p>
+                    {% if is_admin %}
+                        Apply the same point change to all balances or to the
+                        sponsor company selected above.
+                    {% else %}
+                        Apply the same point change to every balance in your
+                        sponsor company.
+                    {% endif %}
+                </p>
+
+                <form method="POST" action="{{ url_for('assignPoints') }}">
+                    {% if is_admin %}
+                        <input type="hidden" name="sponsorcomp_id"
+                            value="{{ selected_company_id if selected_company_id is not none else 'all' }}">
+                    {% endif %}
+
+                    <div class="bulk-form-fields">
+                        <div>
+                            <label for="bulk-amount">Point Amount</label>
+                            <input type="number" id="bulk-amount"
+                                name="bulk_amount" min="1" step="1"
+                                required placeholder="Enter points">
                         </div>
 
-                        <div class="bulk-buttons">
-                            <button type="submit" name="bulk_action" value="add_all" class="add-button" onclick="return confirm('Add these points to ALL your drivers?');">+ Add to All Drivers</button>
-                            <button type="submit" name="bulk_action" value="subtract_all" class="subtract-button" onclick="return confirm('Subtract these points from ALL your drivers? The request will be rejected if any driver does not have enough points.');">- Subtract from All Drivers</button>
+                        <div>
+                            <label for="bulk-reason">Reason for Change</label>
+                            <input type="text" id="bulk-reason"
+                                name="bulk_reason" maxlength="255"
+                                required placeholder="Enter reason">
                         </div>
-                    </form>
-                </div>
-            {% endif %}
+                    </div>
+
+                    <div class="bulk-buttons">
+                        <button type="submit" name="bulk_action"
+                                value="add_all" class="add-button"
+                                onclick="return confirm('Add points to all balances in the selected scope?');">
+                            + Add to All
+                        </button>
+
+                        <button type="submit" name="bulk_action"
+                                value="subtract_all" class="subtract-button"
+                                onclick="return confirm('Subtract points from all balances in the selected scope? The operation will be cancelled if any balance would become negative.');">
+                            - Subtract from All
+                        </button>
+                    </div>
+                </form>
+            </div>
         </section>
     </main>
 

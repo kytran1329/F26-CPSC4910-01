@@ -317,3 +317,54 @@ footer {
 .nav-link:hover {
     text-decoration: underline;
 }
+
+#company-search,
+.company-filter select {
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+#company-search {
+    min-width: 220px;
+}
+
+.company-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.company-filter label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Filter */
+
+.filter-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    margin-bottom: 20px;
+}
+
+.filter-container label {
+    font-weight: bold;
+}
+
+.filter-container select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+.filter-container input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 1rem;
+}

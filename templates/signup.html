@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up</title>
 
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
 </head>
 
@@ -63,6 +64,18 @@
                         title="Password must be at least 8 characters long and contain a number and a special character."
                         required
                     >
+                </div>
+
+                <div class="filter-container">
+                    <label for="sponsorcomp_id">Apply for Company:</label>
+
+                    <select id="sponsorcomp_id" name="sponsorcomp_id" required>
+                        {% for company in sponsor_companies %}
+                        <option value="{{ company.SPONSORCOMP_ID }}">
+                            {{ company.SPONSORCOMP_NAME }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
 
                 <button type="submit">Create Account</button>

@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import csv
 import io
 
-from flask import Blueprint, Response, send_file, request
+from flask import Blueprint, Response, send_file, request, session, abort
 
 from pdf_utils import RoadRewardsPDF
 
@@ -33,6 +33,38 @@ export = Blueprint(
     __name__,
     url_prefix="/admin/audit"
 )
+
+def getLoggedInSponsorCompanyId():
+    user_id = session.get("user_id")
+
+    if not user_id:
+        abort(401)
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT SPONSORCOMP_ID
+            FROM SPONSOR
+            WHERE USER_ID = %s
+        """, (user_id,))
+
+        sponsor = cursor.fetchone()
+
+        if not sponsor:
+            abort(403)
+
+        return sponsor["SPONSORCOMP_ID"]
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # SELECT * from LOGINATTEMPTS for audit log
 def getLoginAttempts(start_date=None, end_date=None):
@@ -87,11 +119,7 @@ def getPasswordChanges(start_date=None, end_date=None):
         cursor.close()
         conn.close()
 
-def getDriverApplications(
-    sponsorcomp_id=None,
-    start_date=None,
-    end_date=None
-):
+def getDriverApplications(sponsorcomp_id=None,start_date=None,end_date=None):
     conn = mysql.connector.connect(
                     host=DB_HOST,
                     user=DB_USER,
@@ -116,6 +144,32 @@ def getDriverApplications(
     finally:
             cursor.close()
             conn.close()
+
+def getPointChangesForExport(sponsorcomp_id=None,start_date=None,end_date=None):
+    conn = mysql.connector.connect(
+                        host=DB_HOST,
+                        user=DB_USER,
+                        password=DB_PASSWORD,
+                        database=DB_NAME
+                    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.callproc(
+            "GET_POINT_CHANGES_AUDIT", # Tried making GET_POINT_CHANGES_AUDIT
+            (sponsorcomp_id, start_date, end_date)
+        )
+
+        point_changes = []
+
+        for result in cursor.stored_results():
+            point_changes.extend(result.fetchall())
+
+        return point_changes
+
+    finally:
+        cursor.close()
+        conn.close()
 
 #Export CSV
 @export.route("/login-attempts/csv")
@@ -389,4 +443,296 @@ def exportDriverApplicationsPdf():
         mimetype="application/pdf",
         as_attachment=True,
         download_name="driver_applications_audit.pdf"
+    )
+
+@export.route("/point-changes/csv")
+def exportPointChangesCsv():
+    sponsorcomp_id = request.args.get("sponsorcomp_id", type=int)
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
+
+    point_changes = getPointChangesForExport(
+        sponsorcomp_id,
+        start_date,
+        end_date
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Driver Email",
+        "Changed By",
+        "Points Changed",
+        "Reason",
+        "Balance ID",
+        "Sponsor Company",
+        "Date and Time"
+    ])
+
+    for change in point_changes:
+        writer.writerow([
+            change["DRIVER_EMAIL"] or "N/A",
+            change["CHANGED_BY_EMAIL"] or "N/A",
+            change["POINTCHANGE_AMOUNT"],
+            change["POINTCHANGE_REASON"] or "N/A",
+            change["BALANCE_ID"] or "N/A",
+            change["SPONSORCOMP_NAME"] or "N/A",
+            change["DTS"] or "N/A"
+        ])
+
+    response = Response(
+        output.getvalue(),
+        mimetype="text/csv"
+    )
+
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=point_changes_audit.csv"
+    )
+
+    return response
+
+@export.route("/point-changes/pdf")
+def exportPointChangesPdf():
+    sponsorcomp_id = request.args.get("sponsorcomp_id", type=int)
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
+
+    point_changes = getPointChangesForExport(
+        sponsorcomp_id,
+        start_date,
+        end_date
+    )
+
+    pdf_buffer = io.BytesIO()
+
+    document = SimpleDocTemplate(
+        pdf_buffer,
+        pagesize=landscape(letter)
+    )
+
+    pdf_style = RoadRewardsPDF()
+
+    elements = pdf_style.createHeader(
+        "Point Changes Audit Log",
+        len(point_changes)
+    )
+
+    data = [[
+        "Driver Email",
+        "Changed By",
+        "Points Changed",
+        "Reason",
+        "Balance ID",
+        "Sponsor Company",
+        "Date and Time"
+    ]]
+
+    for change in point_changes:
+
+        change_date = (
+            change["DTS"].strftime("%Y-%m-%d %H:%M:%S")
+            if change["DTS"] else "N/A"
+        )
+
+        data.append([
+            change["DRIVER_EMAIL"] or "N/A",
+            change["CHANGED_BY_EMAIL"] or "N/A",
+            str(change["POINTCHANGE_AMOUNT"]),
+            change["POINTCHANGE_REASON"] or "N/A",
+            str(change["BALANCE_ID"] or "N/A"),
+            change["SPONSORCOMP_NAME"] or "N/A",
+            change_date
+        ])
+
+    table = pdf_style.createTable(
+        data,
+        column_proportions=[1.8, 1.8, 0.9, 1.8, 0.9, 1.5, 1.5]
+    )
+
+    elements.append(table)
+    document.build(elements)
+    pdf_buffer.seek(0)
+
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="point_changes_audit.pdf"
+    )
+
+@export.route("/sponsor-applications/csv")
+def exportSponsorApplicationsCsv():
+    sponsorcomp_id = getLoggedInSponsorCompanyId()
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
+
+    applications = getDriverApplications(
+        sponsorcomp_id, start_date, end_date
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Driver Email", "Status", "Reason",
+        "Reviewed By", "Created Date", "Updated Date"
+    ])
+
+    for application in applications:
+        writer.writerow([
+            application.get("DRIVER_EMAIL") or "N/A",
+            application.get("STATUS") or "N/A",
+            application.get("REASON") or "N/A",
+            application.get("REVIEWED_BY_EMAIL") or "N/A",
+            application.get("CREATED_DTS") or "N/A",
+            application.get("UPDATED_DTS") or "N/A"
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition":
+                "attachment; filename=sponsor_applications_audit.csv"
+        }
+    )
+
+@export.route("/sponsor-applications/pdf")
+def exportSponsorApplicationsPdf():
+    sponsorcomp_id = getLoggedInSponsorCompanyId()
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
+
+    applications = getDriverApplications(
+        sponsorcomp_id, start_date, end_date
+    )
+
+    pdf_buffer = io.BytesIO()
+    document = SimpleDocTemplate(
+        pdf_buffer,
+        pagesize=landscape(letter)
+    )
+
+    pdf_style = RoadRewardsPDF()
+    elements = pdf_style.createHeader(
+        "Sponsor Driver Applications Audit Log",
+        len(applications)
+    )
+
+    data = [[
+        "Driver Email", "Status", "Reason",
+        "Reviewed By", "Created", "Updated"
+    ]]
+
+    for application in applications:
+        data.append([
+            application.get("DRIVER_EMAIL") or "N/A",
+            application.get("STATUS") or "N/A",
+            application.get("REASON") or "N/A",
+            application.get("REVIEWED_BY_EMAIL") or "N/A",
+            str(application.get("CREATED_DTS") or "N/A"),
+            str(application.get("UPDATED_DTS") or "N/A")
+        ])
+
+    elements.append(pdf_style.createTable(
+        data,
+        column_proportions=[1.5, 0.8, 1.5, 1.5, 1.3, 1.3]
+    ))
+
+    document.build(elements)
+    pdf_buffer.seek(0)
+
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="sponsor_applications_audit.pdf"
+    )
+
+@export.route("/sponsor-point-changes/csv")
+def exportSponsorPointChangesCsv():
+    sponsorcomp_id = getLoggedInSponsorCompanyId()
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
+
+    changes = getPointChangesForExport(
+        sponsorcomp_id, start_date, end_date
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Driver Email", "Changed By", "Points Changed",
+        "Reason", "Date and Time"
+    ])
+
+    for change in changes:
+        writer.writerow([
+            change.get("DRIVER_EMAIL") or "N/A",
+            change.get("CHANGED_BY_EMAIL") or "N/A",
+            change.get("POINTCHANGE_AMOUNT"),
+            change.get("POINTCHANGE_REASON") or "N/A",
+            change.get("DTS") or "N/A"
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition":
+                "attachment; filename=sponsor_point_changes_audit.csv"
+        }
+    )
+
+@export.route("/sponsor-point-changes/pdf")
+def exportSponsorPointChangesPdf():
+    sponsorcomp_id = getLoggedInSponsorCompanyId()
+    start_date = request.args.get("start_date") or None
+    end_date = request.args.get("end_date") or None
+
+    changes = getPointChangesForExport(
+        sponsorcomp_id, start_date, end_date
+    )
+
+    pdf_buffer = io.BytesIO()
+    document = SimpleDocTemplate(
+        pdf_buffer,
+        pagesize=landscape(letter)
+    )
+
+    pdf_style = RoadRewardsPDF()
+    elements = pdf_style.createHeader(
+        "Sponsor Point Changes Audit Log",
+        len(changes)
+    )
+
+    data = [[
+        "Driver Email", "Changed By", "Points Changed",
+        "Reason", "Date and Time"
+    ]]
+
+    for change in changes:
+        data.append([
+            change.get("DRIVER_EMAIL") or "N/A",
+            change.get("CHANGED_BY_EMAIL") or "N/A",
+            str(change.get("POINTCHANGE_AMOUNT", "N/A")),
+            change.get("POINTCHANGE_REASON") or "N/A",
+            str(change.get("DTS") or "N/A")
+        ])
+
+    elements.append(pdf_style.createTable(
+        data,
+        column_proportions=[1.7, 1.7, 1.0, 2.0, 2.0]
+    ))
+
+    document.build(elements)
+    pdf_buffer.seek(0)
+
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="sponsor_point_changes_audit.pdf"
     )
