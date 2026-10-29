@@ -245,7 +245,15 @@ def applications():
 
     # grab correct data about each applicant
     query = """
-        SELECT a.APPLICATION_ID, u.USER_FNAME, u.USER_LNAME, u.EMAIL, a.CREATED_DTS, a.STATUS, d.BALANCE, u.USER_ID
+        SELECT 
+            a.APPLICATION_ID, 
+            u.USER_FNAME, 
+            u.USER_LNAME, 
+            u.EMAIL, 
+            a.CREATED_DTS, 
+            a.STATUS, 
+            d.BALANCE, 
+            u.USER_ID
         FROM USER as u
         JOIN APPLICATIONS as a ON u.USER_ID = a.USER_ID
         JOIN DRIVER as d on u.USER_ID = d.USER_ID
@@ -434,7 +442,11 @@ def userProfile(user_id):
     cursor.close()
     conn.close()
 
-    return render_template("userProfile.html", user_id=user_id, user=user,error=error,
+    return render_template(
+        "userProfile.html", 
+        user_id=user_id, 
+        user=user,
+        error=error,
         success=success)
 
 @app.route("/updateFirstName", methods=["POST"])
@@ -445,10 +457,18 @@ def updateFirstName():
     first_name = request.form["first_name"].strip()
 
     if not first_name:
-        return redirect(url_for("userProfile", user_id=user_id, error="First name cannot be empty."))
+        return redirect(url_for(
+            "userProfile", 
+            user_id=user_id, 
+            error="First name cannot be empty."
+            ))
 
     if not first_name.isalpha():
-        return redirect(url_for("userProfile", user_id=user_id, error="First name can only contain letters."))
+        return redirect(url_for(
+            "userProfile", 
+            user_id=user_id, 
+            error="First name can only contain letters."
+        ))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -473,7 +493,10 @@ def updateFirstName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile", user_id=user_id, success="First name updated successfully!"))
+    return redirect(url_for(
+        "userProfile", 
+        user_id=user_id, 
+        success="First name updated successfully!"))
 
 @app.route("/updateLastName", methods=["POST"])
 def updateLastName():
@@ -483,12 +506,17 @@ def updateLastName():
     last_name = request.form["last_name"].strip()
 
     if not last_name:
-        return redirect(
-            url_for("userProfile", user_id=user_id, error="Last name cannot be empty."))
+        return redirect(url_for(
+                "userProfile",
+                user_id=user_id, 
+                error="Last name cannot be empty."
+            ))
 
     if not last_name.isalpha():
-        return redirect(
-            url_for("userProfile", user_id=user_id, error="Last name can only contain letters."))
+        return redirect(url_for(
+            "userProfile",
+            user_id=user_id,
+            error="Last name can only contain letters."))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -513,7 +541,11 @@ def updateLastName():
     cursor.close()
     conn.close()
 
-    return redirect(url_for("userProfile", user_id=user_id, success="Last name updated successfully!"))
+    return redirect(url_for(
+        "userProfile", 
+        user_id=user_id, 
+        success="Last name updated successfully!"
+    ))
 
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
@@ -1346,14 +1378,16 @@ def adminDash():
     # Get drivers
     cursor.execute("""CALL ADMIN_GET_DRIVERS()""")
     drivers = cursor.fetchall()
-    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    # Pass cursor to next set because stored procedure returns results 
+    # and status of stored proecure
     while cursor.nextset():
         pass
 
     # Get sponsors
     cursor.execute("""CALL ADMIN_GET_SPONSORS()""")
     sponsors = cursor.fetchall()
-    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    # Pass cursor to next set because stored procedure returns results 
+    # and status of stored proecure
     while cursor.nextset():
         pass
 
@@ -1394,7 +1428,8 @@ def adminSponsors():
     # Get sponsors
     cursor.execute("""CALL ADMIN_GET_SPONSORS()""")
     sponsors = cursor.fetchall()
-    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    # Pass cursor to next set because stored procedure returns results 
+    # and status of stored proecure
     while cursor.nextset():
         pass
     
@@ -1451,7 +1486,8 @@ def adminDrivers():
     # Get drivers
     cursor.execute("""CALL ADMIN_GET_DRIVERS()""")
     drivers = cursor.fetchall()
-    # Pass cursor to next set because stored procedure returns results and status of stored proecure
+    # Pass cursor to next set because stored procedure returns results 
+    # and status of stored proecure
     while cursor.nextset():
         pass
 
