@@ -93,7 +93,6 @@
                                 <th>Email</th>
                                 <th>Application Date</th>
                                 <th>Status</th>
-                                <th>Action</th>
                             </tr>
                         </thead>
 
@@ -117,29 +116,6 @@
                                 <td>{{ row["EMAIL"] }}</td>
                                 <td>{{ row["CREATED_DTS"] }}</td>
                                 <td>{{ row["STATUS"] }}</td>
-                                <td>
-                                    <form method="POST"
-                                          action="{{ url_for(
-                                              'accept_application',
-                                              application_id=row['APPLICATION_ID']
-                                          ) }}"
-                                          style="display: inline;">
-                                        <button type="submit">
-                                            Accept
-                                        </button>
-                                    </form>
-
-                                    <form method="POST"
-                                          action="{{ url_for(
-                                              'reject_application',
-                                              application_id=row['APPLICATION_ID']
-                                          ) }}"
-                                          style="display: inline;">
-                                        <button type="submit">
-                                            Reject
-                                        </button>
-                                    </form>
-                                </td>
                             </tr>
                             {% else %}
                             <tr>

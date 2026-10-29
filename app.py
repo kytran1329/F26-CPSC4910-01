@@ -1,4 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import (
+    Flask,
+    render_template,
+    request, 
+    redirect, 
+    url_for, 
+    session, 
+    flash,
+    current_app)
 import mysql.connector 
 import os
 from dotenv import load_dotenv
@@ -331,85 +339,134 @@ def bulk_update_applications():
 
     placeholders = ", ".join(["%s"] * len(application_ids))
 
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
-    query = f"""
-        UPDATE APPLICATIONS
-        SET STATUS = %s,
-            UPDATED_DTS = NOW()
-        WHERE STATUS = 'Pending'
-            AND APPLICATION_ID IN ({placeholders})
-    """
+    # Get the logged-in sponsor's information
+    cursor.execute("""
+        SELECT SPONSOR_ID, SPONSORCOMP_ID
+        FROM SPONSOR
+        WHERE USER_ID = %s
+    """, (session["user_id"],))
 
-    cursor.execute(query, [action] + application_ids)
-    conn.commit()
+    sponsor = cursor.fetchone()
+
+    cursor.execute(f"""
+        SELECT APPLICATION_ID, USER_ID, SPONSORCOMP_ID
+        FROM APPLICATIONS
+        WHERE APPLICATION_ID IN ({placeholders})
+            AND SPONSORCOMP_ID = %s
+            AND STATUS = 'Pending'
+        FOR UPDATE
+    """, tuple(application_ids) + (sponsor["SPONSORCOMP_ID"],))
+
+    applications = cursor.fetchall()
+
+    if not applications:
+        return redirect(url_for(
+            "applications",
+            start_date=start_date,
+            end_date=end_date
+        ))
+
+    # Update the selected applications
+    valid_ids = [app["APPLICATION_ID"] for app in applications]
+    valid_placeholders = ", ".join(["%s"] * len(valid_ids))
+    try:
+        if action == "Accepted":
+            # Update the selected applications
+            cursor.execute(f"""
+                UPDATE APPLICATIONS
+                SET STATUS = 'Accepted',
+                    SPONSOR_ID = %s,
+                    UPDATED_DTS = NOW()
+                WHERE APPLICATION_ID IN ({valid_placeholders})
+                AND STATUS = 'Pending'
+                AND SPONSORCOMP_ID = %s
+            """, (
+                sponsor["SPONSOR_ID"],
+                *valid_ids,
+                sponsor["SPONSORCOMP_ID"]
+            ))
+
+            # Create driver and balance records as needed
+            for application in applications:
+                user_id = application["USER_ID"]
+                sponsorcomp_id = application["SPONSORCOMP_ID"]
+
+                # Check whether this user already has a DRIVER record
+                cursor.execute("""
+                    SELECT DRIVER_ID
+                    FROM DRIVER
+                    WHERE USER_ID = %s
+                """, (user_id,))
+
+                driver = cursor.fetchone()
+
+                # Create the DRIVER record only if one doesn't exist
+                if driver:
+                    driver_id = driver["DRIVER_ID"]
+                else:
+                    cursor.execute("""
+                        INSERT INTO DRIVER (USER_ID)
+                        VALUES (%s)
+                    """, (user_id,))
+
+                    driver_id = cursor.lastrowid
+
+                # Check whether this driver already has a balance
+                # for this sponsor company
+                cursor.execute("""
+                    SELECT DRIVER_ID
+                    FROM BALANCE
+                    WHERE DRIVER_ID = %s
+                    AND SPONSORCOMP_ID = %s
+                """, (driver_id, sponsorcomp_id))
+
+                balance_record = cursor.fetchone()
+
+                # Create an initial zero balance only if needed
+                if not balance_record:
+                    cursor.execute("""
+                        INSERT INTO BALANCE
+                            (DRIVER_ID, SPONSORCOMP_ID, BALANCE)
+                        VALUES (%s, %s, %s)
+                    """, (
+                        driver_id,
+                        sponsorcomp_id,
+                        0
+                    ))
+
+        else:
+            # Reject applications without creating driver records
+            cursor.execute(f"""
+                UPDATE APPLICATIONS
+                SET STATUS = 'Rejected',
+                    UPDATED_DTS = NOW()
+                WHERE APPLICATION_ID IN ({valid_placeholders})
+                  AND STATUS = 'Pending'
+                  AND SPONSORCOMP_ID = %s
+            """, (
+                *valid_ids,
+                sponsor["SPONSORCOMP_ID"]
+            ))
+
+        conn.commit()
+
+    except mysql.connector.Error:
+        conn.rollback()
+        current_app.logger.exception(
+            "Error processing sponsor applications"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
 
     return redirect(url_for(
         "applications",
         start_date=start_date,
         end_date=end_date
     ))
-
-
-@app.route("/accept_application/<int:application_id>", methods=["POST"])
-def accept_application(application_id):
-
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-    conn = mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME
-    )
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE APPLICATIONS
-        SET STATUS = 'Accepted',
-            UPDATED_DTS = NOW()
-        WHERE APPLICATION_ID = %s
-    """, (application_id,))
-
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-    return redirect(url_for("applications"))
-
-
-@app.route("/reject_application/<int:application_id>", methods=["POST"])
-def reject_application(application_id):
-
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-    conn = mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME
-    )
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE APPLICATIONS
-        SET STATUS = 'Rejected',
-            UPDATED_DTS = NOW()
-        WHERE APPLICATION_ID = %s
-    """, (application_id,))
-
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-    return redirect(url_for("applications"))
-
 
 @app.route("/userProfile/<int:user_id>")
 def userProfile(user_id):
