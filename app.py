@@ -2529,5 +2529,38 @@ def notifications():
         cursor.close()
         conn.close()
 
+@app.route("/notifications/mark-read/<int:notification_id>", methods=["POST"])
+def mark_notifications_read(notification_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""
+            UPDATE NOTIFICATIONS
+            SET IS_READ = 1
+            WHERE NOTIFICATION_ID = %s
+                AND USER_ID = %s
+        """, (notification_id, session["user_id"]))
+
+        conn.commit()
+
+    except mysql.connector.Error:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for("notifications"))
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
