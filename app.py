@@ -1183,7 +1183,7 @@ def assignPoints():
                                 driver_type,
                                 driver_title,
                                 driver_message,
-                                pointchange_id=pointhange_id
+                                pointchange_id=pointchange_id
                             )
 
                             # notify sponsor associated with company
@@ -1306,7 +1306,7 @@ def assignPoints():
             # EXISTS Prevents sponsors from changing another company's balance
             cursor.execute("""
                 SELECT
-                    b.BALANCE_ID
+                    b.BALANCE_ID,
                     b.DRIVER_ID,
                     b.SPONSORCOMP_ID,
                     b.BALANCE
@@ -1388,6 +1388,100 @@ def assignPoints():
                 reason,
                 actor_user_id
             ))
+
+            pointchange_id = cursor.lastrowid
+
+            # look up driver user account by sponsor company name
+            cursor.execute("""
+                SELECT d.USER_ID AS DRIVER_USER_ID,
+                    sc.SPONSORCOMP_NAME
+                FROM DRIVER AS d
+                JOIN SPONSORCOMP AS sc
+                    ON sc.SPONSORCOMP_ID = %s
+                WHERE d.DRIVER_ID = %s
+            """, (
+                balanace["SPONSORCOMP_ID"],
+                balance["DRIVER_ID"]
+            ))
+
+            driver_info = cursor.fetchone()
+
+            if driver_info:
+                driver_user_id = driver_info["DRIVER_USER_ID"]
+                company_name = driver_info["SPONSORCOMP_NAME"]
+
+                #notify driver
+                if signed_amount > 0:
+                    driver_type = "POINTS_GAINED"
+                    driver_title = "You earned points!"
+                    driver_message = (
+                        f"You received {signed_amount} points from "
+                        f"{company_name}. Reason: {reason}. "
+                        f"Your new balance is {new_balance:g} points."
+                    )
+                else:
+                    driver_type = "POINTS_LOST"
+                    driver_title = "Your points changed"
+                    driver_message = (
+                        f"{abs(signed_amount)} points were deducted by "
+                        f"{company_name}. Reason: {reason}. "
+                        f"Your new balance is {new_balance:g} points."
+                    )
+                            
+                create_notification(
+                    cursor,
+                    driver_user_id,
+                    driver_type,
+                    driver_title,
+                    driver_message,
+                    pointchange_id=pointchange_id
+                )
+
+                # notify sponsor associated with company
+                cursor.execute("""
+                    SELECT USER_ID
+                    FROM SPONSOR
+                    WHERE SPONSORCOMP_ID = %s
+                """, (balance["SPONSORCOMP_ID"],))
+
+                sponsor_users = cursor.fetchall()
+
+                for sponsor_user in sponsor_users:
+                    create_notification(
+                        cursor,
+                        sponsor_user["USER_ID"],
+                        "SPONSOR_POINT_CHANGE",
+                        "Driver points Updated",
+                        f"{abs(signed_amount)} points were "
+                        f"{'added to' if signed_amount > 0 else 'deducted from'} "
+                        f"a driver's balance at {company_name}. "
+                        f"Reason: {reason}. "
+                        f"New balance: {new_balance:g} points.",
+                        pointchange_id=pointchange_id
+                    )
+
+                # notify admin
+                cursor.execute("""
+                    SELECT USER_ID
+                    FROM USER
+                    WHERE ROLE = 'Admin'
+                """)
+
+                admin_users = cursor.fetchall()
+
+                for admin_user in admin_users:
+                    create_notification(
+                        cursor,
+                        admin_user["USER_ID"],
+                        "ADMIN_POINT_CHANGE",
+                        "Driver points Updated",
+                        f"{abs(signed_amount)} points were "
+                        f"{'added to' if signed_amount > 0 else 'deducted from'} "
+                        f"a driver's balance at {company_name}. "
+                        f"Reason: {reason}. "
+                        f"New balance: {new_balance:g} points.",
+                        pointchange_id=pointchange_id
+                    )
 
             conn.commit()
 
@@ -2343,4 +2437,4 @@ def stopViewingAsSponsor():
         return redirect(url_for("adminDash"))
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
+    app.run(host="0.0.0.0", port=5000)
