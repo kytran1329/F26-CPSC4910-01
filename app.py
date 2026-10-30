@@ -311,6 +311,7 @@ def bulk_update_applications():
 
     action = request.form.get("action")
     application_ids = request.form.getlist("application_ids")
+    reason = request.form.get("reason", "").strip()
 
     start_date = request.form.get("start_date", "")
     end_date = request.form.get("end_date", "")
@@ -378,12 +379,20 @@ def bulk_update_applications():
                 UPDATE APPLICATIONS
                 SET STATUS = 'Accepted',
                     SPONSOR_ID = %s,
+                    REASON = CASE
+                        WHEN %s = '' THEN REASON
+                        WHEN REASON IS NULL OR REASON = '' THEN %s
+                        ELSE CONCAT(REASON, '\n', %s)
+                    END,
                     UPDATED_DTS = NOW()
                 WHERE APPLICATION_ID IN ({valid_placeholders})
                 AND STATUS = 'Pending'
                 AND SPONSORCOMP_ID = %s
             """, (
                 sponsor["SPONSOR_ID"],
+                reason,
+                reason,
+                reason,
                 *valid_ids,
                 sponsor["SPONSORCOMP_ID"]
             ))
@@ -441,11 +450,21 @@ def bulk_update_applications():
             cursor.execute(f"""
                 UPDATE APPLICATIONS
                 SET STATUS = 'Rejected',
+                    SPONSOR_ID = %s,
+                    REASON = CASE
+                        WHEN %s = '' THEN REASON
+                        WHEN REASON IS NULL OR REASON = '' THEN %s
+                        ELSE CONCAT(REASON, '\n', %s)
+                    END,
                     UPDATED_DTS = NOW()
                 WHERE APPLICATION_ID IN ({valid_placeholders})
                   AND STATUS = 'Pending'
                   AND SPONSORCOMP_ID = %s
             """, (
+                sponsor["SPONSOR_ID"],
+                reason,
+                reason,
+                reason,
                 *valid_ids,
                 sponsor["SPONSORCOMP_ID"]
             ))
@@ -506,11 +525,8 @@ def userProfile(user_id):
         error=error,
         success=success)
 
-@app.route("/updateFirstName", methods=["POST"])
-def updateFirstName():
-
-    user_id = session["user_id"]
-
+@app.route("/updateFirstName/<int:user_id>", methods=["POST"])
+def updateFirstName(user_id):
     first_name = request.form["first_name"].strip()
 
     if not first_name:
@@ -555,11 +571,8 @@ def updateFirstName():
         user_id=user_id, 
         success="First name updated successfully!"))
 
-@app.route("/updateLastName", methods=["POST"])
-def updateLastName():
-
-    user_id = session["user_id"]
-
+@app.route("/updateLastName/<int:user_id>", methods=["POST"])
+def updateLastName(user_id):
     last_name = request.form["last_name"].strip()
 
     if not last_name:

@@ -147,8 +147,10 @@
                             <td>{{ sponsor["SPONSOR_ID"] }}</td>
 
                             <td>
-                                {{ sponsor["USER_FNAME"] }}
-                                {{ sponsor["USER_LNAME"] }}
+                                <a href="{{ url_for('userProfile', user_id=sponsor['USER_ID']) }}"
+                                onclick="event.stopPropagation();">
+                                    {{ sponsor["USER_FNAME"] }} {{ sponsor["USER_LNAME"] }}
+                                </a>
                             </td>
 
                             <td>{{ sponsor["EMAIL"] }}</td>

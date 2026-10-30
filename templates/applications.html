@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Applications</title>
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='driverDash.css') }}">
+    <link rel="stylesheet"href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet"href="{{ url_for('static', filename='driverDash.css') }}">
 </head>
 
 <body>
@@ -69,22 +69,6 @@
                 <input type="hidden" name="start_date" value="{{ start_date }}">
                 <input type="hidden" name="end_date" value="{{ end_date }}">
 
-                <div class="bulk-actions">
-                    <label class="select-all-label">
-                        <input type="checkbox" id="select-all">
-                        Select All
-                    </label>
-
-                    <button type="submit" name="action" value="Accepted">
-                        Accept Selected
-                    </button>
-
-                    <button type="submit" name="action" value="Rejected"
-                            class="reject-button">
-                        Reject Selected
-                    </button>
-                </div>
-
                 <div class="table-container">
                     <table class="history-table">
                         <thead>
@@ -127,6 +111,34 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Reason for accepting/rejecting applications -->
+                <div class="reason-field">
+                    <label for="reason">Reason (Optional)</label>
+                    <textarea
+                        id="reason"
+                        name="reason"
+                        placeholder="Enter a reason for accepting or rejecting applications."
+                        rows="2"
+                        cols="50"
+                    ></textarea>
+                </div>
+
+                <div class="bulk-actions">
+                    <label class="select-all-label">
+                        <input type="checkbox" id="select-all">
+                        Select All
+                    </label>
+
+                    <button type="submit" name="action" value="Accepted">
+                        Accept Selected
+                    </button>
+
+                    <button type="submit" name="action" value="Rejected"
+                            class="reject-button">
+                        Reject Selected
+                    </button>
                 </div>
             </form>
 
