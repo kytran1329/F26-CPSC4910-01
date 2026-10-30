@@ -2562,5 +2562,71 @@ def mark_notifications_read(notification_id):
 
     return redirect(url_for("notifications"))
 
+@app.route("/notifications/settings", methods=["GET", "POST"])
+def notification_settings():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        if request.method == "POST":
+            for notification_type in NOTIFICATION_TYPES:
+                is_enabled = (
+                    1 if request.form.get(notification_type) == "on"
+                    else 0
+                )
+
+                cursor.execute("""
+                    INSERT INTO NOTIFICATIONSETTINGS
+                        (USER_ID, NOTIFICATION_TYPE, IS_ENABLED)
+                    VALUES (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        IS_ENABLED = VALUES(IS_ENABLED),
+                        UPDATED_DTS = CURRENT_TIMESTAMP
+                """, (user_id, notification_type, is_enabled))
+
+            conn.commit()
+            flash("Notification settings saved successfully.", "success")
+
+            return redirect(url_for("notification_settings"))
+        
+        cursor.execute("""
+            SELECT NOTIFICATION_TYPE, IS_ENABLED
+            FROM NOTIFICATIONSETTINGS
+            WHERE USER_ID = %s
+        """, (user_id,))
+
+        saved_settings = {
+            row["NOTIFICATION_TYPE"]: bool(row["IS_ENABLED"])
+            for row in cursor.fetchall()
+        }
+
+        # without saved preferences all notifs enabled
+        settings = {
+            notification_type: saved_settings.get(notification_type, True)
+            for notification_type in NOTIFICATION_TYPES
+        }
+
+        return render_template(
+            "notification_setting.html",
+            notification_types=NOTIFICATION_TYPES,
+            settings=settings
+        )
+
+    except mysql.connector.Error:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
