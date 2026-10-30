@@ -2490,5 +2490,44 @@ def stopViewingAsSponsor():
     if session.get("role") == "Admin":
         return redirect(url_for("adminDash"))
 
+
+@app.route("/notifications")
+def notifications():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        cursor.execute("""
+            SELECT
+                NOTIFICATION_ID,
+                NOTIFICATION_TYPE,
+                TITLE,
+                MESSAGE,
+                IS_READ,
+                CREATED_DTS
+            FROM NOTIFICATIONS
+            WHERE USER_ID = %s
+            ORDER BY CREATED_DTS DESC, NOTIFICATION_ID DESC
+        """, (session["user_id"],))
+
+        user_notifications = cursor.fetchall()
+
+        return render_template(
+            "notifications.html",
+            notifications=user_notifications
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
