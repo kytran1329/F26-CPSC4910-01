@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from notifications import create_notification
 
 load_dotenv()
 
