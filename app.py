@@ -1890,51 +1890,35 @@ def adminAudit():
     if not user or user['ROLE'] != 'Admin':
         return redirect(url_for('auth.login'))
 
-
-    cursor.execute("""
-        SELECT ATTEMPTED_EMAIL, RESULT, DTS
-        FROM LOGINATTEMPTS
-        ORDER BY DTS DESC
-    """)
-
-    login_attempts = cursor.fetchall()
-
-    cursor.execute("""
-            SELECT
-                U.EMAIL,
-                PC.PASSWORDCHANGE_REASON,
-                PC.DTS
-            FROM PASSWORDCHANGES AS PC
-            INNER JOIN `USER` AS U
-                ON PC.USER_ID = U.USER_ID
-            ORDER BY PC.DTS DESC;
-        """)
-    
-    password_changes = cursor.fetchall()
-
-    cursor.execute("""
-            SELECT
-                SC.SPONSORCOMP_NAME,
-                A.SPONSORCOMP_ID,
-                U.EMAIL AS DRIVER_EMAIL,
-                SU.EMAIL AS SPONSOR_EMAIL,
-                A.STATUS,
-                A.REASON,
-                A.CREATED_DTS,
-                A.UPDATED_DTS
-            FROM APPLICATIONS AS A
-            LEFT JOIN SPONSORCOMP AS SC
-                ON A.SPONSORCOMP_ID = SC.SPONSORCOMP_ID
-            LEFT JOIN `USER` AS U
-                ON A.USER_ID = U.USER_ID
-            LEFT JOIN SPONSOR AS S
-                ON A.SPONSOR_ID = S.SPONSOR_ID
-            LEFT JOIN `USER` AS SU
-                ON S.USER_ID = SU.USER_ID
-            ORDER BY A.CREATED_DTS DESC;
-            """)
+    cursor.callproc(
+        "GET_LOGIN_ATTEMPTS_AUDIT",
+        (None, None)
+    )
         
-    driver_applications = cursor.fetchall()
+    login_attempts = []
+        
+    for result in cursor.stored_results():
+        login_attempts.extend(result.fetchall())
+
+    cursor.callproc(
+        "GET_PASSWORD_CHANGES_AUDIT",
+        (None, None)
+    )
+            
+    password_changes = []
+            
+    for result in cursor.stored_results():
+        password_changes.extend(result.fetchall())
+
+    cursor.callproc(
+        "GET_DRIVER_APPLICATIONS_AUDIT",
+        (None, None, None)
+    )
+    
+    driver_applications = []
+    
+    for result in cursor.stored_results():
+        driver_applications.extend(result.fetchall())
 
     cursor.callproc(
         "GET_POINT_CHANGES_AUDIT",
@@ -2005,56 +1989,26 @@ def sponsorAudit():
         sponsorcomp_id = sponsor["SPONSORCOMP_ID"]
 
         # Get all driver application data for sponsor company
-        cursor.execute("""
-            SELECT
-                a.CREATED_DTS,
-                a.UPDATED_DTS,
-                du.EMAIL AS DRIVER_EMAIL,
-                a.STATUS,
-                a.REASON,
-                su.EMAIL AS REVIEWED_BY_EMAIL
-            FROM APPLICATIONS a
-            JOIN USER du
-                ON du.USER_ID = a.USER_ID
-            LEFT JOIN SPONSOR reviewer
-                ON reviewer.SPONSOR_ID = a.SPONSOR_ID
-            LEFT JOIN USER su
-                ON su.USER_ID = reviewer.USER_ID
-            WHERE a.SPONSORCOMP_ID = %s
-            ORDER BY
-                COALESCE(a.UPDATED_DTS, a.CREATED_DTS) DESC
-        """, (sponsorcomp_id,))
-
-        applications = cursor.fetchall()
+        cursor.callproc(
+            "GET_DRIVER_APPLICATIONS_AUDIT",
+            (sponsorcomp_id, None, None)
+        )
+            
+        applications = []
+            
+        for result in cursor.stored_results():
+            applications.extend(result.fetchall())
 
         # grab all point changes for sponsor company
-        cursor.execute("""
-            SELECT
-                pc.POINTCHANGE_ID,
-                pc.DRIVER_ID,
-                du.EMAIL AS DRIVER_EMAIL,
-                actor.EMAIL AS CHANGED_BY_EMAIL,
-                pc.POINTCHANGE_AMOUNT,
-                pc.POINTCHANGE_REASON,
-                pc.DTS,
-                b.BALANCE_ID,
-                sc.SPONSORCOMP_NAME
-            FROM POINTCHANGES pc
-            JOIN BALANCE b
-                ON b.BALANCE_ID = pc.BALANCE_ID
-            JOIN SPONSORCOMP sc
-                ON sc.SPONSORCOMP_ID = b.SPONSORCOMP_ID
-            JOIN DRIVER d
-                ON d.DRIVER_ID = pc.DRIVER_ID
-            JOIN USER du
-                ON du.USER_ID = d.USER_ID
-            LEFT JOIN USER actor
-                ON actor.USER_ID = pc.USER_ID
-            WHERE b.SPONSORCOMP_ID = %s
-            ORDER BY pc.DTS DESC
-        """, (sponsorcomp_id,))
-
-        point_changes = cursor.fetchall()
+        cursor.callproc(
+            "GET_POINT_CHANGES_AUDIT",
+            (sponsorcomp_id, None, None, None)
+        )
+        
+        point_changes = []
+    
+        for result in cursor.stored_results():
+            point_changes.extend(result.fetchall())
 
         # Get drivers associated with this sponsor company.
         cursor.execute("""

@@ -338,7 +338,7 @@
                             <tr data-date="{{ change.DTS.strftime('%Y-%m-%d') if change.DTS else '' }}"
                                 data-sort-date="{{ change.DTS.isoformat() if change.DTS else '' }}">
                                 <td>{{ change.EMAIL or 'N/A' }}</td>
-                                <td>{{ change.PASSWORDCHANGE_REASON or 'N/A' }}</td>
+                                <td>{{ change.REASON or 'N/A' }}</td>
                                 <td>{{ change.DTS or 'N/A' }}</td>
                             </tr>
                             {% else %}
