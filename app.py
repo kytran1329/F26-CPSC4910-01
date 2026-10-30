@@ -505,6 +505,114 @@ def bulk_update_applications():
                 sponsor["SPONSORCOMP_ID"]
             ))
 
+        # notify the driver about the application decision
+        for application in applications:
+            driver_user_id = application["USER_ID"]
+            sponsorcomp_id = application["SPONSORCOMP_ID"]
+            application_id = application["APPLICATION_ID"]
+
+            # get the sponsor company's name for the notification
+            cursor.execute("""
+                SELECT SPONSORCOMP_NAME
+                FROM SPONSORCOMP
+                WHERE SPONSORCOMP_ID = %s
+            """, (sponsorcomp_id,))
+
+            company = cursor.fetchone()
+            company_name = (
+                company["SPONSORCOMP_NAME"]
+                if company
+                else "the sponsor company"
+            )
+
+            # get driver's name
+            cursor.execute("""
+                SELECT USER_FNAME, USER_LNAME
+                FROM USER
+                WHERE USER_ID = %s
+            """, (driver_user_id,))
+
+            driver_info = cursor.fetchone()
+            driver_name = (
+                f"{driver_info['USER_FNAME']} {driver_info['USER_LNAME']}"
+                if driver_info
+                else f"Driver user ID {driver_user_id}"
+            )
+
+            if action == "Accepted":
+                create_notification(
+                    cursor,
+                    driver_user_id,
+                    "APPLICATION_ACCEPTED",
+                    "Application accepted!",
+                    f"Your application to join {company_name} "
+                    f"has been accepted.",
+                    application_id=application_id
+                )
+
+                # notify driver that relationship created
+                create_notification(
+                    cursor,
+                    driver_user_id,
+                    "DRIVER_SPONSOR_ADDED",
+                    "Sponsor added",
+                    f"You are now connected with {company_name}. "
+                    f"You can begin earning points through this company.",
+                    application_id=application_id
+                )
+
+                # notify sponsor that driver was added
+                cursor.execute("""
+                    SELECT USER_ID
+                    FROM SPONSOR
+                    WHERE SPONSORCOMP_ID = %s
+                """, (sponsorcomp_id,))
+
+                sponsor_users = cursor.fetchall()
+                
+                for sponsor_user in sponsor_users:
+                    create_notification(
+                        cursor,
+                        sponsor_user["USER_ID"],
+                        "SPONSOR_DRIVER_ADDED",
+                        "Driver added",
+                        f"A driver's application to join {company_name} "
+                        f"was accepted. The driver is now connected "
+                        f"with your company.",
+                        application_id=application_id
+                    )
+
+                # notify admin of application acceptance
+                cursor.execute("""
+                    SELECT USER_ID
+                    FROM USER
+                    WHERE ROLE = 'Admin'
+                """)
+
+                admin_users = cursor.fetchall()
+                
+                for admin_user in admin_users:
+                    create_notification(
+                        cursor,
+                        admin_user["USER_ID"],
+                        "ADMIN_APPLICATION_ACCEPTED",
+                        "Driver application accepted",
+                        f"{driver_name} was accepted by {company_name}. "
+                        f"The driver is now connected with this sponsor.",
+                        application_id=application_id
+                    )
+
+            else:
+                create_notification(
+                    cursor,
+                    driver_user_id,
+                    "APPLICATION_REJECTED",
+                    "Application update",
+                    f"Your application to join {company_name} "
+                    f"was not accepted.",
+                    application_id=application_id
+                )
+
         conn.commit()
 
     except mysql.connector.Error:
@@ -1146,7 +1254,7 @@ def assignPoints():
                                 ON sc.SPONSORCOMP_ID = %s
                             WHERE d.DRIVER_ID = %s
                         """, (
-                            balanace["SPONSORCOMP_ID"],
+                            balance["SPONSORCOMP_ID"],
                             balance["DRIVER_ID"]
                         ))
 
@@ -1382,8 +1490,8 @@ def assignPoints():
                 )
                 VALUES (%s, %s, %s, %s, %s)
             """, (
-                driver["BALANCE_ID"],
-                driver["DRIVER_ID"],
+                balance["BALANCE_ID"],
+                balance["DRIVER_ID"],
                 signed_amount,
                 reason,
                 actor_user_id
@@ -1400,7 +1508,7 @@ def assignPoints():
                     ON sc.SPONSORCOMP_ID = %s
                 WHERE d.DRIVER_ID = %s
             """, (
-                balanace["SPONSORCOMP_ID"],
+                balance["SPONSORCOMP_ID"],
                 balance["DRIVER_ID"]
             ))
 
