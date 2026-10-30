@@ -525,11 +525,8 @@ def userProfile(user_id):
         error=error,
         success=success)
 
-@app.route("/updateFirstName", methods=["POST"])
-def updateFirstName():
-
-    user_id = session["user_id"]
-
+@app.route("/updateFirstName/<int:user_id>", methods=["POST"])
+def updateFirstName(user_id):
     first_name = request.form["first_name"].strip()
 
     if not first_name:
@@ -574,11 +571,8 @@ def updateFirstName():
         user_id=user_id, 
         success="First name updated successfully!"))
 
-@app.route("/updateLastName", methods=["POST"])
-def updateLastName():
-
-    user_id = session["user_id"]
-
+@app.route("/updateLastName/<int:user_id>", methods=["POST"])
+def updateLastName(user_id):
     last_name = request.form["last_name"].strip()
 
     if not last_name:

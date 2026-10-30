@@ -182,8 +182,10 @@
                             </td>
 
                             <td>
-                                {{ sponsor["USER_FNAME"] }}
-                                {{ sponsor["USER_LNAME"] }}
+                                <a href="{{ url_for('userProfile', user_id=sponsor['USER_ID']) }}"
+                                onclick="event.stopPropagation();">
+                                    {{ sponsor["USER_FNAME"] }} {{ sponsor["USER_LNAME"] }}
+                                </a>
                             </td>
 
                             <td>
@@ -289,8 +291,10 @@
                             <td>{{ driver["DRIVER_ID"] }}</td>
 
                             <td>
-                                {{ driver["USER_FNAME"] }}
-                                {{ driver["USER_LNAME"] }}
+                                <a href="{{ url_for('userProfile', user_id=driver['USER_ID']) }}"
+                                onclick="event.stopPropagation();">
+                                    {{ driver["USER_FNAME"] }} {{ driver["USER_LNAME"] }}
+                                </a>
                             </td>
 
                             <td>{{ driver["EMAIL"] }}</td>
