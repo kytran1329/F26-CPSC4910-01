@@ -191,6 +191,62 @@ def signup():
                 VALUES (%s, %s, NULL)
             """, (user_id, sponsorcomp_id))
 
+            application_id = cursor.lastrowid
+
+            # get the sponsor company's name for the notification
+            cursor.execute("""
+                SELECT SPONSORCOMP_NAME
+                FROM SPONSORCOMP
+                WHERE SPONSORCOMP_ID = %s
+            """, (sponsorcomp_id,))
+
+            company = cursor.fetchone()
+            company_name = (
+                company["SPONSORCOMP_NAME"]
+                if company
+                else "the sponsor company"
+            )
+
+            # notify all sponsors in company
+            cursor.execute("""
+                SELECT USER_ID
+                FROM SPONSOR
+                WHERE SPONSORCOMP_ID = %s
+            """, (sponsorcomp_id,))
+
+            sponsor_users = cursor.fetchall()
+
+            for sponsor_user in sponsor_users:
+                create_notification(
+                    cursor,
+                    sponsor_user["USER_ID"],
+                    "SPONSOR_NEW_APPLICATION",
+                    "New driver application",
+                    f"{first_name} {last_name} has applied to join "
+                    f"{company_name}.",
+                    application_id=application_id
+                )
+
+            # notify admin of application acceptance
+            cursor.execute("""
+                SELECT USER_ID
+                FROM USER
+                WHERE ROLE = 'Admin'
+            """)
+
+            admin_users = cursor.fetchall()
+                
+            for admin_user in admin_users:
+                create_notification(
+                    cursor,
+                    admin_user["USER_ID"],
+                    "ADMIN_NEW_APPLICATION",
+                    "New driver application",
+                    f"{first_name} {last_name} has applied to join "
+                    f"{company_name}.",
+                    application_id=application_id
+                )
+
             # Commit only after both inserts succeed
             conn.commit()
 
