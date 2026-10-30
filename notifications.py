@@ -1,3 +1,19 @@
+NOTIFICATION_TYPES = {
+    "POINTS_GAINED": "Points received",
+    "POINTS_LOST": "Points deducted",
+    "SPONSOR_POINT_CHANGE": "Sponsor point changes",
+    "ADMIN_POINT_CHANGE": "Admin point changes",
+    "DRIVER_SPONSOR_ADDED": "Driver connected to a sponsor",
+    "DRIVER_SPONSOR_REMOVED": "Driver disconnected from a sponsor",
+    "SPONSOR_DRIVER_ADDED": "New driver connected to my company",
+    "SPONSOR_DRIVER_REMOVED": "Driver removed from my company",
+    "SPONSOR_NEW_APPLICATION": "New driver applications",
+    "ADMIN_NEW_APPLICATION": "New driver applications for admins",
+    "APPLICATION_ACCEPTED": "Application accepted",
+    "APPLICATION_REJECTED": "Application rejected",
+    "ADMIN_APPLICATION_ACCEPTED": "Driver application acceptance alerts",
+}
+
 def create_notification (
     cursor,
     user_id,

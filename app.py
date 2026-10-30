@@ -17,7 +17,7 @@ from decimal import Decimal
 from export import export
 from catalog import cat
 from auth import auth
-from notifications import create_notification
+from notifications import create_notification, NOTIFICATION_TYPES
 
 load_dotenv()
 
