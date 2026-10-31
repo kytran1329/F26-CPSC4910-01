@@ -163,6 +163,11 @@
 {% if companies %}
     <p>Your balance: <strong>{{ balance }}</strong> points</p>
 {% endif %}
+<a href="{{ url_for('cat.cart', comp_id=comp_id) }}">View Cart</a>
+
+{% with messages = get_flashed_messages() %}
+    {% for m in messages %}<p>{{ m }}</p>{% endfor %}
+{% endwith %}
 {% if companies and not allowed_terms %}
     <p>This sponsor hasn't approved any searches yet.</p>
 {% endif %}
@@ -234,6 +239,15 @@
                             View on eBay
                         </a>
                     {% endif %}
+
+                    <form method="POST" action="{{ url_for('cat.cart_add') }}">
+                        <input type="hidden" name="item_id" value="{{ item.itemId }}">
+                        <input type="hidden" name="comp_id" value="{{ comp_id }}">
+                        <input type="hidden" name="query" value="{{ query }}">
+                        <input type="hidden" name="per_page" value="{{ per_page }}">
+                        <input type="hidden" name="page" value="{{ page }}">
+                        <button type="submit">Add to Cart</button>
+                    </form>
 
                 </div>
 
