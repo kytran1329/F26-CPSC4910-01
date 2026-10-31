@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - Road Reward</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='notifications.css') }}">
+</head>
+
+<body>
+    <main class="'notifications-container">
+        <header class="notifications-header">
+            <h1>Notifications</h1>
+
+            <div class="notification-links">
+                <a href="{{ url_for('notification_settings') }}">
+                    Notification Settings
+                </a>
+
+                <a href="{{ url_for('backToDash') }}">
+                    Back to Dashboard
+                </a>
+            </div>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <p class="flash-message {{ category }}">{{ message }}</p>
+            {% endwith %}
+        {% endwith %}
+
+        {% if notifications %}
+            {% for notification in notifications %}
+                <article class="notification-card
+                    {% if not notification['IS_READ'] %}unread{% endif %}">
+
+                    <div class="notification-content">
+                        <h2>{{ notification["TITLE"] }}</h2>
+                        <p>{{ notification["MESSAGE"] }}</p>
+
+                        <small>
+                            {{ notification["CREATED_DTS"] }}
+                        </small>
+                    </div>
+
+                    {% if not notification["IS_READ"] %}
+                        <form method="POST"
+                            action="{{ url_for(
+                                'mark_notification_read',
+                                notification_id=notification['NOTIFICATION_ID']
+                            ) }}">
+                            <botton type="submit">
+                                Mark as Read
+                            </botton>
+                        </form>
+                    {% else %}
+                        <span class="read-label">Read</span>
+                    {% endif %}
+
+                </article>
+            {% endfor %}
+        {% else %}
+            <p>You don't have any notifications yet.</p>
+        {% endif %}
+    </main>
+</body>
+</html>
