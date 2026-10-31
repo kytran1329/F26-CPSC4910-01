@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Your Cart</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        table { border-collapse: collapse; width: 100%; background: white; }
+        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; vertical-align: middle; }
+        img { width: 60px; height: 60px; object-fit: contain; }
+        .error { background: #ffdede; padding: 15px; margin-bottom: 20px; border: 1px solid #ffaaaa; }
+        .over { color: #b00020; font-weight: bold; }
+        .summary { margin-top: 20px; font-size: 18px; }
+    </style>
+</head>
+<body>
+    <h1>Your Cart</h1>
+
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    {% if companies %}
+        <label for="comp_id">Sponsor:</label>
+        <select id="comp_id"
+            onchange="window.location='{{ url_for('cat.cart') }}?comp_id=' + this.value">
+            {% for c in companies %}
+                <option value="{{ c.SPONSORCOMP_ID }}"
+                    {% if c.SPONSORCOMP_ID == comp_id %}selected{% endif %}>
+                    {{ c.SPONSORCOMP_NAME }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <p>Your points: <strong>{{ balance }}</strong></p>
+
+        {% if cart_items %}
+            <table>
+                <tr><th></th><th>Item</th><th>Cost</th><th></th></tr>
+                {% for item in cart_items %}
+                <tr>
+                    <td>{% if item.image %}<img src="{{ item.image }}" alt="">{% endif %}</td>
+                    <td>
+                        {% if item.url %}<a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
+                        {% else %}{{ item.title }}{% endif %}
+                    </td>
+                    <td>
+                        {% if item.points is not none %}{{ item.points }} points
+                        {% else %}Unavailable{% endif %}
+                    </td>
+                    <td>
+                        <form method="POST" action="{{ url_for('cat.cart_remove') }}">
+                            <input type="hidden" name="item_id" value="{{ item.item_id }}">
+                            <input type="hidden" name="comp_id" value="{{ comp_id }}">
+                            <button type="submit">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <div class="summary">
+                <p>Total: <strong>{{ total }} points</strong></p>
+                {% if over_budget %}
+                    <p class="over">You're {{ total - balance }} points short. Remove something to fit your balance.</p>
+                {% else %}
+                    <p>Remaining after purchase: {{ remaining }} points</p>
+                {% endif %}
+            </div>
+        {% else %}
+            <p>Your cart is empty.</p>
+        {% endif %}
+
+        <p><a href="{{ url_for('cat.catalog', comp_id=comp_id) }}">Back to Catalog</a></p>
+    {% endif %}
+</body>
+</html>

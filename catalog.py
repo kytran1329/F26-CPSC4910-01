@@ -1,4 +1,4 @@
-from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, flash, current_app
+from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, flash, current_app, abort
 from dotenv import load_dotenv
 import requests, base64, os, mysql.connector 
 from dotenv import load_dotenv
@@ -258,6 +258,37 @@ def get_sponsor_info(user_id):
     return (row["SPONSOR_ID"], row["SPONSORCOMP_ID"]) if row else (None, None)
 
 
+def get_driver_id(user_id):
+    conn = mysql.connector.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password= DB_PASSWORD,
+                database= DB_NAME
+        )
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT DRIVER_ID FROM DRIVER WHERE USER_ID = %s", (user_id,))
+    row = cursor.fetchone()
+    return row["DRIVER_ID"] if row else None
+
+
+def get_cart_item_ids(driver_id, comp_id):
+    conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT ITEM_ID FROM CART_ITEM
+        WHERE DRIVER_ID = %s AND SPONSORCOMP_ID = %s
+        ORDER BY ADDED_AT
+        """,
+        (driver_id, comp_id)
+    )
+    return [row["ITEM_ID"] for row in cursor.fetchall()]
+
+
 @cat.route("/catalog", methods=["GET", "POST"])
 def catalog():
     items = []
@@ -389,4 +420,130 @@ def sponsor_catalog_items():
         "sponsor_catalog_terms.html", 
         terms=terms, 
         message=message
+    )
+
+
+@cat.route("/cart/add", methods=["POST"])
+def cart_add():
+    user_id = session.get("user_id")
+
+    driver_id = get_driver_id(user_id)
+    item_id = request.form.get("item_id", "").strip()
+
+    comp_id = int(request.form.get("comp_id", ""))
+
+    valid_ids = {c["SPONSORCOMP_ID"] for c in get_driver_companies(user_id)}
+    if not driver_id or comp_id not in valid_ids or not item_id or len(item_id) > 100:
+        abort(400)
+
+    conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+    )
+
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT IGNORE INTO CART_ITEM (USER_ID, DRIVER_ID, SPONSORCOMP_ID, ITEM_ID)
+        VALUES (%s, %s, %s, %s)
+        """,
+        (user_id, driver_id, comp_id, item_id)
+    )
+    conn.commit()
+
+    # not sure if flash is working
+    flash("Added to cart.")
+    # send them back to the same search results page
+    return redirect(url_for(
+        "cat.catalog",
+        query=request.form.get("query", ""),
+        per_page=request.form.get("per_page", 10),
+        page=request.form.get("page", 1),
+        comp_id=comp_id
+    ))
+
+
+@cat.route("/cart/remove", methods=["POST"])
+def cart_remove():
+    user_id = session.get("user_id")
+
+    driver_id = get_driver_id(user_id)
+    item_id = request.form.get("item_id", "").strip()
+
+    comp_id = int(request.form.get("comp_id", ""))
+
+    conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+    )
+        
+    cursor = conn.cursor()
+    # scoped to this driver, so nobody can delete someone else's cart rows
+    cursor.execute("""
+        DELETE FROM CART_ITEM
+        WHERE DRIVER_ID = %s AND SPONSORCOMP_ID = %s AND ITEM_ID = %s
+        """,
+        (driver_id, comp_id, item_id)
+    )
+    conn.commit()
+
+    return redirect(url_for("cat.cart", comp_id=comp_id))
+
+
+@cat.route("/cart")
+def cart():
+    user_id = session.get("user_id")
+
+    driver_id = get_driver_id(user_id)
+    companies = get_driver_companies(user_id)
+    valid_ids = {c["SPONSORCOMP_ID"] for c in companies}
+
+    cart_items, total, balance = [], 0.0, 0.0
+    comp_id, error = None, None
+
+    if not driver_id or not companies:
+        error = "You aren't assigned to any sponsor company yet."
+    else:
+        try:
+            comp_id = int(request.args.get("comp_id", ""))
+        except ValueError:
+            comp_id = None
+        if comp_id not in valid_ids:
+            comp_id = companies[0]["SPONSORCOMP_ID"]
+
+        balance = get_user_balance(user_id, comp_id)
+        item_ids = get_cart_item_ids(driver_id, comp_id)
+
+        token = get_access_token() if item_ids else None
+        if item_ids and not token:
+            error = "Couldn't reach eBay to load prices. Please try again shortly."
+
+        # one getItem call per cart item, in parallel
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            details_list = list(pool.map(
+                lambda i: get_item_details(i, token) if token else None,
+                item_ids
+            ))
+
+        for item_id, d in zip(item_ids, details_list):
+            d = d or {}
+            price = d.get("price")
+            cart_items.append({
+                "item_id": item_id,
+                "title": d.get("title", "Item unavailable"),
+                "image": (d.get("image") or {}).get("imageUrl"),
+                "url": d.get("itemWebUrl"),
+                "points": float(price["value"]) if price else None,
+            })
+
+        total = sum(i["points"] for i in cart_items if i["points"] is not None)
+
+    return render_template(
+        "cart.html",
+        cart_items=cart_items, total=total, balance=balance,
+        remaining=balance - total, over_budget=total > balance,
+        companies=companies, comp_id=comp_id, error=error
     )
