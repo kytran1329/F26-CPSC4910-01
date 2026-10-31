@@ -2567,6 +2567,8 @@ def notification_settings():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
+    user_id = session["user_id"]
+
     conn = mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -2615,7 +2617,7 @@ def notification_settings():
         }
 
         return render_template(
-            "notification_setting.html",
+            "notification_settings.html",
             notification_types=NOTIFICATION_TYPES,
             settings=settings
         )
@@ -2624,6 +2626,37 @@ def notification_settings():
         conn.rollback()
         raise
 
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.context_processor
+def inject_unread_notification_count():
+    if "user_id" not in session:
+        return {"unread_notification_count": 0}
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) AS unread_count
+            FROM NOTIFICATIONS
+            WHERE USER_ID = %s
+            AND IS_READ = 0
+        """, (session["user_id"],))
+
+        result = cursor.fetchone()
+
+        return {
+            "unread_notification_count": result["unread_count"]
+        }
+    
     finally:
         cursor.close()
         conn.close()

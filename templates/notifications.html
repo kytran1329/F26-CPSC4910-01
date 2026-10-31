@@ -27,7 +27,7 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
                 <p class="flash-message {{ category }}">{{ message }}</p>
-            {% endwith %}
+            {% endfor %}
         {% endwith %}
 
         {% if notifications %}
@@ -47,7 +47,7 @@
                     {% if not notification["IS_READ"] %}
                         <form method="POST"
                             action="{{ url_for(
-                                'mark_notification_read',
+                                'mark_notifications_read',
                                 notification_id=notification['NOTIFICATION_ID']
                             ) }}">
                             <botton type="submit">
