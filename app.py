@@ -1166,7 +1166,7 @@ def assignPoints():
             # EXISTS Prevents sponsors from changing another company's balance
             cursor.execute("""
                 SELECT
-                    b.BALANCE_ID
+                    b.BALANCE_ID,
                     b.DRIVER_ID,
                     b.SPONSORCOMP_ID,
                     b.BALANCE
@@ -1242,8 +1242,8 @@ def assignPoints():
                 )
                 VALUES (%s, %s, %s, %s, %s)
             """, (
-                driver["BALANCE_ID"],
-                driver["DRIVER_ID"],
+                balance["BALANCE_ID"],
+                balance["DRIVER_ID"],
                 signed_amount,
                 reason,
                 actor_user_id
