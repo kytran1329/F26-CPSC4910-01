@@ -41,6 +41,14 @@
                 </form>
             {% endif %}
 
+            <a href="{{ url_for('notifications') }}" class="nav-link notification-link">
+                🔔 Notifications
+                {% if unread_notifications_count and unread_notification_count > 0 %}
+                    <span class="notification-badge">
+                        {{ unread_notification_count }}
+                    </span>
+                {% endif %}
+            </a>
             <a href="{{ url_for('auth.logout') }}" class="logout-button">
                 Logout
             </a>
