@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - Road Reward</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='notifications.css') }}">
+</head>
+
+<body>
+
+<header>
+    <div class="header-content">
+        <div class="dashboard-name">Notifications</div>
+        <div class="tagline">Good Driving. Better Rewards.</div>
+
+        <div class="header-links">
+            <a href="{{ url_for('backToDash') }}" class="nav-link">
+                Dashboard
+            </a>
+            <a href="{{ url_for('notification_settings') }}" class="nav-link">
+                Notification Settings
+            </a>
+        </div>
+    </div>
+</header>
+    
+<main>
+    <div class="notifications-card">
+
+        <div class="notifications-header">
+            <div>
+                <h1 class="page-heading">Your Notifications</h1>
+                <p class="page-description">
+                    Keep track of updates and activity related to your account.
+                </p>
+            </div>
+        </div>
+
+        {% if notifications %}
+            <div class="notification-list">
+
+                {% for notification in notifications %}
+                    <div class="notification {% if not notification['IS_READ'] %}unread{% endif %}">
+
+                        <div class="notification-info">
+
+                            {% if not notification['IS_READ'] %}
+                                <span class="notification-status">
+                                    NEW
+                                </span>
+                            {% endif %}
+
+                            <h3 class="notification-title">
+                                {{ notification['TITLE'] }}
+                            </h3>
+
+                            <p class="notification-message">
+                                {{ notification['MESSAGE'] }}
+                            </p>
+
+                            <span class="notification-date">
+                                {{ notification['CREATED_DTS'] }}
+                            </span>
+
+                        </div>
+
+                        {% if not notification['IS_READ'] %}
+                            <div class="notification-actions">
+                                <form action="{{ url_for('mark_notifications_read', notification_id=notification['NOTIFICATION_ID']) }}"
+                                    method="POST">
+                                    <button type="submit" class="button">
+                                        Mark as Read
+                                    </button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-notifications">
+                <h3>No Notifications Yet</h3>
+                <p>You're all caught up! New updates will appear here.</p>
+            </div>
+        {% endif %}
+
+        <a href="{{ url_for('backToDash') }}" class="back-link">
+            Back to Dashboard
+        </a>
+    </div>
+</main>
+
+<footer>
+    Good (Truck) Driver Incentive Program &mdash; Fall 2026
+</footer>
+
+</body>
+</html>

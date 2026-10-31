@@ -35,6 +35,14 @@
                 <a href="{{ url_for('adminReports') }}" class="nav-link">Reports</a>
                 <a href="{{ url_for('adminAudit') }}" class="nav-link">Audit Logs</a>
                 <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+                <a href="{{ url_for('notifications') }}" class="nav-link notification-link">
+                    🔔 Notifications
+                    {% if unread_notifications_count and unread_notification_count > 0 %}
+                        <span class="notification-badge">
+                            {{ unread_notification_count }}
+                        </span>
+                    {% endif %}
+                </a>
                 <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
             </div>
         </div>

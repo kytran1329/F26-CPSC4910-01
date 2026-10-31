@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications Settings - Road Reward</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='notifications.css') }}">
+</head>
+
+<body>
+
+<header>
+    <div class="header-content">
+        <div class="dashboard-name">Notification Settings</div>
+        <div class="tagline">Good Driving. Better Rewards.</div>
+
+        <div class="header-links">
+            <a href="{{ url_for('notifications') }}" class="nav-link">
+                Notifications
+            </a>
+            <a href="{{ url_for('backToDash') }}" class="nav-link">
+                Dashboard
+            </a>
+        </div>
+    </div>
+</header>
+
+<main>
+    <div class="settings-card">
+
+        <h1 class="page-heading">Manage Notification Preferences</h1>
+        <p class="settings-description">
+            Choose which updates you would like to receive.
+            Turn off any notification type you no longer want to see.
+        </p>
+
+        <form method="POST" action="{{ url_for('notification_settings') }}">
+
+            {% for notification_type, label in notification_types.items() %}
+                <div class="setting-row">
+                    <label class="setting-label" for="{{ notification_type }}">
+                        {{ label }}
+                    </label>
+
+                    <input
+                        type="checkbox"
+                        id="{{ notification_type }}"
+                        name="{{ notification_type }}"
+                        value="1"
+                        {% if settings.get(notification_type, True) %}checked{% endif %}
+                    >
+                </div>
+            {% endfor %}
+
+            <div class="settings-buttons">
+                <button type="submit" class="button">
+                    Save Preferences
+                </button>
+
+                <a href="{{ url_for('notifications') }}" class="secondary-button">
+                    Cancel
+                </a>
+            </div>
+        </form>
+
+        <a href="{{ url_for('backToDash') }}" class="back-link">
+            Back to Dashboard
+        </a>
+
+    </div>
+</main>
+
+<footer>
+    Good (Truck) Driver Incentive Program &mdash; Fall 2026
+</footer>
+
+</body>
+</html>

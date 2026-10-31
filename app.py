@@ -17,6 +17,7 @@ from decimal import Decimal
 from export import export
 from catalog import cat
 from auth import auth
+from notifications import create_notification, NOTIFICATION_TYPES
 
 load_dotenv()
 
@@ -468,6 +469,114 @@ def bulk_update_applications():
                 *valid_ids,
                 sponsor["SPONSORCOMP_ID"]
             ))
+
+        # notify the driver about the application decision
+        for application in applications:
+            driver_user_id = application["USER_ID"]
+            sponsorcomp_id = application["SPONSORCOMP_ID"]
+            application_id = application["APPLICATION_ID"]
+
+            # get the sponsor company's name for the notification
+            cursor.execute("""
+                SELECT SPONSORCOMP_NAME
+                FROM SPONSORCOMP
+                WHERE SPONSORCOMP_ID = %s
+            """, (sponsorcomp_id,))
+
+            company = cursor.fetchone()
+            company_name = (
+                company["SPONSORCOMP_NAME"]
+                if company
+                else "the sponsor company"
+            )
+
+            # get driver's name
+            cursor.execute("""
+                SELECT USER_FNAME, USER_LNAME
+                FROM USER
+                WHERE USER_ID = %s
+            """, (driver_user_id,))
+
+            driver_info = cursor.fetchone()
+            driver_name = (
+                f"{driver_info['USER_FNAME']} {driver_info['USER_LNAME']}"
+                if driver_info
+                else f"Driver user ID {driver_user_id}"
+            )
+
+            if action == "Accepted":
+                create_notification(
+                    cursor,
+                    driver_user_id,
+                    "APPLICATION_ACCEPTED",
+                    "Application accepted!",
+                    f"Your application to join {company_name} "
+                    f"has been accepted.",
+                    application_id=application_id
+                )
+
+                # notify driver that relationship created
+                create_notification(
+                    cursor,
+                    driver_user_id,
+                    "DRIVER_SPONSOR_ADDED",
+                    "Sponsor added",
+                    f"You are now connected with {company_name}. "
+                    f"You can begin earning points through this company.",
+                    application_id=application_id
+                )
+
+                # notify sponsor that driver was added
+                cursor.execute("""
+                    SELECT USER_ID
+                    FROM SPONSOR
+                    WHERE SPONSORCOMP_ID = %s
+                """, (sponsorcomp_id,))
+
+                sponsor_users = cursor.fetchall()
+                
+                for sponsor_user in sponsor_users:
+                    create_notification(
+                        cursor,
+                        sponsor_user["USER_ID"],
+                        "SPONSOR_DRIVER_ADDED",
+                        "Driver added",
+                        f"A driver's application to join {company_name} "
+                        f"was accepted. The driver is now connected "
+                        f"with your company.",
+                        application_id=application_id
+                    )
+
+                # notify admin of application acceptance
+                cursor.execute("""
+                    SELECT USER_ID
+                    FROM USER
+                    WHERE ROLE = 'Admin'
+                """)
+
+                admin_users = cursor.fetchall()
+                
+                for admin_user in admin_users:
+                    create_notification(
+                        cursor,
+                        admin_user["USER_ID"],
+                        "ADMIN_APPLICATION_ACCEPTED",
+                        "Driver application accepted",
+                        f"{driver_name} was accepted by {company_name}. "
+                        f"The driver is now connected with this sponsor.",
+                        application_id=application_id
+                    )
+
+            else:
+                create_notification(
+                    cursor,
+                    driver_user_id,
+                    "APPLICATION_REJECTED",
+                    "Application update",
+                    f"Your application to join {company_name} "
+                    f"was not accepted.",
+                    application_id=application_id
+                )
 
         conn.commit()
 
@@ -1075,6 +1184,7 @@ def assignPoints():
                     tuple([signed_amount] + company_params))
 
                     for balance in balances:
+                        # record point change
                         cursor.execute("""
                             INSERT INTO POINTCHANGES (
                                 BALANCE_ID,
@@ -1091,6 +1201,103 @@ def assignPoints():
                             bulk_reason,
                             actor_user_id
                         ))
+
+                        pointchange_id = cursor.lastrowid
+
+                        # get driver user account and sponsor company name
+                        cursor.execute("""
+                            SELECT d.USER_ID AS DRIVER_USER_ID,
+                                sc.SPONSORCOMP_NAME
+                            FROM DRIVER AS d
+                            JOIN SPONSORCOMP AS sc
+                                ON sc.SPONSORCOMP_ID = %s
+                            WHERE d.DRIVER_ID = %s
+                        """, (
+                            balance["SPONSORCOMP_ID"],
+                            balance["DRIVER_ID"]
+                        ))
+
+                        driver_info = cursor.fetchone()
+
+                        if driver_info:
+                            driver_user_id = driver_info["DRIVER_USER_ID"]
+                            company_name = driver_info["SPONSORCOMP_NAME"]
+
+                            # calculate the driver's updated balance
+                            new_balance = (float(balance["BALANCE"] or 0) + signed_amount)
+
+                            #notify driver
+                            if signed_amount > 0:
+                                driver_type = "POINTS_GAINED"
+                                driver_title = "You earned points!"
+                                driver_message = (
+                                    f"You received {signed_amount} points from "
+                                    f"{company_name}. Reason: {bulk_reason}. "
+                                    f"Your new balance is {new_balance:g} points."
+                                )
+                            else:
+                                driver_type = "POINTS_LOST"
+                                driver_title = "Your points changed"
+                                driver_message = (
+                                    f"{abs(signed_amount)} points were deducted by "
+                                    f"{company_name}. Reason: {bulk_reason}. "
+                                    f"Your new balance is {new_balance:g} points."
+                                )
+                            
+                            create_notification(
+                                cursor,
+                                driver_user_id,
+                                driver_type,
+                                driver_title,
+                                driver_message,
+                                pointchange_id=pointchange_id
+                            )
+
+                            # notify sponsor associated with company
+                            cursor.execute("""
+                                SELECT USER_ID
+                                FROM SPONSOR
+                                WHERE SPONSORCOMP_ID = %s
+                            """, (balance["SPONSORCOMP_ID"],))
+
+                            sponsor_users = cursor.fetchall()
+
+                            for sponsor_user in sponsor_users:
+                                create_notification(
+                                    cursor,
+                                    sponsor_user["USER_ID"],
+                                    "SPONSOR_POINT_CHANGE",
+                                    "Driver points Updated",
+                                    f"{abs(signed_amount)} points were "
+                                    f"{'added to' if signed_amount > 0 else 'deducted from'} "
+                                    f"a driver's balance at {company_name}. "
+                                    f"Reason: {bulk_reason}. "
+                                    f"New balance: {new_balance:g} points.",
+                                    pointchange_id=pointchange_id
+                                )
+
+                            # notify admin
+                            cursor.execute("""
+                                SELECT USER_ID
+                                FROM USER
+                                WHERE ROLE = 'Admin'
+                            """)
+
+                            admin_users = cursor.fetchall()
+
+                            for admin_user in admin_users:
+                                create_notification(
+                                    cursor,
+                                    admin_user["USER_ID"],
+                                    "ADMIN_POINT_CHANGE",
+                                    "Driver points Updated",
+                                    f"{abs(signed_amount)} points were "
+                                    f"{'added to' if signed_amount > 0 else 'deducted from'} "
+                                    f"a driver's balance at {company_name}. "
+                                    f"Reason: {bulk_reason}. "
+                                    f"New balance: {new_balance:g} points.",
+                                    pointchange_id=pointchange_id
+                                )
 
                     conn.commit()
 
@@ -1248,6 +1455,100 @@ def assignPoints():
                 reason,
                 actor_user_id
             ))
+
+            pointchange_id = cursor.lastrowid
+
+            # look up driver user account by sponsor company name
+            cursor.execute("""
+                SELECT d.USER_ID AS DRIVER_USER_ID,
+                    sc.SPONSORCOMP_NAME
+                FROM DRIVER AS d
+                JOIN SPONSORCOMP AS sc
+                    ON sc.SPONSORCOMP_ID = %s
+                WHERE d.DRIVER_ID = %s
+            """, (
+                balance["SPONSORCOMP_ID"],
+                balance["DRIVER_ID"]
+            ))
+
+            driver_info = cursor.fetchone()
+
+            if driver_info:
+                driver_user_id = driver_info["DRIVER_USER_ID"]
+                company_name = driver_info["SPONSORCOMP_NAME"]
+
+                #notify driver
+                if signed_amount > 0:
+                    driver_type = "POINTS_GAINED"
+                    driver_title = "You earned points!"
+                    driver_message = (
+                        f"You received {signed_amount} points from "
+                        f"{company_name}. Reason: {reason}. "
+                        f"Your new balance is {new_balance:g} points."
+                    )
+                else:
+                    driver_type = "POINTS_LOST"
+                    driver_title = "Your points changed"
+                    driver_message = (
+                        f"{abs(signed_amount)} points were deducted by "
+                        f"{company_name}. Reason: {reason}. "
+                        f"Your new balance is {new_balance:g} points."
+                    )
+                            
+                create_notification(
+                    cursor,
+                    driver_user_id,
+                    driver_type,
+                    driver_title,
+                    driver_message,
+                    pointchange_id=pointchange_id
+                )
+
+                # notify sponsor associated with company
+                cursor.execute("""
+                    SELECT USER_ID
+                    FROM SPONSOR
+                    WHERE SPONSORCOMP_ID = %s
+                """, (balance["SPONSORCOMP_ID"],))
+
+                sponsor_users = cursor.fetchall()
+
+                for sponsor_user in sponsor_users:
+                    create_notification(
+                        cursor,
+                        sponsor_user["USER_ID"],
+                        "SPONSOR_POINT_CHANGE",
+                        "Driver points Updated",
+                        f"{abs(signed_amount)} points were "
+                        f"{'added to' if signed_amount > 0 else 'deducted from'} "
+                        f"a driver's balance at {company_name}. "
+                        f"Reason: {reason}. "
+                        f"New balance: {new_balance:g} points.",
+                        pointchange_id=pointchange_id
+                    )
+
+                # notify admin
+                cursor.execute("""
+                    SELECT USER_ID
+                    FROM USER
+                    WHERE ROLE = 'Admin'
+                """)
+
+                admin_users = cursor.fetchall()
+
+                for admin_user in admin_users:
+                    create_notification(
+                        cursor,
+                        admin_user["USER_ID"],
+                        "ADMIN_POINT_CHANGE",
+                        "Driver points Updated",
+                        f"{abs(signed_amount)} points were "
+                        f"{'added to' if signed_amount > 0 else 'deducted from'} "
+                        f"a driver's balance at {company_name}. "
+                        f"Reason: {reason}. "
+                        f"New balance: {new_balance:g} points.",
+                        pointchange_id=pointchange_id
+                    )
 
             conn.commit()
 
@@ -2155,6 +2456,177 @@ def stopViewingAsSponsor():
 
     if session.get("role") == "Admin":
         return redirect(url_for("adminDash"))
+
+
+@app.route("/notifications")
+def notifications():
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        cursor.execute("""
+            SELECT
+                NOTIFICATION_ID,
+                NOTIFICATION_TYPE,
+                TITLE,
+                MESSAGE,
+                IS_READ,
+                CREATED_DTS
+            FROM NOTIFICATIONS
+            WHERE USER_ID = %s
+            ORDER BY CREATED_DTS DESC, NOTIFICATION_ID DESC
+        """, (session["user_id"],))
+
+        user_notifications = cursor.fetchall()
+
+        return render_template(
+            "notifications.html",
+            notifications=user_notifications
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.route("/notifications/mark-read/<int:notification_id>", methods=["POST"])
+def mark_notifications_read(notification_id):
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""
+            UPDATE NOTIFICATIONS
+            SET IS_READ = 1
+            WHERE NOTIFICATION_ID = %s
+                AND USER_ID = %s
+        """, (notification_id, session["user_id"]))
+
+        conn.commit()
+
+    except mysql.connector.Error:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for("notifications"))
+
+@app.route("/notifications/settings", methods=["GET", "POST"])
+def notification_settings():
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    user_id = session["user_id"]
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        if request.method == "POST":
+            for notification_type in NOTIFICATION_TYPES:
+                is_enabled = (
+                    1 if request.form.get(notification_type) == "1"
+                    else 0
+                )
+
+                cursor.execute("""
+                    INSERT INTO NOTIFICATIONSETTINGS
+                        (USER_ID, NOTIFICATION_TYPE, IS_ENABLED)
+                    VALUES (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        IS_ENABLED = VALUES(IS_ENABLED),
+                        UPDATED_DTS = CURRENT_TIMESTAMP
+                """, (user_id, notification_type, is_enabled))
+
+            conn.commit()
+            flash("Notification settings saved successfully.", "success")
+
+            return redirect(url_for("notification_settings"))
+        
+        cursor.execute("""
+            SELECT NOTIFICATION_TYPE, IS_ENABLED
+            FROM NOTIFICATIONSETTINGS
+            WHERE USER_ID = %s
+        """, (user_id,))
+
+        saved_settings = {
+            row["NOTIFICATION_TYPE"]: bool(row["IS_ENABLED"])
+            for row in cursor.fetchall()
+        }
+
+        # without saved preferences all notifs enabled
+        settings = {
+            notification_type: saved_settings.get(notification_type, True)
+            for notification_type in NOTIFICATION_TYPES
+        }
+
+        return render_template(
+            "notification_settings.html",
+            notification_types=NOTIFICATION_TYPES,
+            settings=settings
+        )
+
+    except mysql.connector.Error:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.context_processor
+def inject_unread_notification_count():
+    if "user_id" not in session:
+        return {"unread_notification_count": 0}
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) AS unread_count
+            FROM NOTIFICATIONS
+            WHERE USER_ID = %s
+            AND IS_READ = 0
+        """, (session["user_id"],))
+
+        result = cursor.fetchone()
+
+        return {
+            "unread_notification_count": result["unread_count"]
+        }
+    
+    finally:
+        cursor.close()
+        conn.close()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
