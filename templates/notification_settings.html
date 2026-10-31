@@ -10,25 +10,36 @@
 
 <body>
 
-    <main class="notifications-container">
-        <header class="notifications-header">
-            <h1>Notification Settings</h1>
+<header>
+    <div class="header-content">
+        <div class="dashboard-name">Notification Settings</div>
+        <div class="tagline">Good Driving. Better Rewards.</div>
 
-            <a href="{{ url_for('notifications') }}">
-                Back to Notifications
+        <div class="header-links">
+            <a href="{{ url_for('notifications') }}" class="nav-link">
+                Notifications
             </a>
-        </header>
+            <a href="{{ url_for('backToDash') }}" class="nav-link">
+                Dashboard
+            </a>
+        </div>
+    </div>
+</header>
 
-        <p>
-            Choose which types of notifications you want to receive.
-            Changes are saved to your account when you click Save Setting.
+<main>
+    <div class="settings-card">
+
+        <h1 class="page-heading">Manage Notification Preferences</h1>
+        <p class="settings-description">
+            Choose which updates you would like to receive.
+            Turn off any notification type you no longer want to see.
         </p>
 
         <form method="POST" action="{{ url_for('notification_settings') }}">
 
             {% for notification_type, label in notification_types.items() %}
-                <div class="'notification-card">
-                    <label for="{{ notification_type }}">
+                <div class="setting-row">
+                    <label class="setting-label" for="{{ notification_type }}">
                         {{ label }}
                     </label>
 
@@ -36,13 +47,33 @@
                         type="checkbox"
                         id="{{ notification_type }}"
                         name="{{ notification_type }}"
-                        {% if settings[notification_type] %}checked{% endif %}
+                        value="1"
+                        {% if settings.get(notification_type, True) %}checked{% endif %}
                     >
                 </div>
             {% endfor %}
 
-            <button type="submit">Save Settings</button>
+            <div class="settings-buttons">
+                <button type="submit" class="button">
+                    Save Preferences
+                </button>
+
+                <a href="{{ url_for('notifications') }}" class="secondary-button">
+                    Cancel
+                </a>
+            </div>
         </form>
-    </main>
+
+        <a href="{{ url_for('backToDash') }}" class="back-link">
+            Back to Dashboard
+        </a>
+
+    </div>
+</main>
+
+<footer>
+    Good (Truck) Driver Incentive Program &mdash; Fall 2026
+</footer>
+
 </body>
 </html>

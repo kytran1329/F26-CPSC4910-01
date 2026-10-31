@@ -2494,7 +2494,7 @@ def stopViewingAsSponsor():
 @app.route("/notifications")
 def notifications():
     if "user_id" not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -2532,7 +2532,7 @@ def notifications():
 @app.route("/notifications/mark-read/<int:notification_id>", methods=["POST"])
 def mark_notifications_read(notification_id):
     if "user_id" not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -2565,7 +2565,7 @@ def mark_notifications_read(notification_id):
 @app.route("/notifications/settings", methods=["GET", "POST"])
 def notification_settings():
     if "user_id" not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     user_id = session["user_id"]
 
@@ -2581,7 +2581,7 @@ def notification_settings():
         if request.method == "POST":
             for notification_type in NOTIFICATION_TYPES:
                 is_enabled = (
-                    1 if request.form.get(notification_type) == "on"
+                    1 if request.form.get(notification_type) == "1"
                     else 0
                 )
 

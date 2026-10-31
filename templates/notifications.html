@@ -9,60 +9,92 @@
 </head>
 
 <body>
-    <main class="'notifications-container">
-        <header class="notifications-header">
-            <h1>Notifications</h1>
 
-            <div class="notification-links">
-                <a href="{{ url_for('notification_settings') }}">
-                    Notification Settings
-                </a>
+<header>
+    <div class="header-content">
+        <div class="dashboard-name">Notifications</div>
+        <div class="tagline">Good Driving. Better Rewards.</div>
 
-                <a href="{{ url_for('backToDash') }}">
-                    Back to Dashboard
-                </a>
+        <div class="header-links">
+            <a href="{{ url_for('backToDash') }}" class="nav-link">
+                Dashboard
+            </a>
+            <a href="{{ url_for('notification_settings') }}" class="nav-link">
+                Notification Settings
+            </a>
+        </div>
+    </div>
+</header>
+    
+<main>
+    <div class="notifications-card">
+
+        <div class="notifications-header">
+            <div>
+                <h1 class="page-heading">Your Notifications</h1>
+                <p class="page-description">
+                    Keep track of updates and activity related to your account.
+                </p>
             </div>
-        </header>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% for category, message in messages %}
-                <p class="flash-message {{ category }}">{{ message }}</p>
-            {% endfor %}
-        {% endwith %}
+        </div>
 
         {% if notifications %}
-            {% for notification in notifications %}
-                <article class="notification-card
-                    {% if not notification['IS_READ'] %}unread{% endif %}">
+            <div class="notification-list">
 
-                    <div class="notification-content">
-                        <h2>{{ notification["TITLE"] }}</h2>
-                        <p>{{ notification["MESSAGE"] }}</p>
+                {% for notification in notifications %}
+                    <div class="notification {% if not notification['IS_READ'] %}unread{% endif %}">
 
-                        <small>
-                            {{ notification["CREATED_DTS"] }}
-                        </small>
+                        <div class="notification-info">
+
+                            {% if not notification['IS_READ'] %}
+                                <span class="notification-status">
+                                    NEW
+                                </span>
+                            {% endif %}
+
+                            <h3 class="notification-title">
+                                {{ notification['TITLE'] }}
+                            </h3>
+
+                            <p class="notification-message">
+                                {{ notification['MESSAGE'] }}
+                            </p>
+
+                            <span class="notification-date">
+                                {{ notification['CREATED_DTS'] }}
+                            </span>
+
+                        </div>
+
+                        {% if not notification['IS_READ'] %}
+                            <div class="notification-actions">
+                                <form action="{{ url_for('mark_notifications_read', notification_id=notification['NOTIFICATION_ID']) }}"
+                                    method="POST">
+                                    <button type="submit" class="button">
+                                        Mark as Read
+                                    </button>
+                                </form>
+                            </div>
+                        {% endif %}
                     </div>
-
-                    {% if not notification["IS_READ"] %}
-                        <form method="POST"
-                            action="{{ url_for(
-                                'mark_notifications_read',
-                                notification_id=notification['NOTIFICATION_ID']
-                            ) }}">
-                            <botton type="submit">
-                                Mark as Read
-                            </botton>
-                        </form>
-                    {% else %}
-                        <span class="read-label">Read</span>
-                    {% endif %}
-
-                </article>
-            {% endfor %}
+                {% endfor %}
+            </div>
         {% else %}
-            <p>You don't have any notifications yet.</p>
+            <div class="no-notifications">
+                <h3>No Notifications Yet</h3>
+                <p>You're all caught up! New updates will appear here.</p>
+            </div>
         {% endif %}
-    </main>
+
+        <a href="{{ url_for('backToDash') }}" class="back-link">
+            Back to Dashboard
+        </a>
+    </div>
+</main>
+
+<footer>
+    Good (Truck) Driver Incentive Program &mdash; Fall 2026
+</footer>
+
 </body>
 </html>
