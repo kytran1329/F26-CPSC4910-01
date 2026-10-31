@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications Settings - Road Reward</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='notifications.css') }}">
+</head>
+
+<body>
+
+    <main class="notifications-container">
+        <header class="notifications-header">
+            <h1>Notification Settings</h1>
+
+            <a href="{{ url_for('notifications') }}">
+                Back to Notifications
+            </a>
+        </header>
+
+        <p>
+            Choose which types of notifications you want to receive.
+            Changes are saved to your account when you click Save Setting.
+        </p>
+
+        <form method="POST" action="{{ url_for('notification_settings') }}">
+
+            {% for notification_type, label in notification_types.items() %}
+                <div class="'notification-card">
+                    <label for="{{ notification_type }}">
+                        {{ label }}
+                    </label>
+
+                    <input
+                        type="checkbox"
+                        id="{{ notification_type }}"
+                        name="{{ notification_type }}"
+                        {% if settings[notification_type] %}checked{% endif %}
+                    >
+                </div>
+            {% endfor %}
+
+            <button type="submit">Save Settings</button>
+        </form>
+    </main>
+</body>
+</html>

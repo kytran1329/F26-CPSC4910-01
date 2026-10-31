@@ -1,0 +1,269 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #f4f6f8;
+    color: #222;
+    line-height: 1.6;
+}
+
+header {
+    background-color: #1f2937;
+    color: white;
+    padding: 25px 40px;
+}
+
+.header-content {
+    max-width: 1100px;
+    margin: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+header h1 {
+    font-size: 2rem;
+    margin: 0;
+}
+
+.header-links {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.nav-link:hover {
+    text-decoration: underline;
+}
+
+main {
+    max-width: 1000px;
+    margin: 50px auto;
+    padding: 0 25px;
+}
+
+.notifications-container {
+    background-color: white;
+    border-radius: 12px;
+    padding: 35px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.notifications-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.notifications-header h2 {
+    font-size: 1.5rem;
+    color: #1f2937;
+}
+
+.notification {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+
+    background-color: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+.notification.unread {
+    background-color: #eff6ff;
+    border-left: 5px solid #2563eb;
+}
+
+.notification-info {
+    flex: 1;
+}
+
+.notification-title {
+    font-size: 1.05rem;
+    font-weight: bold;
+    color: #1f2937;
+    margin-bottom: 5px;
+}
+
+.notification-message {
+    color: #4b5563;
+    margin-bottom: 8px;
+}
+
+.notification-date {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.notification-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.button {
+    display: inline-block;
+    background-color: #1f2937;
+    color: white;
+    padding: 9px 15px;
+    border: none;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.button:hover {
+    background-color: #374151;
+}
+
+.secondary-button {
+    background-color: #6b7280;
+}
+
+.secondary-button:hover {
+    background-color: #4b5563;
+}
+
+.no-notifications {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+    background-color: #f8fafc;
+    border-radius: 8px;
+}
+
+.settings-container {
+    background-color: white;
+    border-radius: 12px;
+    padding: 35px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.settings-container h2 {
+    color: #1f2937;
+    margin-bottom: 10px;
+}
+
+.settings-description {
+    color: #6b7280;
+    margin-bottom: 25px;
+}
+
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+
+    background-color: #f8fafc;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    border-radius: 6px;
+}
+
+.setting-label {
+    font-weight: bold;
+    color: #374151;
+}
+
+.setting-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.setting-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.message {
+    padding: 12px;
+    margin-top: 20px;
+    border-radius: 5px;
+}
+
+.error-message {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.success-message {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.back-link {
+    display: inline-block;
+    margin-top: 20px;
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+footer {
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.9rem;
+    padding: 30px;
+}
+
+@media (max-width: 650px) {
+    header {
+        padding: 20px;
+    }
+
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    main {
+        margin: 25px auto;
+        padding: 0 15px;
+    }
+
+    .notifications-container,
+    .settings-container {
+        padding: 20px;
+    }
+
+    .notification {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .notification-actions {
+        width: 100%;
+    }
+
+    .setting-row {
+        align-items: flex-start;
+    }
+}
