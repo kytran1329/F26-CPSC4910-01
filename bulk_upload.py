@@ -136,9 +136,12 @@ def validate_bulk_upload(file, user_role):
             # Sponsors cannot receive points
             if record_type == "S" and (points or reason):
                 errors.append(
-                    f"Line {line_number}: Points cannot be assigned to sponsors."
+                    f"Line {line_number}: Points cannot be assigned to sponsors. "
+                    "Points and reason were ignored, but the sponsor record "
+                    "will still be processed."
                 )
-                continue
+                points = ""
+                reason = ""
 
             # Validate points and reason
             if points:
