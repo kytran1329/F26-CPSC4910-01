@@ -18,6 +18,7 @@ from export import export
 from catalog import cat
 from auth import auth
 from notifications import create_notification, NOTIFICATION_TYPES
+from bulk_upload import validate_bulk_upload
 
 load_dotenv()
 
@@ -2627,6 +2628,388 @@ def inject_unread_notification_count():
     finally:
         cursor.close()
         conn.close()
+
+@app.route("/bulkUpload", methods=["POST"])
+def bulkUpload():
+
+    # Only Admins and Sponsors can upload files
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    user_role = session.get("role")
+
+    if user_role not in ("Admin", "Sponsor"):
+        return "Unauthorized", 403
+
+    uploaded_file = request.files.get("file")
+
+    if uploaded_file is None or uploaded_file.filename == "":
+        return render_template(
+            "bulk_upload_results.html",
+            results=[],
+            errors=["Please select a file to upload."]
+        )
+
+    # Validate the file before processing records
+    valid_records, errors = validate_bulk_upload(
+        uploaded_file,
+        user_role
+    )
+
+    results = []
+    upload_errors = list(errors)
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+
+        # Sponsors can only upload to their own organization
+        sponsor_company_id = None
+
+        if user_role == "Sponsor":
+
+            cursor.execute("""
+                SELECT SPONSORCOMP_ID
+                FROM SPONSOR
+                WHERE USER_ID = %s
+            """, (session["user_id"],))
+
+            sponsor = cursor.fetchone()
+
+            if sponsor is None:
+                return "Sponsor organization not found.", 403
+
+            sponsor_company_id = sponsor["SPONSORCOMP_ID"]
+
+        # Tracks organizations created earlier in this upload
+        created_organizations = {}
+
+        # Process records in their original file order
+        valid_records.sort(key=lambda record: record["line_number"])
+
+        for record in valid_records:
+
+            line_number = record["line_number"]
+            record_type = record["type"]
+
+            try:
+
+                # Each line is processed independently
+                if record_type == "O":
+
+                    if user_role != "Admin":
+                        upload_errors.append(
+                            f"Line {line_number}: Only Admins can create organizations."
+                        )
+                        continue
+
+                    organization_name = record["organization"]
+
+                    cursor.execute("""
+                        SELECT SPONSORCOMP_ID
+                        FROM SPONSORCOMP
+                        WHERE SPONSORCOMP_NAME = %s
+                    """, (organization_name,))
+
+                    existing_organizations = cursor.fetchall()
+
+                    if existing_organizations:
+                        raise ValueError(
+                            f"Organization '{organization_name}' already exists."
+                        )
+
+                    cursor.execute("""
+                        INSERT INTO SPONSORCOMP (
+                            SPONSORCOMP_NAME,
+                            SPONSORCOMP_DOLLAR,
+                            SPONSORCOMP_POINT
+                        )
+                        VALUES (%s, %s, %s)
+                    """, (organization_name, 1, 10))
+
+                    organization_id = cursor.lastrowid
+
+                    conn.commit()
+
+                    created_organizations[organization_name] = organization_id
+
+                    results.append({
+                        "message": f"Line {line_number}: Created organization '{organization_name}'.",
+                        "email": "N/A",
+                        "temporary_password": None
+                    })
+
+                    continue
+
+                # Determine which organization this user belongs to
+                if user_role == "Sponsor":
+
+                    organization_id = sponsor_company_id
+
+                else:
+
+                    organization_name = record["organization"]
+
+                    if not organization_name:
+                        raise ValueError(
+                            "An organization name is required for Admin uploads."
+                        )
+
+                    # First check organizations created earlier in this file
+                    organization_id = created_organizations.get(
+                        organization_name
+                    )
+
+                    # Otherwise, check the database
+                    if organization_id is None:
+
+                        cursor.execute("""
+                            SELECT SPONSORCOMP_ID
+                            FROM SPONSORCOMP
+                            WHERE SPONSORCOMP_NAME = %s
+                        """, (organization_name,))
+
+                        organizations = cursor.fetchall()
+
+                        if len(organizations) == 0:
+                            raise ValueError(
+                                f"Organization '{organization_name}' does not exist."
+                            )
+
+                        if len(organizations) > 1:
+                            raise ValueError(
+                                f"Organization '{organization_name}' is ambiguous."
+                            )
+
+                        organization_id = organizations[0]["SPONSORCOMP_ID"]
+
+                email = record["email"]
+                first_name = record["first_name"]
+                last_name = record["last_name"]
+
+                # Look for an existing user by email
+                cursor.execute("""
+                    SELECT USER_ID, ROLE
+                    FROM `USER`
+                    WHERE EMAIL = %s
+                """, (email,))
+
+                existing_user = cursor.fetchone()
+
+                new_password = None
+
+                # Create the user if they do not already exist
+                if existing_user is None:
+
+                    new_password = "123_password"
+
+                    password_hash = generate_password_hash(new_password)
+
+                    expected_role = (
+                        "Driver" if record_type == "D" else "Sponsor"
+                    )
+
+                    cursor.execute("""
+                        INSERT INTO USER (
+                            USER_FNAME,
+                            USER_LNAME,
+                            ROLE,
+                            EMAIL,
+                            PASSWORD
+                        )
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (
+                        first_name,
+                        last_name,
+                        expected_role,
+                        email,
+                        password_hash
+                    ))
+
+                    user_id = cursor.lastrowid
+
+                else:
+
+                    user_id = existing_user["USER_ID"]
+
+                    expected_role = (
+                        "Driver" if record_type == "D" else "Sponsor"
+                    )
+
+                    if existing_user["ROLE"] != expected_role:
+                        raise ValueError(
+                            f"{email} already belongs to a user with role "
+                            f"'{existing_user['ROLE']}'."
+                        )
+
+                # -------------------------------------------------
+                # SPONSOR RECORD
+                # -------------------------------------------------
+                if record_type == "S":
+
+                    cursor.execute("""
+                        SELECT SPONSORCOMP_ID
+                        FROM SPONSOR
+                        WHERE USER_ID = %s
+                    """, (user_id,))
+
+                    existing_sponsor = cursor.fetchone()
+
+                    if existing_sponsor:
+
+                        if existing_sponsor["SPONSORCOMP_ID"] != organization_id:
+                            raise ValueError(
+                                "This Sponsor already belongs to another organization."
+                            )
+
+                        message = f"Line {line_number}: Sponsor {email} already exists."
+
+                    else:
+
+                        cursor.execute("""
+                            INSERT INTO SPONSOR (
+                                USER_ID,
+                                SPONSORCOMP_ID
+                            )
+                            VALUES (%s, %s)
+                        """, (user_id, organization_id))
+
+                        message = f"Line {line_number}: Created Sponsor {email}."
+
+                # -------------------------------------------------
+                # DRIVER RECORD
+                # -------------------------------------------------
+                elif record_type == "D":
+
+                    cursor.execute("""
+                        SELECT DRIVER_ID
+                        FROM DRIVER
+                        WHERE USER_ID = %s
+                    """, (user_id,))
+
+                    existing_driver = cursor.fetchone()
+
+                    if existing_driver:
+
+                        driver_id = existing_driver["DRIVER_ID"]
+
+                    else:
+
+                        cursor.execute("""
+                            INSERT INTO DRIVER (USER_ID)
+                            VALUES (%s)
+                        """, (user_id,))
+
+                        driver_id = cursor.lastrowid
+
+                    # Find or create this driver's balance
+                    cursor.execute("""
+                        SELECT BALANCE_ID, BALANCE
+                        FROM BALANCE
+                        WHERE DRIVER_ID = %s
+                        AND SPONSORCOMP_ID = %s
+                    """, (driver_id, organization_id))
+
+                    balance_record = cursor.fetchone()
+
+                    if balance_record is None:
+
+                        cursor.execute("""
+                            INSERT INTO BALANCE (
+                                DRIVER_ID,
+                                SPONSORCOMP_ID,
+                                BALANCE
+                            )
+                            VALUES (%s, %s, %s)
+                        """, (driver_id, organization_id, 0))
+
+                        balance_id = cursor.lastrowid
+
+                    else:
+
+                        balance_id = balance_record["BALANCE_ID"]
+
+                    # Add optional points to the driver's balance
+                    points = record["points"]
+
+                    if points is not None:
+
+                        # POINTCHANGE_AMOUNT is an INT in your database
+                        if not float(points).is_integer():
+                            raise ValueError(
+                                "Points must be a whole number."
+                            )
+
+                        points = int(points)
+
+                        cursor.execute("""
+                            UPDATE BALANCE
+                            SET BALANCE = BALANCE + %s
+                            WHERE BALANCE_ID = %s
+                        """, (points, balance_id))
+
+                        cursor.execute("""
+                            INSERT INTO POINTCHANGES (
+                                DRIVER_ID,
+                                POINTCHANGE_AMOUNT,
+                                POINTCHANGE_REASON,
+                                USER_ID,
+                                BALANCE_ID
+                            )
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (
+                            driver_id,
+                            points,
+                            record["reason"],
+                            session["user_id"],
+                            balance_id
+                        ))
+
+                    message = f"Line {line_number}: Created/updated Driver {email}."
+
+                # Commit this record before moving to the next line
+                conn.commit()
+
+                # Show the temporary password only for newly created accounts
+                if new_password:
+                    results.append({
+                        "message": message,
+                        "email": email,
+                        "temporary_password": new_password
+                    })
+                else:
+                    results.append({
+                        "message": message,
+                        "email": email,
+                        "temporary_password": None
+                    })
+
+            except (mysql.connector.Error, ValueError) as e:
+
+                # Undo only the current record; continue with the next line
+                conn.rollback()
+
+                upload_errors.append(
+                    f"Line {line_number}: {str(e)}"
+                )
+
+    finally:
+
+        cursor.close()
+        conn.close()
+
+    return render_template(
+        "bulk_upload_results.html",
+        results=results,
+        errors=upload_errors
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

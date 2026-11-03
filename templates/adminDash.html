@@ -232,7 +232,6 @@
 
         </section>
 
-
         <!-- DRIVERS -->
         <section class="admin-card">
 
@@ -332,6 +331,59 @@
                 </table>
 
             </div>
+
+        </section>
+        <!-- BULK UPLOAD -->
+        <section class="admin-card bulk-upload-card">
+
+            <div class="bulk-upload-header">
+                <div>
+                    <h2>Bulk Upload</h2>
+                    <p>
+                        Upload a pipe-delimited text file to add organizations,
+                        sponsors, and drivers to the program.
+                    </p>
+                </div>
+            </div>
+
+            <form action="{{ url_for('bulkUpload') }}"
+                method="POST"
+                enctype="multipart/form-data"
+                class="bulk-upload-form">
+
+                <div class="upload-instructions">
+                    <strong>Before uploading:</strong>
+                    <ul>
+                        <li>Upload a .txt file.</li>
+                        <li>Separate each field using a pipe (|).</li>
+                        <li>Points and reasons are optional for drivers.</li>
+                        <li>Organizations must be created before assigning users to them.</li>
+                    </ul>
+                </div>
+
+                <div class="file-upload-area">
+                    <label for="bulk-upload-file">
+                        Select your upload file
+                    </label>
+
+                    <input
+                        type="file"
+                        id="bulk-upload-file"
+                        name="file"
+                        accept=".txt"
+                        required
+                    >
+
+                    <span id="selected-file-name">
+                        No file selected
+                    </span>
+                </div>
+
+                <button type="submit" class="button bulk-upload-button">
+                    Upload File
+                </button>
+
+            </form>
 
         </section>
         </div>
@@ -744,7 +796,16 @@
 
         };
 
+        document.getElementById("bulk-upload-file")
+            .addEventListener("change", function () {
 
+                const fileName = this.files.length > 0
+                    ? this.files[0].name
+                    : "No file selected";
+
+                document.getElementById("selected-file-name")
+                    .textContent = fileName;
+            });
     </script>
 
 </body>

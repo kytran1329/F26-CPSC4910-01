@@ -413,3 +413,108 @@ footer {
     outline: 2px solid #245c43;
     outline-offset: 3px;
 }
+
+/*spon Bulk upload*/
+.bulk-upload-section {
+    border-left: 5px solid #245c43;
+    margin-top: 30px;
+    margin-bottom: 30px;
+}
+
+.bulk-upload-header {
+    margin-bottom: 25px;
+}
+
+.bulk-upload-header h2 {
+    margin-bottom: 8px;
+}
+
+.bulk-upload-header p {
+    color: #6b7280;
+    font-size: 0.95rem;
+}
+
+.bulk-upload-form {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.upload-instructions {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 18px 22px;
+    color: #4b5563;
+}
+
+.upload-instructions strong {
+    color: #1f2937;
+}
+
+.upload-instructions ul {
+    margin: 10px 0 0 20px;
+    padding: 0;
+}
+
+.upload-instructions li {
+    padding: 4px 0;
+}
+
+.file-upload-area {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.file-upload-area label {
+    font-weight: bold;
+    color: #1f2937;
+}
+
+.file-upload-area input[type="file"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 14px;
+    background: #f9fafb;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.file-upload-area input[type="file"]:hover {
+    border-color: #245c43;
+    background: #f0f7f3;
+}
+
+#selected-file-name {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.bulk-upload-button {
+    align-self: flex-start;
+    background: #245c43;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 24px;
+    font-size: 0.95rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.bulk-upload-button:hover {
+    background: #194832;
+}
+
+@media (max-width: 600px) {
+    .bulk-upload-button {
+        width: 100%;
+    }
+
+    .upload-instructions {
+        padding: 15px;
+    }
+}

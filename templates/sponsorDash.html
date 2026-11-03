@@ -227,6 +227,62 @@
                 </div>
 
             </div>
+            
+            <!-- Bulk Upload Section -->
+            <div class="history-section bulk-upload-section">
+
+                <div class="bulk-upload-header">
+                    <div>
+                        <h2>Bulk Upload</h2>
+                        <p>
+                            Upload multiple drivers and sponsors to your organization.
+                        </p>
+                    </div>
+                </div>
+
+                <form action="{{ url_for('bulkUpload') }}"
+                    method="POST"
+                    enctype="multipart/form-data"
+                    class="bulk-upload-form">
+
+                    <div class="upload-instructions">
+                        <strong>Upload Instructions</strong>
+
+                        <ul>
+                            <li>Upload a pipe-delimited (.txt) file.</li>
+                            <li>Use D for Drivers and S for Sponsors.</li>
+                            <li>Leave the organization field blank.</li>
+                            <li>Points may only be assigned to Drivers.</li>
+                            <li>A reason is required when assigning points.</li>
+                            <li>Invalid records will be skipped and reported.</li>
+                        </ul>
+                    </div>
+
+                    <div class="file-upload-area">
+
+                        <label for="bulk-upload-file">
+                            Select Upload File
+                        </label>
+
+                        <input type="file"
+                            id="bulk-upload-file"
+                            name="file"
+                            accept=".txt"
+                            required>
+
+                        <span id="selected-file-name">
+                            No file selected
+                        </span>
+
+                    </div>
+
+                    <button type="submit" class="bulk-upload-button">
+                        Upload File
+                    </button>
+
+                </form>
+
+            </div>
 
 
             <!-- point history -->
@@ -400,6 +456,16 @@
                     : "descending";
         }
 
+        document.getElementById("bulk-upload-file")
+            .addEventListener("change", function () {
+
+                const fileName = this.files.length > 0
+                    ? this.files[0].name
+                    : "No file selected";
+
+                document.getElementById("selected-file-name")
+                    .textContent = fileName;
+            });
     </script>
 
 </body>
