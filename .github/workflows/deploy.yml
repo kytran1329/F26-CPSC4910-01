@@ -1,0 +1,36 @@
+
+name: Deploy Website to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          script: |
+            echo "Navigating to project..."
+            cd /home/ec2-user/F26-CPSC4910-01
+
+            echo "Pulling latest changes..."
+            git fetch
+            git pull origin main
+
+            echo "Activating virtual environment..."
+            source .venv/bin/activate
+
+            echo "Stopping existing Gunicorn process..."
+            pkill -f gunicorn || true
+
+            echo "Starting Gunicorn..."
+            nohup gunicorn --bind 127.0.0.1:8000 app:app > gunicorn.log 2>&1 &
+
+            echo "Deployment complete!"
