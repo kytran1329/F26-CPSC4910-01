@@ -227,7 +227,15 @@
                 </div>
 
             </div>
+            <form action="{{ url_for('bulkUpload') }}"
+                method="POST"
+                enctype="multipart/form-data">
 
+                <input type="file" name="file" accept=".txt" required>
+
+                <button type="submit">Upload File</button>
+
+            </form>
 
             <!-- point history -->
             <div class="history-section">
