@@ -172,7 +172,7 @@ def driverDash():
         
         drive_info = cursor.fetchone()
         if drive_info is None:
-            return "Driver account not found", 404
+            return driverApplications()
         
         #point history
         cursor.execute("""
@@ -596,6 +596,215 @@ def bulk_update_applications():
         start_date=start_date,
         end_date=end_date
     ))
+
+@app.route("/driverDash/applications", methods=["GET", "POST"])
+def driverApplications():
+    # Connect to database
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    
+    cursor = conn.cursor(dictionary=True)
+    
+    error = None
+    success = None
+    user_id = session["user_id"]
+
+    if request.method == "POST":
+
+        sponsorcomp_id = request.form.get("sponsor_id")
+
+        if not sponsorcomp_id:
+            error = "Please select a sponsor company."
+
+        else:
+            try:
+                sponsorcomp_id = int(sponsorcomp_id)
+
+                # Select user for user information
+                cursor.execute(
+                        "SELECT * FROM USER WHERE USER_ID = %s",
+                        (user_id,)
+                )
+                            
+                user = cursor.fetchone()
+
+                first_name = user["USER_FNAME"]
+                last_name = user["USER_LNAME"]
+
+                # Check if the driver already applied to this company
+                # Allow apply again if previously rejected
+                cursor.execute("""
+                    SELECT APPLICATION_ID
+                    FROM APPLICATIONS
+                    WHERE USER_ID = %s
+                    AND SPONSORCOMP_ID = %s
+                    AND STATUS != 'Rejected'
+                """, (user_id, sponsorcomp_id))
+
+                existing_application = cursor.fetchone()
+
+                if existing_application:
+                    error = "You have already submitted an application to this sponsor company."
+
+                else:
+                    # Get the sponsor company's name
+                    cursor.execute("""
+                        SELECT SPONSORCOMP_NAME
+                        FROM SPONSORCOMP
+                        WHERE SPONSORCOMP_ID = %s
+                    """, (sponsorcomp_id,))
+
+                    company = cursor.fetchone()
+
+                    if not company:
+                        error = "The selected sponsor company could not be found."
+
+                    else:
+                        company_name = company["SPONSORCOMP_NAME"]
+
+                        # Insert the new sponsor application
+                        cursor.execute("""
+                            INSERT INTO APPLICATIONS
+                                (USER_ID, SPONSORCOMP_ID, SPONSOR_ID)
+                            VALUES (%s, %s, NULL)
+                        """, (user_id, sponsorcomp_id))
+
+                        application_id = cursor.lastrowid
+
+                        # Notify all sponsors in the company
+                        cursor.execute("""
+                            SELECT USER_ID
+                            FROM SPONSOR
+                            WHERE SPONSORCOMP_ID = %s
+                        """, (sponsorcomp_id,))
+
+                        sponsor_users = cursor.fetchall()
+
+                        for sponsor_user in sponsor_users:
+                            create_notification(
+                                cursor,
+                                sponsor_user["USER_ID"],
+                                "SPONSOR_NEW_APPLICATION",
+                                "New driver application",
+                                f"{first_name} {last_name} has applied to join "
+                                f"{company_name}.",
+                                application_id=application_id
+                            )
+
+                        # Notify all admins
+                        cursor.execute("""
+                            SELECT USER_ID
+                            FROM USER
+                            WHERE ROLE = 'Admin'
+                        """)
+
+                        admin_users = cursor.fetchall()
+
+                        for admin_user in admin_users:
+                            create_notification(
+                                cursor,
+                                admin_user["USER_ID"],
+                                "ADMIN_NEW_APPLICATION",
+                                "New driver application",
+                                f"{first_name} {last_name} has applied to join "
+                                f"{company_name}.",
+                                application_id=application_id
+                            )
+
+                        # Commit the application and notifications
+                        conn.commit()
+
+                        success = f"Your application to {company_name} was submitted successfully!"
+
+            except ValueError:
+                error = "Invalid sponsor company selection."
+
+            except Exception as e:
+                conn.rollback()
+                print(f"Error submitting application: {e}")
+                error = "Something went wrong while submitting your application. Please try again."
+
+    # Validate selected dates
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+    try:
+        if start_date:
+            date.fromisoformat(start_date)
+
+        if end_date:
+            date.fromisoformat(end_date)
+
+        if start_date and end_date and start_date > end_date:
+            raise ValueError("Start date must not be after end date.")
+
+    except ValueError:
+        return render_template(
+            "driverApplications.html",
+            applications=[],
+            sponsors=[],
+            start_date=start_date,
+            end_date=end_date,
+            error="Please enter a valid date range.",
+            success=success
+        )
+
+    # Get the logged-in driver's applications
+    query = """
+        SELECT
+            a.APPLICATION_ID,
+            a.CREATED_DTS,
+            a.STATUS,
+            a.REASON,
+            s.SPONSORCOMP_NAME
+        FROM APPLICATIONS AS a
+        JOIN SPONSORCOMP AS s
+            ON s.SPONSORCOMP_ID = a.SPONSORCOMP_ID
+        WHERE a.USER_ID = %s
+    """
+
+    params = [session["user_id"]]
+
+    if start_date:
+        query += " AND a.CREATED_DTS >= %s"
+        params.append(start_date)
+
+    if end_date:
+        query += " AND a.CREATED_DTS < DATE_ADD(%s, INTERVAL 1 DAY)"
+        params.append(end_date)
+
+    query += " ORDER BY a.CREATED_DTS DESC"
+
+    cursor.execute(query, params)
+
+    applications = cursor.fetchall()
+
+    # Get available sponsor companies for dropdown
+    cursor.execute("""
+        SELECT
+            SPONSORCOMP_ID,
+            SPONSORCOMP_NAME
+        FROM SPONSORCOMP
+        ORDER BY SPONSORCOMP_NAME
+    """)
+
+    sponsors = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "driverApplications.html",
+        applications=applications,
+        sponsors=sponsors,
+        start_date=start_date,
+        end_date=end_date,
+        error=error,
+        success=success
+    )
 
 @app.route("/userProfile/<int:user_id>")
 def userProfile(user_id):

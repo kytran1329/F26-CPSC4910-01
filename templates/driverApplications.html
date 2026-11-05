@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Applications</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='driverDash.css') }}">
+</head>
+
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <div class="dashboard-name">
+                Driver Dashboard
+            </div>
+
+            <div class="tagline">
+                Good Driving. Better Rewards.
+            </div>
+
+            <div class="header-links">
+                <a href="{{ url_for('notifications') }}" class="nav-link notification-link">
+                    🔔 Notifications
+                    {% if unread_notification_count and unread_notification_count > 0 %}
+                        <span class="notification-badge">
+                            {{ unread_notification_count }}
+                        </span>
+                    {% endif %}
+                </a>
+
+                <a href="{{ url_for('driverApplications') }}" class="nav-link">Applications</a>
+
+                <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+
+                <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        {% if error %}
+        <div class="message error-message">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        {% if success %}
+            <div class="message success-message">
+                {{ success }}
+            </div>
+        {% endif %}
+
+        <div class="dashboard-card">
+
+            <h2>My Applications</h2>
+
+            <!-- Apply to a sponsor -->
+            <div class="apply-section">
+
+                <h3>Apply to a Sponsor</h3>
+                <p>
+                    Select a sponsor company to apply for their driver incentive program.
+                </p>
+
+                <form method="POST"
+                    action="{{ url_for('driverApplications') }}"
+                    id="apply-form">
+
+                    <div class="company-filter">
+                        <label for="sponsor">Sponsor Company</label>
+
+                        <select id="sponsor" name="sponsor_id" required>
+                            <option value="">Select a sponsor company</option>
+
+                            {% for sponsor in sponsors %}
+                                <option value="{{ sponsor['SPONSORCOMP_ID'] }}">
+                                    {{ sponsor['SPONSORCOMP_NAME'] }}
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                        <button type="submit" id="apply-button" class="button" disabled>
+                            Apply
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+
+            <hr>
+
+            <!-- Date Filters -->
+            <form method="GET"
+                  action="{{ url_for('driverApplications') }}"
+                  class="date-filter">
+
+                <div class="filter-field">
+                    <label for="start_date">Start Date</label>
+
+                    <input
+                        type="date"
+                        id="start_date"
+                        name="start_date"
+                        value="{{ start_date }}"
+                    >
+                </div>
+
+                <div class="filter-field">
+                    <label for="end_date">End Date</label>
+
+                    <input
+                        type="date"
+                        id="end_date"
+                        name="end_date"
+                        value="{{ end_date }}"
+                    >
+                </div>
+
+                <button type="submit">Filter</button>
+
+                <a href="{{ url_for('driverApplications') }}"
+                   class="clear-filter">
+                    Clear Filters
+                </a>
+
+            </form>
+
+            <!-- Application History -->
+            <div class="table-container">
+
+                <table class="history-table">
+
+                    <thead>
+                        <tr>
+                            <th>Sponsor Company</th>
+                            <th>Application Date</th>
+                            <th>Status</th>
+                            <th>Reason</thth>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for row in applications %}
+                        <tr>
+                            <td>{{ row["SPONSORCOMP_NAME"] }}</td>
+                            <td>{{ row["CREATED_DTS"] }}</td>
+                            <td>{{ row["STATUS"] }}</td>
+                            <td>{{ row["REASON"] or "N/A" }}</td>
+                        </tr>
+
+                        {% else %}
+                        <tr>
+                            <td colspan="3">
+                                You have not submitted any applications yet.
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+    </main>
+
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+    </footer>
+
+    <script>
+        const sponsorDropdown = document.getElementById("sponsor");
+        const applyButton = document.querySelector("#apply-form button");
+
+        sponsorDropdown.addEventListener("change", function () {
+            applyButton.disabled = !sponsorDropdown.value;
+        });
+    </script>
+
+</body>
+</html>
