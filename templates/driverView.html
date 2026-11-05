@@ -39,6 +39,15 @@
         <div class="dashboard-card">
             <div class="history-section">
                 <h2>Drivers</h2>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="notice {{ category }}" role="status">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
                 <div class="table-container">
                     <table class="history-table">
                         <thead>
@@ -47,7 +56,7 @@
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Balance</th>
-                                <th>Action</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -66,6 +75,13 @@
                                           method="POST">
                                         <button type="submit" class="view-driver-btn">
                                             View as Driver
+                                        </button>
+                                    </form>
+                                    <form action="{{ url_for('fireDriver', driver_id=driver['DRIVER_ID']) }}"
+                                          method="POST"
+                                          onsubmit="return confirm('Are you sure you wish to remove this driver from your company?');">
+                                        <button type="submit" class="fire-driver-btn">
+                                            Fire Driver
                                         </button>
                                     </form>
                                 </td>

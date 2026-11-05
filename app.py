@@ -1097,6 +1097,114 @@ def driverView():
         cursor.close()
         conn.close()
 
+@app.route("/sponDash/drivers/<int:driver_id>/fire", methods=["POST"])
+def fireDriver(driver_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    role = session.get("role")
+    if role == "Sponsor":
+        cursor_sponsor_id = session["user_id"]
+        sponsor_query = """
+            SELECT s.SPONSORCOMP_ID, sc.SPONSORCOMP_NAME
+            FROM SPONSOR AS s
+            JOIN SPONSORCOMP AS sc
+                ON sc.SPONSORCOMP_ID = s.SPONSORCOMP_ID
+            WHERE s.USER_ID = %s
+        """
+    elif role == "Admin":
+        cursor_sponsor_id = session.get("view_as_sponsor_id")
+        if cursor_sponsor_id is None:
+            return redirect(url_for("adminDash"))
+        sponsor_query = """
+            SELECT s.SPONSORCOMP_ID, sc.SPONSORCOMP_NAME
+            FROM SPONSOR AS s
+            JOIN SPONSORCOMP AS sc
+                ON sc.SPONSORCOMP_ID = s.SPONSORCOMP_ID
+            WHERE s.SPONSOR_ID = %s
+        """
+    else:
+        return "Unauthorized", 403
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute(sponsor_query, (cursor_sponsor_id,))
+        sponsor = cursor.fetchone()
+        if sponsor is None:
+            return "Sponsor account not found", 404
+
+        sponsorcomp_id = sponsor["SPONSORCOMP_ID"]
+        company_name = sponsor["SPONSORCOMP_NAME"]
+
+        cursor.execute("""
+            SELECT d.USER_ID, u.USER_FNAME, u.USER_LNAME
+            FROM BALANCE AS b
+            JOIN DRIVER AS d
+                ON d.DRIVER_ID = b.DRIVER_ID
+            JOIN `USER` AS u
+                ON u.USER_ID = d.USER_ID
+            WHERE b.DRIVER_ID = %s
+              AND b.SPONSORCOMP_ID = %s
+        """, (driver_id, sponsorcomp_id))
+        driver = cursor.fetchone()
+        if driver is None:
+            flash("That driver is not affiliated with your company.", "error")
+            return redirect(url_for("driverView"))
+
+        cursor.execute("""
+            DELETE FROM BALANCE
+            WHERE DRIVER_ID = %s
+              AND SPONSORCOMP_ID = %s
+        """, (driver_id, sponsorcomp_id))
+        if cursor.rowcount != 1:
+            conn.rollback()
+            flash("The driver affiliation could not be removed.", "error")
+            return redirect(url_for("driverView"))
+
+        driver_name = (
+            f"{driver['USER_FNAME']} {driver['USER_LNAME']}"
+        )
+        create_notification(
+            cursor,
+            driver["USER_ID"],
+            "DRIVER_SPONSOR_REMOVED",
+            "Sponsor connection ended",
+            f"You are no longer connected with {company_name}."
+        )
+
+        cursor.execute("""
+            SELECT USER_ID
+            FROM SPONSOR
+            WHERE SPONSORCOMP_ID = %s
+        """, (sponsorcomp_id,))
+        for sponsor_user in cursor.fetchall():
+            create_notification(
+                cursor,
+                sponsor_user["USER_ID"],
+                "SPONSOR_DRIVER_REMOVED",
+                "Driver removed",
+                f"{driver_name} was removed from {company_name}."
+            )
+
+        conn.commit()
+        flash(f"{driver_name} was removed from {company_name}.", "success")
+    except mysql.connector.Error:
+        conn.rollback()
+        current_app.logger.exception("Error removing driver from sponsor company")
+        flash("The driver could not be removed due to a database error.", "error")
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for("driverView"))
+
 @app.route("/assignPoints", methods=["GET", "POST"])
 def assignPoints():
     if "user_id" not in session:
