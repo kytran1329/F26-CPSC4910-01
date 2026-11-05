@@ -518,3 +518,8 @@ footer {
         padding: 15px;
     }
 }
+
+.apply-section + hr {
+    margin-top: 30px;
+    margin-bottom: 30px;
+}
