@@ -1038,6 +1038,65 @@ def sponDash():
         points_this_month=points_this_month
     )
 
+@app.route("/sponDash/drivers")
+def driverView():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    role = session.get("role")
+    if role == "Sponsor":
+        sponsor_id = session["user_id"]
+        sponsor_lookup = "USER_ID"
+    elif role == "Admin":
+        sponsor_id = session.get("view_as_sponsor_id")
+        if sponsor_id is None:
+            return redirect(url_for("adminDash"))
+        sponsor_lookup = "SPONSOR_ID"
+    else:
+        return "Unauthorized", 403
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute(f"""
+            SELECT SPONSORCOMP_ID
+            FROM SPONSOR
+            WHERE {sponsor_lookup} = %s
+        """, (sponsor_id,))
+        sponsor = cursor.fetchone()
+
+        if sponsor is None:
+            return "Sponsor account not found", 404
+
+        cursor.execute("""
+            SELECT DISTINCT
+                d.DRIVER_ID,
+                u.USER_ID,
+                u.USER_FNAME,
+                u.USER_LNAME,
+                u.EMAIL,
+                b.BALANCE
+            FROM BALANCE AS b
+            JOIN DRIVER AS d
+                ON d.DRIVER_ID = b.DRIVER_ID
+            JOIN `USER` AS u
+                ON u.USER_ID = d.USER_ID
+            WHERE b.SPONSORCOMP_ID = %s
+            ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
+        """, (sponsor["SPONSORCOMP_ID"],))
+        drivers = cursor.fetchall()
+
+        return render_template("driverView.html", drivers=drivers)
+    finally:
+        cursor.close()
+        conn.close()
+
 @app.route("/assignPoints", methods=["GET", "POST"])
 def assignPoints():
     if "user_id" not in session:
