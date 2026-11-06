@@ -573,7 +573,7 @@ def cart():
 
     return render_template(
         "cart.html",
-        cart_items=cart_items, total=total, balance=balance/rate,
+        cart_items=cart_items, total=total, balance=balance,
         remaining=balance - total, over_budget=total > balance,
         companies=companies, comp_id=comp_id, error=error
     )
