@@ -258,6 +258,44 @@
                     </div>
                 </form>
             </div>
+            {% if not is_admin %}
+            <div class="bulk-points-section">
+                <h2>Point Conversion Rate</h2>
+
+                <p>
+                    Set how many points equal a dollar amount for your sponsor company.
+                    Catalog prices shown to your drivers are converted with this rate.
+                    Current rate: <strong>${{ '%g'|format(rate_dollars) }} = {{ '%g'|format(rate_points) }} points</strong>.
+                </p>
+
+                <form method="POST" action="{{ url_for('assignPoints') }}">
+                    <input type="hidden" name="rate_action" value="save_rate">
+
+                    <div class="bulk-form-fields">
+                        <div>
+                            <label for="rate-dollars">Dollars ($)</label>
+                            <input type="number" id="rate-dollars" name="rate_dollars"
+                                min="0.01" step="0.01" required
+                                value="{{ '%g'|format(rate_dollars) }}">
+                        </div>
+
+                        <div>
+                            <label for="rate-points">Points</label>
+                            <input type="number" id="rate-points" name="rate_points"
+                                min="1" step="1" required
+                                value="{{ '%g'|format(rate_points) }}">
+                        </div>
+                    </div>
+
+                    <div class="bulk-buttons">
+                        <button type="submit" class="add-button"
+                                onclick="return confirm('Change the conversion rate? This changes the point cost of every catalog item for all of your drivers.');">
+                            Save Rate
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
         </section>
     </main>
 

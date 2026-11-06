@@ -12,7 +12,7 @@ import os
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from export import export
 from catalog import cat
@@ -1484,6 +1484,71 @@ def assignPoints():
 
     try:
         if request.method == "POST":
+
+            # Save the point-to-dollar conversion rate (sponsors only)
+            if request.form.get("rate_action") == "save_rate":
+                if is_admin:
+                    flash("Only sponsors can change the conversion rate.", "error")
+                    return redirect(url_for(
+                        "assignPoints",
+                        sponsorcomp_id=selected_company_raw
+                    ))
+
+                try:
+                    rate_dollars = Decimal(request.form.get("rate_dollars", "").strip())
+                    rate_points = int(request.form.get("rate_points", "").strip())
+
+                    if (not rate_dollars.is_finite()
+                            or rate_dollars <= 0 or rate_dollars > 1000000
+                            or rate_points <= 0 or rate_points > 1000000):
+                        raise ValueError
+
+                    rate_dollars = rate_dollars.quantize(Decimal("0.01"))
+                    if rate_dollars <= 0:      # e.g. 0.001 rounds down to 0
+                        raise ValueError
+
+                except (InvalidOperation, ValueError):
+                    flash(
+                        "Enter a dollar amount and a whole number of points, "
+                        "both greater than zero.",
+                        "error"
+                    )
+                    return redirect(url_for(
+                        "assignPoints",
+                        sponsorcomp_id=selected_company_raw
+                    ))
+
+                # The company comes from the logged-in account, never from the form.
+                cursor.execute(
+                    "SELECT SPONSORCOMP_ID FROM SPONSOR WHERE USER_ID = %s",
+                    (actor_user_id,)
+                )
+                sponsor_row = cursor.fetchone()
+
+                if not sponsor_row:
+                    flash("Your account isn't linked to a sponsor company.", "error")
+                    return redirect(url_for(
+                        "assignPoints",
+                        sponsorcomp_id=selected_company_raw
+                    ))
+
+                cursor.execute("""
+                    UPDATE SPONSORCOMP
+                    SET SPONSORCOMP_DOLLAR = %s,
+                        SPONSORCOMP_POINT = %s
+                    WHERE SPONSORCOMP_ID = %s
+                """, (rate_dollars, rate_points, sponsor_row["SPONSORCOMP_ID"]))
+                conn.commit()
+
+                flash(
+                    f"Conversion rate saved: ${rate_dollars} = {rate_points} points.",
+                    "success"
+                )
+                return redirect(url_for(
+                    "assignPoints",
+                    sponsorcomp_id=selected_company_raw
+                ))
+
             # Bulk Add or Subtract
             bulk_action = request.form.get("bulk_action")
 
@@ -2107,13 +2172,30 @@ def assignPoints():
 
         sponsor_companies = cursor.fetchall()
 
+        # Current conversion rate (sponsors only)
+        rate_dollars, rate_points = 1, 1
+        if not is_admin:
+            cursor.execute("""
+                SELECT sc.SPONSORCOMP_DOLLAR, sc.SPONSORCOMP_POINT
+                FROM SPONSOR AS s
+                JOIN SPONSORCOMP AS sc ON sc.SPONSORCOMP_ID = s.SPONSORCOMP_ID
+                WHERE s.USER_ID = %s
+                LIMIT 1
+            """, (actor_user_id,))
+            rate_row = cursor.fetchone()
+            if rate_row and rate_row["SPONSORCOMP_DOLLAR"] and rate_row["SPONSORCOMP_POINT"]:
+                rate_dollars = float(rate_row["SPONSORCOMP_DOLLAR"])
+                rate_points = float(rate_row["SPONSORCOMP_POINT"])
+
         return render_template(
             "assignPoints.html",
             drivers=drivers,
             history_by_driver=history_by_driver,
             is_admin=is_admin,
             sponsor_companies=sponsor_companies,
-            selected_company_id=selected_company_id
+            selected_company_id=selected_company_id,
+            rate_dollars=rate_dollars,
+            rate_points=rate_points
         )
 
     except Exception:
