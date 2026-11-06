@@ -1,6 +1,6 @@
 from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, flash, current_app, abort
 from dotenv import load_dotenv
-import requests, base64, os, mysql.connector 
+import requests, base64, os, mysql.connector, math
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
 import re
@@ -289,6 +289,27 @@ def get_cart_item_ids(driver_id, comp_id):
     return [row["ITEM_ID"] for row in cursor.fetchall()]
 
 
+def get_points_per_dollar(comp_id):
+    conn = mysql.connector.connect(
+        host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME
+    )
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT SPONSORCOMP_DOLLAR, SPONSORCOMP_POINT
+            FROM SPONSORCOMP
+            WHERE SPONSORCOMP_ID = %s
+            """,
+            (comp_id,)
+        )
+        row = cursor.fetchone()
+        if row and row["SPONSORCOMP_DOLLAR"] and row["SPONSORCOMP_POINT"]:
+            return float(row["SPONSORCOMP_POINT"]) / float(row["SPONSORCOMP_DOLLAR"])
+        return 1.0      # fall back to 1 point per dollar if the rate isn't set
+    finally:
+        conn.close()
+
+
 @cat.route("/catalog", methods=["GET", "POST"])
 def catalog():
     items = []
@@ -319,6 +340,7 @@ def catalog():
     comp_id = None
     allowed_terms = []
     balance = 0.0
+    rate = 1.0
 
     if not companies:
         error = "You aren't assigned to any sponsor company yet."
@@ -333,6 +355,7 @@ def catalog():
 
         allowed_terms = get_allowed_terms(user_id, comp_id)
         balance = get_user_balance(user_id, comp_id)
+        rate = get_points_per_dollar(comp_id)
 
         if query and query.lower() not in allowed_terms:
             error = "That search isn't approved by this sponsor."
@@ -345,11 +368,17 @@ def catalog():
             query,
             limit=per_page,
             offset=offset,
-            max_price=balance
+            max_price=balance/rate
         )
 
         if data:
             items = data.get("itemSummaries", [])
+
+            for item in items:
+                price = item.get("price")
+                if price:
+                    item["points"] = math.ceil(float(price["value"]) * rate)
+
             total = int(data.get("total", 0))
 
     total_pages = max(1, (total + per_page - 1) // per_page)
@@ -501,7 +530,7 @@ def cart():
     companies = get_driver_companies(user_id)
     valid_ids = {c["SPONSORCOMP_ID"] for c in companies}
 
-    cart_items, total, balance = [], 0.0, 0.0
+    cart_items, total, balance, rate = [], 0.0, 0.0, 1.0
     comp_id, error = None, None
 
     if not driver_id or not companies:
@@ -515,6 +544,7 @@ def cart():
             comp_id = companies[0]["SPONSORCOMP_ID"]
 
         balance = get_user_balance(user_id, comp_id)
+        rate = get_points_per_dollar(comp_id)
         item_ids = get_cart_item_ids(driver_id, comp_id)
 
         token = get_access_token() if item_ids else None
@@ -536,14 +566,14 @@ def cart():
                 "title": d.get("title", "Item unavailable"),
                 "image": (d.get("image") or {}).get("imageUrl"),
                 "url": d.get("itemWebUrl"),
-                "points": float(price["value"]) if price else None,
+                "points": math.ceil(float(price["value"]) * rate) if price else None,
             })
 
         total = sum(i["points"] for i in cart_items if i["points"] is not None)
 
     return render_template(
         "cart.html",
-        cart_items=cart_items, total=total, balance=balance,
+        cart_items=cart_items, total=total, balance=balance/rate,
         remaining=balance - total, over_budget=total > balance,
         companies=companies, comp_id=comp_id, error=error
     )
