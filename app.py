@@ -118,6 +118,7 @@ def driverDash():
                         ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                     WHERE d.DRIVER_ID = %s
                       AND s.USER_ID = %s
+                      AND b.IS_ACTIVE = 1
                 """, (driver_id, session["user_id"]))
             else:
                 # Admins can view any existing driver.
@@ -168,7 +169,8 @@ def driverDash():
                         on d.DRIVER_ID = b.DRIVER_ID 
                     join `USER` as u
                         on u.USER_ID = d.USER_ID
-                    where d.USER_ID  = %s""", (user_id,))
+                    where d.USER_ID  = %s
+                    and b.IS_ACTIVE = 1""", (user_id,))
         
         drive_info = cursor.fetchone()
         if drive_info is None:
@@ -427,7 +429,7 @@ def bulk_update_applications():
                 # Check whether this driver already has a balance
                 # for this sponsor company
                 cursor.execute("""
-                    SELECT DRIVER_ID
+                    SELECT DRIVER_ID, IS_ACTIVE
                     FROM BALANCE
                     WHERE DRIVER_ID = %s
                     AND SPONSORCOMP_ID = %s
@@ -436,16 +438,22 @@ def bulk_update_applications():
                 balance_record = cursor.fetchone()
 
                 # Create an initial zero balance only if needed
-                if not balance_record:
+                if balance_record:
+                    # reactivate the existing affiliation
+                    if not balance_record["IS_ACTIVE"]:
+                        cursor.execute("""
+                            UPDATE BALANCE
+                            SET IS_ACTIVE = 1
+                            WHERE DRIVER_ID = %s
+                              AND SPONSORCOMP_ID = %s
+                        """, (driver_id, sponsorcomp_id))
+                else:
+                    # create new affiliation
                     cursor.execute("""
                         INSERT INTO BALANCE
-                            (DRIVER_ID, SPONSORCOMP_ID, BALANCE)
-                        VALUES (%s, %s, %s)
-                    """, (
-                        driver_id,
-                        sponsorcomp_id,
-                        0
-                    ))
+                            (DRIVER_ID, SPONSORCOMP_ID, BALANCE, IS_ACTIVE)
+                        VALUES (%s, %s, %s, %s)
+                    """, (driver_id, sponsorcomp_id, 0, 1))
 
         else:
             # Reject applications without creating driver records
@@ -1117,6 +1125,13 @@ def sponDash():
         left join POINTCHANGES as p
             on p.USER_ID = d.USER_ID
 
+        where b.is_active = 1
+            and b.SPONSORCOMP_ID in (
+                select s.SPONSORCOMP_ID
+                from SPONSOR as s
+                where s.USER_ID = %s
+            )
+
         group by
             u.USER_ID,
             u.USER_FNAME,
@@ -1128,7 +1143,7 @@ def sponDash():
             b.BALANCE
 
         order by d.DRIVER_ID
-    """)
+    """, (sponsor_user_id,))
 
     user_info = cursor.fetchall()
     
@@ -1297,6 +1312,7 @@ def driverView():
             JOIN `USER` AS u
                 ON u.USER_ID = d.USER_ID
             WHERE b.SPONSORCOMP_ID = %s
+                AND b.IS_ACTIVE = 1
             ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
         """, (sponsor["SPONSORCOMP_ID"],))
         drivers = cursor.fetchall()
@@ -1361,6 +1377,7 @@ def fireDriver(driver_id):
                 ON u.USER_ID = d.USER_ID
             WHERE b.DRIVER_ID = %s
               AND b.SPONSORCOMP_ID = %s
+              AND b.IS_ACTIVE = 1
         """, (driver_id, sponsorcomp_id))
         driver = cursor.fetchone()
         if driver is None:
@@ -1368,9 +1385,11 @@ def fireDriver(driver_id):
             return redirect(url_for("driverView"))
 
         cursor.execute("""
-            DELETE FROM BALANCE
+            UPDATE BALANCE
+            SET IS_ACTIVE = 0
             WHERE DRIVER_ID = %s
               AND SPONSORCOMP_ID = %s
+              AND IS_ACTIVE = 1
         """, (driver_id, sponsorcomp_id))
         if cursor.rowcount != 1:
             conn.rollback()
@@ -1532,7 +1551,7 @@ def assignPoints():
                             b.SPONSORCOMP_ID,
                             b.BALANCE
                         FROM BALANCE AS b
-                        WHERE 1 = 1
+                        WHERE b.IS_ACTIVE = 1
                     """ + company_condition + """
                         FOR UPDATE
                     """, tuple(company_params))
@@ -1571,7 +1590,7 @@ def assignPoints():
                     cursor.execute("""
                         UPDATE BALANCE AS b
                         SET BALANCE = BALANCE + %s
-                        WHERE 1 = 1
+                        WHERE b.IS_ACTIVE = 1
                     """ + company_condition,
                     tuple([signed_amount] + company_params))
 
@@ -1772,6 +1791,7 @@ def assignPoints():
                 FROM BALANCE AS b
                 WHERE b.DRIVER_ID = %s
                   AND b.SPONSORCOMP_ID = %s
+                  AND b.IS_ACTIVE = 1
                   AND (
                       %s = 1
                       OR EXISTS (
@@ -1825,6 +1845,7 @@ def assignPoints():
                 SET BALANCE = %s
                 WHERE DRIVER_ID = %s
                   AND SPONSORCOMP_ID = %s
+                  AND IS_ACTIVE = 1
             """, (
                 new_balance,
                 driver_id,
@@ -1985,13 +2006,14 @@ def assignPoints():
                     ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC
                     LIMIT 1
                 )
+            WHERE b.IS_ACTIVE = 1
         """
 
         if is_admin:
             if selected_company_id is not None:
                 cursor.execute(
                     driver_query + """
-                        WHERE b.SPONSORCOMP_ID = %s
+                        AND b.SPONSORCOMP_ID = %s
                         ORDER BY u.USER_LNAME, u.USER_FNAME, d.DRIVER_ID
                     """,
                     (selected_company_id,)
@@ -2005,7 +2027,7 @@ def assignPoints():
         else:
             cursor.execute(
                 driver_query + """
-                    WHERE EXISTS (
+                    AND EXISTS (
                         SELECT 1
                         FROM SPONSOR AS s
                         WHERE s.USER_ID = %s
@@ -2338,10 +2360,11 @@ def adminReports():
                     ON d.DRIVER_ID = o.DRIVER_ID
                 JOIN BALANCE AS b
                     ON d.DRIVER_ID = b.DRIVER_ID
+                    AND b.SPONSORCOMP_ID = %s
+                    AND b.IS_ACTIVE = 1
                 JOIN ITEMIZEDORDER AS io
                     ON io.ORDER_ID = o.ORDER_ID
-                WHERE b.SPONSORCOMP_ID = %s
-                    AND LOWER(o.ORDER_STATUS) = 'done'
+                WHERE LOWER(o.ORDER_STATUS) = 'done'
                     AND o.ORDER_DTS >= %s
                     AND o.ORDER_DTS < DATE_ADD(%s, INTERVAL 1 DAY)
                 ORDER BY o.DRIVER_ID, o.ORDER_ID, io.ITEMIZED_ID
@@ -2714,6 +2737,7 @@ def sponsorAudit():
             JOIN BALANCE b
                 ON b.DRIVER_ID = d.DRIVER_ID
             WHERE b.SPONSORCOMP_ID = %s
+                AND b.IS_ACTIVE = 1
             ORDER BY u.EMAIL
         """, (sponsorcomp_id,))
 
@@ -2757,6 +2781,7 @@ def viewAsDriver(driver_id):
                     ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
                 WHERE b.DRIVER_ID = %s
                   AND s.USER_ID = %s
+                  AND b.IS_ACTIVE = 1
             """, (driver_id, session["user_id"]))
         else:
             # Admins can view any existing driver.
@@ -3306,6 +3331,7 @@ def bulkUpload():
                         FROM BALANCE
                         WHERE DRIVER_ID = %s
                         AND SPONSORCOMP_ID = %s
+                        AND IS_ACTIVE = 1
                     """, (driver_id, organization_id))
 
                     balance_record = cursor.fetchone()
@@ -3316,10 +3342,11 @@ def bulkUpload():
                             INSERT INTO BALANCE (
                                 DRIVER_ID,
                                 SPONSORCOMP_ID,
-                                BALANCE
+                                BALANCE,
+                                IS_ACTIVE
                             )
-                            VALUES (%s, %s, %s)
-                        """, (driver_id, organization_id, 0))
+                            VALUES (%s, %s, %s, %s)
+                        """, (driver_id, organization_id, 0, 1))
 
                         balance_id = cursor.lastrowid
 
@@ -3344,6 +3371,7 @@ def bulkUpload():
                             UPDATE BALANCE
                             SET BALANCE = BALANCE + %s
                             WHERE BALANCE_ID = %s
+                                AND IS_ACTIVE = 1
                         """, (points, balance_id))
 
                         cursor.execute("""

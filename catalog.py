@@ -184,7 +184,7 @@ def get_user_balance(user_id, comp_id):
         SELECT b.BALANCE
         FROM DRIVER d
         JOIN BALANCE b ON d.DRIVER_ID = b.DRIVER_ID
-        WHERE d.USER_ID = %s AND b.SPONSORCOMP_ID = %s
+        WHERE d.USER_ID = %s AND b.SPONSORCOMP_ID = %s AND b.IS_ACTIVE = 1
         """,
         (user_id, comp_id)
     )
@@ -208,7 +208,7 @@ def get_driver_companies(user_id):
         FROM DRIVER d
         JOIN BALANCE b ON b.DRIVER_ID = d.DRIVER_ID
         JOIN SPONSORCOMP sc ON sc.SPONSORCOMP_ID = b.SPONSORCOMP_ID
-        WHERE d.USER_ID = %s
+        WHERE d.USER_ID = %s AND b.IS_ACTIVE = 1
         ORDER BY sc.SPONSORCOMP_NAME
         """,
         (user_id,)
@@ -230,7 +230,7 @@ def get_allowed_terms(user_id, comp_id):
         FROM DRIVER d
         JOIN BALANCE b ON b.DRIVER_ID = d.DRIVER_ID
         JOIN SPONSORORDERS so ON so.SPONSORCOMP_ID = b.SPONSORCOMP_ID
-        WHERE d.USER_ID = %s AND b.SPONSORCOMP_ID = %s
+        WHERE d.USER_ID = %s AND b.SPONSORCOMP_ID = %s AND b.IS_ACTIVE = 1
         ORDER BY so.`QUERY`
         """,
         (user_id, comp_id)
