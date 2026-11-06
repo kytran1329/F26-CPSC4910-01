@@ -15,6 +15,29 @@ NOTIFICATION_TYPES = {
     "ADMIN_DRIVER_REMOVED": "Driver removal alerts",
 }
 
+ROLE_NOTIFICATION_TYPES = {
+    "Driver": [
+        "POINTS_GAINED",
+        "POINTS_LOST",
+        "APPLICATION_ACCEPTED",
+        "APPLICATION_REJECTED",
+        "DRIVER_SPONSOR_ADDED",
+        "DRIVER_SPONSOR_REMOVED"
+    ],
+    "Sponsor": [
+        "SPONSOR_NEW_APPLICATION",
+        "SPONSOR_DRIVER_ADDED",
+        "SPONSOR_DRIVER_REMOVED",
+        "SPONSOR_POINT_CHANGE"
+    ],
+    "Admin": [
+        "ADMIN_NEW_APPLICATION",
+        "ADMIN_APPLICATION_ACCEPTED",
+        "ADMIN_DRIVER_REMOVED",
+        "ADMIN_POINT_CHANGE"
+    ]
+}
+
 def create_notification (
     cursor,
     user_id,
