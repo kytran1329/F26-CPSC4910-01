@@ -12,6 +12,7 @@ NOTIFICATION_TYPES = {
     "APPLICATION_ACCEPTED": "Application accepted",
     "APPLICATION_REJECTED": "Application rejected",
     "ADMIN_APPLICATION_ACCEPTED": "Driver application acceptance alerts",
+    "ADMIN_DRIVER_REMOVED": "Driver removal alerts",
 }
 
 def create_notification (

@@ -1402,6 +1402,21 @@ def fireDriver(driver_id):
                 f"{driver_name} was removed from {company_name}."
             )
 
+        # notify admin of driver removal
+        cursor.execute("""
+            SELECT USER_ID
+            FROM USER
+            WHERE ROLE = 'Admin'
+        """)
+        for admin_user in cursor.fetchall():
+            create_notification(
+                cursor,
+                admin_user["USER_ID"],
+                "ADMIN_DRIVER_REMOVED",
+                "Driver removed from sponsor company",
+                f"{driver_name} was removed from {company_name}."
+            )
+
         conn.commit()
         flash(f"{driver_name} was removed from {company_name}.", "success")
     except mysql.connector.Error:
