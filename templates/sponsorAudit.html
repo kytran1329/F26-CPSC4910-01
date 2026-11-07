@@ -9,6 +9,7 @@
 
     <link rel="stylesheet"href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet"href="{{ url_for('static', filename='adminDash.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 
     <style>
         .report-container[hidden],
@@ -42,6 +43,12 @@
                 <a href="{{ url_for('assignPoints') }}" class="nav-link">Assign Points</a>
                 <a href="{{ url_for('sponsorAudit') }}" class="nav-link">Audit Logs</a>
                 <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+                <a href="{{ url_for('notifications') }}" class="notification-button">
+                    🔔 Notifications
+                    <span class="notification-badge">
+                        {{ unread_notification_count | default(0) }}
+                    </span>
+                </a>
                 <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
             </div>
 
