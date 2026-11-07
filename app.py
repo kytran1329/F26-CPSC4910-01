@@ -17,7 +17,7 @@ from decimal import Decimal, InvalidOperation
 from export import export
 from catalog import cat
 from auth import auth
-from notifications import create_notification, NOTIFICATION_TYPES
+from notifications import create_notification, NOTIFICATION_TYPES, ROLE_NOTIFICATION_TYPES
 from bulk_upload import validate_bulk_upload
 
 load_dotenv()
@@ -3034,6 +3034,19 @@ def notification_settings():
         return redirect(url_for("auth.login"))
 
     user_id = session["user_id"]
+    role = session.get("role")
+
+    # only get notification types that apply to the user's role
+    allowed_types = ROLE_NOTIFICATION_TYPES.get(role)
+    if allowed_types is None:
+        return "Unauthorized", 403
+
+    # filter the full notification dictionary by the user's role
+    user_notification_types = {
+        notification_type: label
+        for notification_type, label in NOTIFICATION_TYPES.items()
+        if notification_type in allowed_types
+    }
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -3045,7 +3058,7 @@ def notification_settings():
     
     try:
         if request.method == "POST":
-            for notification_type in NOTIFICATION_TYPES:
+            for notification_type in user_notification_types:
                 is_enabled = (
                     1 if request.form.get(notification_type) == "1"
                     else 0
@@ -3079,12 +3092,12 @@ def notification_settings():
         # without saved preferences all notifs enabled
         settings = {
             notification_type: saved_settings.get(notification_type, True)
-            for notification_type in NOTIFICATION_TYPES
+            for notification_type in user_notification_types
         }
 
         return render_template(
             "notification_settings.html",
-            notification_types=NOTIFICATION_TYPES,
+            notification_types=user_notification_types,
             settings=settings
         )
 
@@ -3120,7 +3133,7 @@ def inject_unread_notification_count():
         result = cursor.fetchone()
 
         return {
-            "unread_notification_count": result["unread_count"]
+            "unread_notification_count": int(result["unread_count"])
         }
     
     finally:
