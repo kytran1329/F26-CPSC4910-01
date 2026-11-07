@@ -157,6 +157,12 @@
             </option>
         {% endfor %}
     </select>
+    <label for="sort">Sort by:</label>
+    <select id="sort" name="sort" onchange="this.form.submit()">
+        <option value="default" {% if sort == 'default' %}selected{% endif %}>Original order</option>
+        <option value="low"     {% if sort == 'low' %}selected{% endif %}>Points: low to high</option>
+        <option value="high"    {% if sort == 'high' %}selected{% endif %}>Points: high to low</option>
+    </select>
 
 </form>
 
@@ -246,6 +252,7 @@
                         <input type="hidden" name="query" value="{{ query }}">
                         <input type="hidden" name="per_page" value="{{ per_page }}">
                         <input type="hidden" name="page" value="{{ page }}">
+                        <input type="hidden" name="sort" value="{{ sort }}">
                         <button type="submit">Add to Cart</button>
                     </form>
 
@@ -257,13 +264,7 @@
             <div class="pagination">
 
                 {% if page > 1 %}
-                    <a href="{{ url_for(
-                        'cat.catalog',
-                        query=query,
-                        per_page=per_page,
-                        page=page - 1,
-                        comp_id=comp_id
-                    ) }}">
+                    <a href="{{ url_for('cat.catalog', query=query, per_page=per_page, page=page - 1, comp_id=comp_id, sort=sort) }}">
                         &laquo; Previous
                     </a>
                 {% else %}
@@ -277,13 +278,7 @@
                 </span>
 
                 {% if page < total_pages %}
-                    <a href="{{ url_for(
-                        'cat.catalog',
-                        query=query,
-                        per_page=per_page,
-                        page=page + 1,
-                        comp_id=comp_id
-                    ) }}">
+                    <a href="{{ url_for('cat.catalog', query=query, per_page=per_page, page=page - 1, comp_id=comp_id, sort=sort) }}">
                         Next &raquo;
                     </a>
                 {% else %}

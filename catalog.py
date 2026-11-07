@@ -13,6 +13,8 @@ DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_NAME = os.getenv("DB_NAME")
 
+SORT_OPTIONS = {"low": "price", "high": "-price"}   # "default" = no sort param
+
 cat = Blueprint("cat", __name__)
 
 CLIENT_ID = os.getenv("EBAY_CLIENT_ID")
@@ -122,7 +124,7 @@ def availability_text(avail):
 
 # This is used to actually query for ebay items/data
 # It will return items in form of json
-def search_ebay(query, limit=10, offset=0, max_price=None):
+def search_ebay(query, limit=10, offset=0, max_price=None, sort=None):
     access_token = get_access_token()
 
     if not access_token:
@@ -138,6 +140,9 @@ def search_ebay(query, limit=10, offset=0, max_price=None):
 
     if max_price is not None:
         params["filter"] = f"price:[..{max_price:.2f}],priceCurrency:USD"
+
+    if sort:
+        params["sort"] = sort
 
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -331,6 +336,10 @@ def catalog():
     if per_page not in (10, 25, 50):
         per_page = 10
 
+    sort = source.get("sort", "default")
+    if sort not in ("default", "low", "high"):
+        sort = "default"
+
     page = max(1, int(page))
 
     # Companies this driver can choose from
@@ -368,7 +377,8 @@ def catalog():
             query,
             limit=per_page,
             offset=offset,
-            max_price=balance/rate
+            max_price=balance/rate,
+            sort=SORT_OPTIONS.get(sort)
         )
 
         if data:
@@ -489,7 +499,8 @@ def cart_add():
         query=request.form.get("query", ""),
         per_page=request.form.get("per_page", 10),
         page=request.form.get("page", 1),
-        comp_id=comp_id
+        comp_id=comp_id,
+        sort=request.form.get("sort", "default")
     ))
 
 
