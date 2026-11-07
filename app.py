@@ -3133,7 +3133,7 @@ def inject_unread_notification_count():
         result = cursor.fetchone()
 
         return {
-            "unread_notification_count": result["unread_count"]
+            "unread_notification_count": int(result["unread_count"])
         }
     
     finally:

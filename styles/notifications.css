@@ -51,6 +51,54 @@ header {
     text-decoration: underline;
 }
 
+/* notification button and unread count */
+a.notification-button,
+a.notification-button:link,
+a.notification-button:visited {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+
+    background-color: #1f2937;
+    color: #ffffff !important;
+
+    text-decoration: none !important;
+    font-weight: bold;
+
+    border: none;
+    border-radius: 8px;
+
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+a.notification-button:hover,
+a.notification-button:active {
+    background-color: #374151;
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
+.notification-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 23px;
+    height: 23px;
+    padding: 0 6px;
+
+    background-color: #dc2626 !important;
+    color: #ffffff !important;
+
+    border-radius: 50%;
+
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+}
+
 /* Main content */
 main {
     max-width: 1000px;
@@ -217,7 +265,7 @@ main {
     cursor: pointer;
 }
 
-.setting-buttons {
+.settings-buttons {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
@@ -250,6 +298,10 @@ footer {
 
     .dashboard-name {
         font-size: 1.6rem;
+    }
+
+    .header-links {
+        gap: 12px;
     }
 
     main {
