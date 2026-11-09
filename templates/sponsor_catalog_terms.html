@@ -1,26 +1,137 @@
-<h1>Allowed Catalog Searches</h1>
+<!DOCTYPE html>
+<html lang="en">
 
-{% if message %}<p class="error">{{ message }}</p>{% endif %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catalog Items</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='driverDash.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+</head>
 
-<form method="POST">
-    <input type="hidden" name="action" value="add">
-    <input type="text" name="term" placeholder="e.g. headphones" maxlength="100" required>
-    <button type="submit">Add</button>
-</form>
+<body>
+    <!-- header (same as the sponsor dashboard) -->
+    <header>
+        <div class="header-content">
+            <div class="dashboard-name">
+                Sponsor Dashboard
+            </div>
+            <div class="tagline">
+                Good Driving. Better Rewards.
+            </div>
+            {% if session.get("view_as_sponsor_id") is not none %}
+                <form action="{{ url_for('stopViewingAsSponsor') }}" method="POST"
+                    style="display: inline;">
+                    <button type="submit" class="return-dashboard-button">
+                        Return to Admin Dashboard
+                    </button>
+                </form>
+            {% endif %}
+            <div class="header-links">
+                <a href="{{ url_for('sponDash') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('cat.sponsor_catalog_items') }}" class="nav-link">Catalog Items</a>
+                <a href="{{ url_for('applications') }}" class="nav-link">Applications</a>
+                <a href="{{ url_for('driverView') }}" class="nav-link">Drivers</a>
+                <a href="{{ url_for('assignPoints') }}" class="nav-link">Assign Points</a>
+                <a href="{{ url_for('sponsorAudit') }}" class="nav-link">Audit Logs</a>
+                <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+                <a href="{{ url_for('notifications') }}" class="notification-button">
+                    🔔 Notifications
+                    <span class="notification-badge">
+                        {{ unread_notification_count | default(0) }}
+                    </span>
+                </a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
+            </div>
+        </div>
+    </header>
+    <main>
+        <div class="dashboard-card">
+            {% if message %}
+                <div class="notice error" role="status">
+                    {{ message }}
+                </div>
+            {% endif %}
+            <!-- Term Count -->
+            <div class="points-box">
 
-{% if terms %}
-<ul>
-    {% for term in terms %}
-    <li>
-        {{ term }}
-        <form method="POST" style="display:inline">
-            <input type="hidden" name="action" value="delete">
-            <input type="hidden" name="term" value="{{ term }}">
-            <button type="submit">Remove</button>
-        </form>
-    </li>
-    {% endfor %}
-</ul>
-{% else %}
-<p>No terms yet. Your drivers won't be able to search until you add some.</p>
-{% endif %}
+                <div class="points-label">
+                    Approved Search Terms
+                </div>
+                <div class="points-value">
+                    {{ terms | length }}
+                </div>
+            </div>
+            <!-- Add a term -->
+            <div class="history-section">
+                <div class="bulk-upload-header">
+                    <h2>Add a Search Term</h2>
+                    <p>
+                        Your drivers can only search the catalog for the terms listed
+                        below. Terms are shared by everyone in your sponsor company.
+                    </p>
+                </div>
+                <form method="POST" class="date-filter">
+                    <input type="hidden" name="action" value="add">
+                    <div class="filter-field">
+                        <label for="term">New search term</label>
+                        <input type="text" id="term" name="term"
+                            placeholder="e.g. headphones"
+                            maxlength="100" required>
+                    </div>
+                    <button type="submit">Add Term</button>
+                </form>
+            </div>
+            <!-- Current terms -->
+            <div class="history-section">
+                <h2>Approved Search Terms</h2>
+                <div class="table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Search Term</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for term in terms %}
+                            <tr>
+                                <td>
+                                    {{ term }}
+                                </td>
+                                <td class="actions-cell">
+                                    <form method="POST"
+                                          data-term="{{ term }}"
+                                          onsubmit="return confirm('Remove &quot;' + this.dataset.term + '&quot;? Your drivers will no longer be able to search for it.');">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="term" value="{{ term }}">
+                                        <button type="submit" class="fire-driver-btn"
+                                                style="margin-top: 0;">
+                                            Remove
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="2">
+                                    No terms yet. Your drivers can't search the catalog
+                                    until you add at least one.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Home -->
+            <a href="/home" class="back-link">
+                Back to Home
+            </a>
+        </div>
+    </main>
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+    </footer>
+</body>
+</html>
