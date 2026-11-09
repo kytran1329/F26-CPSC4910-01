@@ -1,0 +1,182 @@
+/* Catalog + cart extras. Load AFTER driverDash.css (it reuses that file's colors and base classes). */
+
+/* Section heading with an action on the right (e.g. "View Cart") */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.section-header h2 {
+    margin-bottom: 0;
+}
+
+/* Filter bar: driverDash.css styles the inputs, this adds the dropdowns */
+.filter-field select {
+    padding: 9px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background: white;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.empty-note {
+    color: #6b7280;
+    margin: 15px 0;
+}
+
+/* Product grid */
+.products {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.product {
+    display: flex;
+    flex-direction: column;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 18px;
+}
+
+.product img {
+    width: 100%;
+    height: 180px;
+    object-fit: contain;
+    background: white;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.product h3 {
+    font-size: 1rem;
+    color: #111827;
+    margin-bottom: 8px;
+}
+
+.product .price {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #1f2937;
+}
+
+.product .condition {
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.product .availability {
+    color: #15803d;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.product .description {
+    color: #4b5563;
+    font-size: 0.9rem;
+    margin-top: 6px;
+}
+
+.ebay-link {
+    display: inline-block;
+    margin-top: 10px;
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.ebay-link:hover {
+    text-decoration: underline;
+}
+
+/* Pins the Add to Cart button to the bottom so cards line up */
+.product form {
+    margin-top: auto;
+    padding-top: 14px;
+}
+
+.product .view-driver-btn {
+    width: 100%;
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin: 30px 0 10px;
+    color: #4b5563;
+}
+
+.pagination a {
+    padding: 10px 16px;
+    background-color: #1f2937;
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 6px;
+}
+
+.pagination a:hover {
+    background-color: #374151;
+}
+
+.pagination .disabled {
+    padding: 10px 16px;
+    color: #9ca3af;
+    background-color: #e5e7eb;
+    border-radius: 6px;
+}
+
+/* Cart */
+.cart-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+}
+
+.history-table td {
+    vertical-align: middle;
+}
+
+.history-table td a {
+    color: #2563eb;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.history-table td a:hover {
+    text-decoration: underline;
+}
+
+.table-container .fire-driver-btn {
+    margin-top: 0;
+}
+
+.cart-summary {
+    margin-top: 25px;
+}
+
+.over {
+    color: #b91c1c;
+    font-weight: bold;
+}
+
+.bulk-upload-button:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+@media (max-width: 650px) {
+    .date-filter {
+        align-items: stretch;
+    }
+}
