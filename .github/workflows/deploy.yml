@@ -23,15 +23,27 @@ jobs:
             git fetch
             git pull origin main
 
-            echo "Activating virtual environment..."
-            source .venv/bin/activate
-
             echo "Stopping existing Gunicorn process..."
-            pkill -f '[g]unicorn.*app:app' || true
 
-            sleep 2
+            if [ -f /home/ec2-user/gunicorn.pid ]; then
+              PID=$(cat /home/ec2-user/gunicorn.pid)
+
+              if kill -0 "$PID" 2>/dev/null; then
+                kill -TERM "$PID"
+
+                for i in $(seq 1 10); do
+                  if ! kill -0 "$PID" 2>/dev/null; then
+                    break
+                  fi
+                  sleep 1
+                done
+              fi
+
+              rm -f /home/ec2-user/gunicorn.pid
+            fi
 
             echo "Starting Gunicorn..."
+
             .venv/bin/gunicorn \
               --bind 127.0.0.1:8000 \
               --access-logfile /home/ec2-user/gunicorn-access.log \
