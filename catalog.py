@@ -582,9 +582,174 @@ def cart():
 
         total = sum(i["points"] for i in cart_items if i["points"] is not None)
 
+    has_unavailable = any(i["points"] is None for i in cart_items)
+
     return render_template(
         "cart.html",
-        cart_items=cart_items, total=total, balance=balance,
-        remaining=balance - total, over_budget=total > balance,
-        companies=companies, comp_id=comp_id, error=error
+        cart_items=cart_items, 
+        total=total, 
+        balance=balance,
+        remaining=balance - total, 
+        over_budget=total > balance,
+        companies=companies, 
+        comp_id=comp_id, 
+        error=error,
+        has_unavailable=has_unavailable
     )
+
+
+@cat.route("/cart/checkout", methods=["POST"])
+def cart_checkout():
+    user_id = session.get("user_id")
+    if not user_id:
+        abort(403)
+
+    driver_id = get_driver_id(user_id)
+    try:
+        comp_id = int(request.form.get("comp_id", ""))
+    except ValueError:
+        abort(400)
+
+    valid_ids = {c["SPONSORCOMP_ID"] for c in get_driver_companies(user_id)}
+    if not driver_id or comp_id not in valid_ids:
+        abort(400)
+
+    cart_url = url_for("cat.cart", comp_id=comp_id)
+
+    # Price everything from live eBay data (before taking the DB lock)
+    item_ids = get_cart_item_ids(driver_id, comp_id)
+    if not item_ids:
+        flash("Your cart is empty.", "error")
+        return redirect(cart_url)
+
+    token = get_access_token()
+    if not token:
+        flash("Couldn't reach eBay to confirm prices. Please try again shortly.", "error")
+        return redirect(cart_url)
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        details_list = list(pool.map(lambda i: get_item_details(i, token), item_ids))
+
+    rate = get_points_per_dollar(comp_id)
+    lines = []
+    for item_id, d in zip(item_ids, details_list):
+        d = d or {}
+        price = d.get("price")
+        avail = (d.get("estimatedAvailabilities") or [{}])[0]
+
+        if (not price or price.get("currency") != "USD"
+                or avail.get("estimatedAvailabilityStatus") == "OUT_OF_STOCK"):
+            flash("One or more items in your cart are no longer available. "
+                  "Remove them and try again.", "error")
+            return redirect(cart_url)
+
+        lines.append({
+            "item_id": item_id,                                   # used only to clear the cart
+            "title": d.get("title", "")[:255],                    # -> ITEM_NAME
+            "desc": clean_description(d, max_length=250),         # -> ITEM_DESC
+            "points": math.ceil(float(price["value"]) * rate),    # -> ITEM_PRICE
+        })
+
+    total = sum(l["points"] for l in lines)
+
+    # Reject if the price changed since the driver last looked at the cart
+    try:
+        expected = int(float(request.form.get("expected_total", "")))
+    except ValueError:
+        expected = None
+    if expected != total:
+        flash("Prices changed since you last viewed your cart. "
+              "Please review the new total.", "error")
+        return redirect(cart_url)
+
+    # Do the purchase as one transaction 
+    conn = mysql.connector.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password= DB_PASSWORD,
+                database= DB_NAME
+        )
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Lock this driver's balance row so two purchases can't spend the same points
+        cursor.execute("""
+            SELECT BALANCE_ID, BALANCE
+            FROM BALANCE
+            WHERE DRIVER_ID = %s AND SPONSORCOMP_ID = %s AND IS_ACTIVE = 1
+            FOR UPDATE
+            """,
+            (driver_id, comp_id)
+        )
+        bal = cursor.fetchone()
+
+        if not bal:
+            conn.rollback()
+            flash("No active balance was found for this sponsor.", "error")
+            return redirect(cart_url)
+
+        balance = float(bal["BALANCE"] or 0)
+        if total > balance:
+            conn.rollback()
+            flash(f"Not enough points: your cart costs {total} and you have {balance:g}.", "error")
+            return redirect(cart_url)
+
+        # Remove from cart first. If a duplicate request already bought these,
+        # nothing gets deleted and we stop instead of charging twice.
+        for l in lines:
+            cursor.execute("""
+                DELETE FROM CART_ITEM
+                WHERE DRIVER_ID = %s AND SPONSORCOMP_ID = %s AND ITEM_ID = %s
+                """,
+                (driver_id, comp_id, l["item_id"])
+            )
+            if cursor.rowcount != 1:
+                conn.rollback()
+                flash("Your cart changed while checking out. Please review it and try again.", "error")
+                return redirect(cart_url)
+
+        # Order header
+        cursor.execute("""
+            INSERT INTO ORDERS
+                (USER_ID, DRIVER_ID, SPONSORCOMP_ID, ORDER_DTS, POINT_TOTAL, ORDER_STATUS)
+            VALUES (%s, %s, %s, NOW(), %s, 'Active')
+            """,
+            (user_id, driver_id, comp_id, total)
+        )
+        order_id = cursor.lastrowid
+
+        # Order lines (quantity is always 1 per cart item)
+        cursor.executemany("""
+            INSERT INTO ITEMIZEDORDER
+                (ORDER_ID, ITEM_NAME, ITEM_DESC, ITEM_AMOUNT, ITEM_PRICE)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            [(order_id, l["title"], l["desc"], 1, l["points"]) for l in lines]
+        )
+
+        # Deduct the points
+        cursor.execute(
+            "UPDATE BALANCE SET BALANCE = BALANCE - %s WHERE BALANCE_ID = %s",
+            (total, bal["BALANCE_ID"])
+        )
+
+        # Log it like any other point change so history and audits stay complete
+        cursor.execute("""
+            INSERT INTO POINTCHANGES
+                (BALANCE_ID, DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON, USER_ID)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (bal["BALANCE_ID"], driver_id, -total, f"Purchase (order #{order_id})", user_id)
+        )
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+    flash(f"Order #{order_id} placed! {total} points were deducted.", "success")
+    return redirect(cart_url)

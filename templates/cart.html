@@ -11,12 +11,19 @@
         .error { background: #ffdede; padding: 15px; margin-bottom: 20px; border: 1px solid #ffaaaa; }
         .over { color: #b00020; font-weight: bold; }
         .summary { margin-top: 20px; font-size: 18px; }
+        .success { background: #def7e0; padding: 15px; margin-bottom: 20px; border: 1px solid #9bd3a1; }
     </style>
 </head>
 <body>
     <h1>Your Cart</h1>
 
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="{{ 'error' if category == 'error' else 'success' }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}  
 
     {% if companies %}
         <label for="comp_id">Sponsor:</label>
@@ -64,6 +71,18 @@
                 {% else %}
                     <p>Remaining after purchase: {{ remaining }} points</p>
                 {% endif %}
+                <form method="POST" action="{{ url_for('cat.cart_checkout') }}"
+                    onsubmit="if (!confirm('Spend {{ total }} points on these items?')) return false;
+                                this.querySelector('button').disabled = true;">
+                    <input type="hidden" name="comp_id" value="{{ comp_id }}">
+                    <input type="hidden" name="expected_total" value="{{ total }}">
+                    <button type="submit" {% if over_budget or has_unavailable %}disabled{% endif %}>
+                        Purchase
+                    </button>
+                    {% if has_unavailable %}
+                        <p class="over">Remove unavailable items to purchase.</p>
+                    {% endif %}
+                </form>
             </div>
         {% else %}
             <p>Your cart is empty.</p>
