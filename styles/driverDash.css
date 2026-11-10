@@ -555,3 +555,121 @@ footer {
     margin-top: 30px;
     margin-bottom: 30px;
 }
+
+/* Order History Tabs */
+.order-history-section {
+    margin-top: 35px;
+}
+
+.order-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.order-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 12px 20px;
+    color: #6b7280;
+    font-size: 0.95rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.order-tab:hover {
+    color: #245c43;
+}
+
+.order-tab.active {
+    color: #245c43;
+    border-bottom-color: #245c43;
+}
+
+.order-tab:focus-visible {
+    outline: 2px solid #245c43;
+    outline-offset: 3px;
+}
+
+/* Hide the inactive view */
+.order-view[hidden] {
+    display: none;
+}
+
+@media (max-width: 600px) {
+    .order-tabs {
+        gap: 0;
+    }
+
+    .order-tab {
+        flex: 1;
+        padding: 12px 10px;
+        font-size: 0.85rem;
+    }
+}
+
+/* Itemized Order Description */
+.description-cell {
+    width: 250px;
+    max-width: 250px;
+    vertical-align: top;
+}
+
+.item-description {
+    width: 100%;
+}
+
+.item-description summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.item-description summary::-webkit-details-marker {
+    display: none;
+}
+
+.description-preview {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    flex: 1;
+    line-height: 1.4;
+}
+
+.description-toggle::after {
+    content: "More";
+    color: #245c43;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.item-description[open] .description-toggle::after {
+    content: "Less";
+}
+
+.item-description[open] .description-preview {
+    display: none;
+}
+
+.description-full {
+    margin-top: 8px;
+    padding: 10px;
+    background-color: #f8fafc;
+    border-radius: 6px;
+    color: #4b5563;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.item-description:not([open]) .description-full {
+    display: none;
+}

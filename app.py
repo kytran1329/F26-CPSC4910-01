@@ -228,7 +228,7 @@ def driverDash():
         conn.close()
         #print(drive_info)
         return render_template("driverDash.html", drive_info = drive_info,
-                            history= history, order_stat = order_stat
+                            history= history, order_stat = order_stat,
                             itemized_orders = itemized_orders)
     finally: 
         cursor.close()
