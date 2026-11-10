@@ -205,11 +205,31 @@ def driverDash():
 
         order_stat = cursor.fetchall()
 
+        cursor.execute("""
+            select
+                io.ITEMIZED_ID,
+                io.ORDER_ID,
+                io.ITEM_NAME,
+                io.ITEM_DESC,
+                io.ITEM_AMOUNT,
+                io.ITEM_PRICE,
+                o.ORDER_DTS,
+                o.ORDER_STATUS
+            from ITEMIZEDORDER as io
+            join ORDERS as o
+                on io.ORDER_ID = o.ORDER_ID
+            where o.DRIVER_ID = %s
+            order by o.ORDER_DTS desc, io.ITEMIZED_ID asc
+        """, (drive_info["DRIVER_ID"],))
+
+        itemized_orders = cursor.fetchall()
+
         cursor.close()
         conn.close()
         #print(drive_info)
         return render_template("driverDash.html", drive_info = drive_info,
-                            history= history, order_stat = order_stat)
+                            history= history, order_stat = order_stat,
+                            itemized_orders = itemized_orders)
     finally: 
         cursor.close()
         conn.close()

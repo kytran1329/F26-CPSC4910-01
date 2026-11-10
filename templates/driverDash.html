@@ -199,71 +199,143 @@
             </div>
 
             <!-- Order History -->
-            <div class="history-section">
+            <div class="history-section order-history-section">
 
                 <h2>Order History</h2>
 
-                <div class="table-container">
+                <!-- Order History Tabs -->
+                <div class="order-tabs">
+                    <button type="button"
+                            class="order-tab active"
+                            id="orders-tab"
+                            onclick="showOrderView('orders')">
+                        Orders View
+                    </button>
 
-                    <table class="history-table">
+                    <button type="button"
+                            class="order-tab"
+                            id="items-tab"
+                            onclick="showOrderView('items')">
+                        Itemized View
+                    </button>
+                </div>
 
-                        <thead>
-                            <tr>
-                                <th>Order ID</th>
-                                <th>Points Total</th>
-                                <th>Status</th>
-                                <th>Date & Time</th>
-                            </tr>
-                        </thead>
+                <!-- Orders View -->
+                <div id="orders-view" class="order-view">
 
+                    <div class="table-container">
+                        <table class="history-table">
 
-                        <tbody>
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Points Total</th>
+                                    <th>Status</th>
+                                    <th>Date & Time</th>
+                                </tr>
+                            </thead>
 
-                            {% for row in order_stat %}
+                            <tbody>
+                                {% for row in order_stat %}
+                                <tr>
+                                    <td>{{ row["ORDER_ID"] }}</td>
+                                    <td>{{ row["POINT_TOTAL"] }}</td>
+                                    <td>{{ row["ORDER_STATUS"] }}</td>
+                                    <td>{{ row["ORDER_DTS"] }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4">No orders found.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
 
-                            <tr>
+                        </table>
+                    </div>
 
-                                <td>
-                                    {{ row["ORDER_ID"] }}
-                                </td>
+                </div>
 
-                                <td>
-                                    {{ row["POINT_TOTAL"] }}
-                                </td>
+                <!-- Itemized View -->
+                <div id="items-view" class="order-view" hidden>
 
-                                <td>
-                                    {{ row["ORDER_STATUS"] }}
-                                </td>
-                                <td>
-                                    {{ row["ORDER_DTS"] }}
-                                </td>
+                    <div class="table-container">
+                        <table class="history-table">
 
-                            </tr>
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Item Name</th>
+                                    <th>Description</th>
+                                    <th>Quantity</th>
+                                    <th>Item Price</th>
+                                    <th>Order Date</th>
+                                </tr>
+                            </thead>
 
-                            {% endfor %}
+                            <tbody>
+                                {% for item in itemized_orders %}
+                                <tr>
+                                    <td>{{ item["ORDER_ID"] }}</td>
+                                    <td>{{ item["ITEM_NAME"] }}</td>
+                                    <td class="description-cell">
+                                        {% if item["ITEM_DESC"] %}
+                                            <details class="item-description">
+                                                <summary>
+                                                    <span class="description-preview">
+                                                        {{ item["ITEM_DESC"] }}
+                                                    </span>
+                                                    <span class="description-toggle"></span>
+                                                </summary>
 
-                        </tbody>
+                                                <div class="description-full">
+                                                    {{ item["ITEM_DESC"] }}
+                                                </div>
+                                            </details>
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item["ITEM_AMOUNT"] }}</td>
+                                    <td>{{ item["ITEM_PRICE"] }}</td>
+                                    <td>{{ item["ORDER_DTS"] }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6">No order items found.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
 
-                    </table>
+                        </table>
+                    </div>
 
                 </div>
 
             </div>
 
-
-            <!--Home button -->
-            <a href="/home" class="back-link">
-                Back to Home
-            </a>
-
-        </div>
     </main>
 
 
     <footer>
         Good (Truck) Driver Incentive Program &mdash; Fall 2026
     </footer>
+    <script>
+        function showOrderView(view) {
+            const ordersView = document.getElementById("orders-view");
+            const itemsView = document.getElementById("items-view");
 
+            const ordersTab = document.getElementById("orders-tab");
+            const itemsTab = document.getElementById("items-tab");
+
+            const showItems = view === "items";
+
+            ordersView.hidden = showItems;
+            itemsView.hidden = !showItems;
+
+            ordersTab.classList.toggle("active", !showItems);
+            itemsTab.classList.toggle("active", showItems);
+        }
+    </script>
 </body>
 
 </html>
