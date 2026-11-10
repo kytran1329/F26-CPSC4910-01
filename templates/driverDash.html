@@ -232,6 +232,7 @@
                                     <th>Points Total</th>
                                     <th>Status</th>
                                     <th>Date & Time</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
 
@@ -242,6 +243,28 @@
                                     <td>{{ row["POINT_TOTAL"] }}</td>
                                     <td>{{ row["ORDER_STATUS"] }}</td>
                                     <td>{{ row["ORDER_DTS"] }}</td>
+                                    <td>
+                                        {% if row["ORDER_STATUS"] == "Active"
+                                            and session.get("role") == "Driver"
+                                            and row["CAN_CANCEL"] %}
+
+                                            <form
+                                                action="{{ url_for('cancelOrder', order_id=row['ORDER_ID']) }}"
+                                                method="POST"
+                                            >
+                                                <button type="submit" class="cancel-order-btn">
+                                                    Cancel Order
+                                                </button>
+                                            </form>
+
+                                        {% elif row["ORDER_STATUS"] == "Cancelled" %}
+                                            Cancelled
+
+                                        {% else %}
+                                            Unavailable
+                                        {% endif %}
+                                    </td>
+
                                 </tr>
                                 {% else %}
                                 <tr>

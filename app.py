@@ -197,7 +197,11 @@ def driverDash():
                 DRIVER_ID,
                 POINT_TOTAL,
                 ORDER_STATUS,
-                ORDER_DTS
+                ORDER_DTS,
+                (ORDER_STATUS = 'Active'
+                AND NOW() < DATE_ADD(
+                    ORDER_DTS, INTERVAL 5 MINUTE)
+            ) AS CAN_CANCEL
             from ORDERS
             WHERE DRIVER_ID = %s
             order by ORDER_DTS DESC;
@@ -234,6 +238,158 @@ def driverDash():
         cursor.close()
         conn.close()
 
+
+@app.route("/cancelOrder/<int:order_id>", methods=["POST"])
+def cancelOrder(order_id):
+
+    # Only logged-in Drivers can cancel their own orders.
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    if session.get("role") != "Driver":
+        return "Unauthorized", 403
+
+    user_id = session["user_id"]
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # Lock the order to prevent two cancellation
+        # requests from refunding the same purchase.
+        cursor.execute("""
+            SELECT
+                o.ORDER_ID,
+                o.DRIVER_ID,
+                o.SPONSORCOMP_ID,
+                o.POINT_TOTAL,
+                o.ORDER_STATUS,
+                o.ORDER_DTS,
+                (NOW() < DATE_ADD(
+                    o.ORDER_DTS, INTERVAL 5 MINUTE
+                )) AS CAN_CANCEL
+            FROM ORDERS AS o
+            JOIN DRIVER AS d
+                ON d.DRIVER_ID = o.DRIVER_ID
+            WHERE o.ORDER_ID = %s
+              AND o.USER_ID = %s
+              AND d.USER_ID = %s
+            FOR UPDATE
+        """, (order_id, user_id, user_id))
+
+        order = cursor.fetchone()
+
+        if order is None:
+            conn.rollback()
+            flash("Order not found.", "error")
+            return redirect(url_for("driverDash"))
+
+        if order["ORDER_STATUS"] != "Active":
+            conn.rollback()
+            flash("This order can no longer be cancelled.", "error")
+            return redirect(url_for("driverDash"))
+
+        if not order["CAN_CANCEL"]:
+            conn.rollback()
+            flash("The 5-minute cancellation window has expired.", "error")
+            return redirect(url_for("driverDash"))
+
+        # Find the original sponsor balance, including
+        # balances that are no longer active.
+        cursor.execute("""
+            SELECT BALANCE_ID
+            FROM BALANCE
+            WHERE DRIVER_ID = %s
+              AND SPONSORCOMP_ID = %s
+            FOR UPDATE
+        """, (
+            order["DRIVER_ID"],
+            order["SPONSORCOMP_ID"]
+        ))
+
+        balance = cursor.fetchone()
+
+        if balance is None:
+            raise ValueError("The original order balance was not found.")
+
+        # Recheck the deadline at the time of the status
+        # update, not just when the request first arrived.
+        cursor.execute("""
+            UPDATE ORDERS
+            SET ORDER_STATUS = 'Cancelled'
+            WHERE ORDER_ID = %s
+              AND ORDER_STATUS = 'Active'
+              AND NOW() < DATE_ADD(
+                  ORDER_DTS, INTERVAL 5 MINUTE
+              )
+        """, (order_id,))
+
+        if cursor.rowcount != 1:
+            conn.rollback()
+            flash("The cancellation window has expired.", "error")
+            return redirect(url_for("driverDash"))
+
+        # Refund the original amount of points.
+        cursor.execute("""
+            UPDATE BALANCE
+            SET BALANCE = BALANCE + %s
+            WHERE BALANCE_ID = %s
+        """, (
+            order["POINT_TOTAL"],
+            balance["BALANCE_ID"]
+        ))
+
+        if cursor.rowcount != 1:
+            raise ValueError("The points could not be refunded.")
+
+        # Record the refund in point history.
+        cursor.execute("""
+            INSERT INTO POINTCHANGES (
+                BALANCE_ID,
+                DRIVER_ID,
+                POINTCHANGE_AMOUNT,
+                POINTCHANGE_REASON,
+                USER_ID
+            )
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            balance["BALANCE_ID"],
+            order["DRIVER_ID"],
+            order["POINT_TOTAL"],
+            f"Refund for cancelled order #{order_id}",
+            user_id
+        ))
+
+        # Save the cancellation and refund together.
+        conn.commit()
+
+        flash(
+            f"Order #{order_id} was cancelled. "
+            f"{order['POINT_TOTAL']} points were refunded.",
+            "success"
+        )
+
+    except (mysql.connector.Error, ValueError):
+        conn.rollback()
+        current_app.logger.exception(
+            "Failed to cancel order %s", order_id
+        )
+        flash(
+            "Unable to cancel the order. No refund was completed.",
+            "error"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for("driverDash"))
 
 @app.route("/sponDash/applications")
 def applications():
