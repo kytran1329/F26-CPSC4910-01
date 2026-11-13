@@ -691,3 +691,65 @@ h2 {
     align-items: center;
     gap: 10px;
 }
+
+.invoice-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+            max-width: 900px;
+        }
+
+        .invoice-form label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        .invoice-form input,
+        .invoice-form select {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 10px;
+        }
+
+        .invoice-form button,
+        .invoice-action {
+            display: inline-block;
+            padding: 10px 16px;
+            cursor: pointer;
+        }
+
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .invoice-table th,
+        .invoice-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .invoice-table th {
+            background: #f2f2f2;
+        }
+
+        .report-message {
+            margin: 12px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        .report-content[hidden] {
+            display: none;
+        }
+
+        @media print {
+            header, footer, .report-tabs, .back-link,
+            .invoice-form, .invoice-action {
+                display: none !important;
+            }
+        }
