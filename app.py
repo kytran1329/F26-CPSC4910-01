@@ -1123,7 +1123,11 @@ def updateLastName(user_id):
 @app.route("/changePassword", methods=["GET", "POST"])
 def changePassword():
 
-    user_id = USER_ID
+    # required login
+    if "user_id" not in session:
+            return redirect(url_for("login"))
+
+    user_id = session["user_id"]
 
     error = None
     success = None
@@ -1160,9 +1164,9 @@ def changePassword():
             error = "Please fill in all password fields."
 
         # verify current password against the stored hash    
-        elif not check_password_hash(
-            user["PASSWORD"],
-            current_password
+        elif not (
+            check_password_hash(user["PASSWORD"], current_password)
+            or user["PASSWORD"] == current_password
         ):
             error = "Current password is incorrect"
 
