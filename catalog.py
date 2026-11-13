@@ -1,4 +1,4 @@
-from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, flash, current_app, abort
+from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, flash, current_app, abort, g
 from dotenv import load_dotenv
 import requests, base64, os, mysql.connector, math
 from dotenv import load_dotenv
@@ -218,7 +218,13 @@ def get_driver_companies(user_id):
         """,
         (user_id,)
     )
-    return cursor.fetchall()
+    companies = cursor.fetchall()
+
+    _, comp_limit, _ = acting_context()
+    if comp_limit is not None:
+        companies = [c for c in companies if c["SPONSORCOMP_ID"] == comp_limit]
+
+    return companies
 
 
 # helper function to get the allowed search queries for a driver based on the comany they belong to
@@ -315,13 +321,67 @@ def get_points_per_dollar(comp_id):
         conn.close()
 
 
+def acting_context():
+    """
+    Returns (driver_user_id, sponsor_comp_id, is_acting).
+    - Driver:                 (own user_id, None, False)
+    - Sponsor in control:     (driver's user_id, sponsor's company id, True)
+    - Admin in control:       (driver's user_id, None, True)   # admins aren't limited to one company
+    Cached per request so it only hits the database once.
+    """
+    if hasattr(g, "acting_ctx"):
+        return g.acting_ctx
+
+    user_id = session.get("user_id")
+    role = session.get("role")
+    controlled = session.get("view_as_driver_id")
+    ctx = (user_id, None, False)
+
+    if user_id is not None and controlled is not None and role in ("Sponsor", "Admin"):
+        conn = mysql.connector.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password= DB_PASSWORD,
+                database= DB_NAME
+        )
+        try:
+            cursor = conn.cursor(dictionary=True)
+            if role == "Sponsor":
+                cursor.execute("""
+                    SELECT d.USER_ID, s.SPONSORCOMP_ID
+                    FROM DRIVER d
+                    JOIN BALANCE b ON b.DRIVER_ID = d.DRIVER_ID
+                    JOIN SPONSOR s ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                    WHERE d.DRIVER_ID = %s AND s.USER_ID = %s AND b.IS_ACTIVE = 1
+                    LIMIT 1
+                    """,
+                    (controlled, user_id)
+                )
+            else:
+                cursor.execute(
+                    "SELECT USER_ID, NULL AS SPONSORCOMP_ID FROM DRIVER WHERE DRIVER_ID = %s",
+                    (controlled,)
+                )
+            row = cursor.fetchone()
+        finally:
+            conn.close()
+        if row:
+            ctx = (row["USER_ID"], row["SPONSORCOMP_ID"], True)
+
+    g.acting_ctx = ctx
+    return ctx
+
+def acting_driver_user_id():
+    return acting_context()[0]
+
+
 @cat.route("/catalog", methods=["GET", "POST"])
 def catalog():
     items = []
     error = None
     total = 0
 
-    user_id = session.get("user_id")
+    user_id = acting_driver_user_id()
     # balance = get_user_balance(user_id)
 
     source = request.form if request.method == "POST" else request.args
@@ -464,7 +524,7 @@ def sponsor_catalog_items():
 
 @cat.route("/cart/add", methods=["POST"])
 def cart_add():
-    user_id = session.get("user_id")
+    user_id = acting_driver_user_id()
 
     driver_id = get_driver_id(user_id)
     item_id = request.form.get("item_id", "").strip()
@@ -506,7 +566,7 @@ def cart_add():
 
 @cat.route("/cart/remove", methods=["POST"])
 def cart_remove():
-    user_id = session.get("user_id")
+    user_id = acting_driver_user_id()
 
     driver_id = get_driver_id(user_id)
     item_id = request.form.get("item_id", "").strip()
@@ -535,7 +595,7 @@ def cart_remove():
 
 @cat.route("/cart")
 def cart():
-    user_id = session.get("user_id")
+    user_id = acting_driver_user_id()
 
     driver_id = get_driver_id(user_id)
     companies = get_driver_companies(user_id)
@@ -600,7 +660,9 @@ def cart():
 
 @cat.route("/cart/checkout", methods=["POST"])
 def cart_checkout():
-    user_id = session.get("user_id")
+    user_id = acting_driver_user_id()
+    actor_id = session.get("user_id")
+
     if not user_id:
         abort(403)
 
@@ -733,12 +795,16 @@ def cart_checkout():
         )
 
         # Log it like any other point change so history and audits stay complete
+        reason = f"Purchase (order #{order_id})"
+        if actor_id != user_id:
+            reason += " placed by sponsor"
+
         cursor.execute("""
             INSERT INTO POINTCHANGES
                 (BALANCE_ID, DRIVER_ID, POINTCHANGE_AMOUNT, POINTCHANGE_REASON, USER_ID)
             VALUES (%s, %s, %s, %s, %s)
             """,
-            (bal["BALANCE_ID"], driver_id, -total, f"Purchase (order #{order_id})", user_id)
+            (bal["BALANCE_ID"], driver_id, -total, reason, actor_id)
         )
 
         conn.commit()
