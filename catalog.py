@@ -781,7 +781,7 @@ def cart_checkout():
         # notify the driver who submitted the order
         create_notification(
             cursor,
-            driver_id,
+            user_id,
             "DRIVER_ORDER_PLACED",
             "Order placed",
             f"Your order #{order_id} was successfully placed."
