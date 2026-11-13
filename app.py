@@ -366,6 +366,51 @@ def cancelOrder(order_id):
             user_id
         ))
 
+        # notify the driver who submitted the cancellation
+        create_notification(
+            cursor,
+            user_id,
+            "DRIVER_ORDER_CANCELED",
+            "Order canceled",
+            f"Your order #{order_id} was successfully canceled."
+        )
+
+        # notify the sponsor associated with this company
+        cursor.execute("""
+            SELECT USER_ID
+            FROM SPONSOR
+            WHERE SPONSORCOMP_ID = %s
+        """, (order["SPONSORCOMP_ID"],))
+
+        sponsors = cursor.fetchall()
+
+        for sponsor in sponsors:
+            create_notification(
+                cursor,
+                sponsor["USER_ID"],
+                "SPONSOR_ORDER_CANCELED",
+                "Driver canceled order",
+                f"A driver canceled order #{order_id}."
+            )
+
+        # notify all admins
+        cursor.execute("""
+            SELECT USER_ID
+            FROM USER
+            WHERE ROLE = 'Admin'
+        """)
+
+        admins = cursor.fetchall()
+
+        for admin in admins:
+            create_notification(
+                cursor,
+                admin["USER_ID"],
+                "ADMIN_ORDER_CANCELED",
+                "Driver canceled order",
+                f"A driver canceled order #{order_id}."
+            )
+
         # Save the cancellation and refund together.
         conn.commit()
 
