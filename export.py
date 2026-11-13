@@ -4,6 +4,9 @@ from dotenv import load_dotenv
 import csv
 import io
 
+from datetime import date
+from decimal import Decimal
+
 from flask import Blueprint, Response, send_file, request, session, abort
 
 from pdf_utils import RoadRewardsPDF
@@ -21,6 +24,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from xml.sax.saxutils import escape
+
 load_dotenv()
 
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -31,7 +36,7 @@ DB_NAME = os.getenv("DB_NAME")
 export = Blueprint(
     "export",
     __name__,
-    url_prefix="/admin/audit"
+    url_prefix="/admin/export"
 )
 
 def getLoggedInSponsorCompanyId():
@@ -744,4 +749,334 @@ def exportSponsorPointChangesPdf():
         mimetype="application/pdf",
         as_attachment=True,
         download_name="sponsor_point_changes_audit.pdf"
+    )
+
+# Helper function to validate all filter values
+def parseOrderReportFilters(values):
+    reportType = (
+        values.get("report_type") or "summary"
+    ).strip().lower()
+
+    role = (
+        values.get("role") or "Driver"
+    ).strip().title()
+
+    if reportType not in ("summary", "detailed"):
+        raise ValueError("Invalid report type")
+
+    if role not in ("Driver", "Sponsor"):
+        raise ValueError("Invalid role")
+
+    def optionalId(name):
+        text = (values.get(name) or "").strip()
+
+        if not text:
+            return None
+
+        result = int(text)
+
+        if result <= 0:
+            raise ValueError("Invalid ID")
+
+        return result
+
+    def optionalDate(name):
+        text = (values.get(name) or "").strip()
+
+        return date.fromisoformat(text) if text else None
+
+    # Filters Dictionary
+    filters = {
+        "report_type": reportType,
+        "sponsorcomp_id": optionalId("sponsorcomp_id"),
+        "user_id": optionalId("user_id"),
+        "start_date": optionalDate("start_date"),
+        "end_date": optionalDate("end_date"),
+        "role": role
+    }
+
+    if (
+        filters["start_date"] is not None
+        and filters["end_date"] is not None
+        and filters["start_date"] > filters["end_date"]
+    ):
+        raise ValueError(
+            "End date must be on or after start date"
+        )
+
+    return filters
+
+# Retrieve Report Rows using Filters
+def getOrderReportRows(
+    report_type,
+    role,
+    sponsorcomp_id=None,
+    user_id=None,
+    start_date=None,
+    end_date=None,
+):
+
+    # Uses MySQL stored procedure names for different forms
+    procedures = {
+        "summary": "GET_ORDER_SUMMARY",
+        "detailed": "GET_ORDER_DETAILED"
+    }
+
+    if report_type not in procedures:
+        raise ValueError("Invalid report type")
+
+    if role not in ("Driver", "Sponsor"):
+        raise ValueError("Invalid role")
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.callproc(
+            procedures[report_type],
+            (
+                sponsorcomp_id,
+                user_id,
+                start_date,
+                end_date,
+                role
+            )
+        )
+
+        rows = []
+
+        for result in cursor.stored_results():
+            rows.extend(result.fetchall())
+
+        return rows
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@export.route("/orders/<report_type>/csv")
+def exportOrderReportCsv(report_type):
+    try:
+        # Retrieve arguments/filters
+        args = request.args.to_dict()
+        args["report_type"] = report_type
+
+        # Validate filters
+        filters = parseOrderReportFilters(args)
+
+    except (ValueError, TypeError):
+        abort(400, "Invalid report filters")
+
+    # Retrieve orders from the stored procedure using filter dictionary 
+    orders = getOrderReportRows(**filters)
+
+    output = io.StringIO()
+    writer = csv.writer(output) # Create CSV writer to StringIO buffer
+
+    if report_type == "summary":
+        
+        writer.writerow([
+            "Ordered By",
+            "Sponsor Company",
+            "Number of Purchases",
+            "Points Used",
+            "Total Sales"
+        ])
+
+        for order in orders:
+            writer.writerow([
+                order["ORDERED_BY_NAME"],
+                order["SPONSORCOMP_NAME"],
+                order["PURCHASE_COUNT"],
+                order["TOTAL_POINTS_USED"],
+                order["TOTAL_SALES"]
+            ])
+
+    else:
+
+        writer.writerow([
+            "Order ID",
+            "Ordered By",
+            "Receiving Driver",
+            "Sponsor Company",
+            "Date",
+            "Item",
+            "Points Used",
+            "Total Sales"
+        ])
+
+        for order in orders:
+            writer.writerow([
+                order["ORDER_ID"],
+                order["ORDERED_BY_NAME"],
+                order["DRIVER_NAME"] or "N/A",
+                order["SPONSORCOMP_NAME"],
+                order["ORDER_DTS"],
+                order["ITEM_NAME"],
+                order["POINTS_USED"]
+                    if order["POINTS_USED"] is not None
+                    else "",
+                order["LINE_TOTAL"]
+            ])
+
+    # Create HTTP response
+    response = Response(
+        output.getvalue(), # Retrieves generated CSV text
+        mimetype="text/csv" # Tell browser the content is CSV
+    )
+    # Create HTTP response header
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename="
+        f"sales_by_{filters['role'].lower()}_{report_type}.csv"
+    )
+
+    return response
+
+@export.route("/orders/<report_type>/pdf")
+def exportOrderReportPdf(report_type):
+    try:
+        # Retrieve arguments/filters
+        args = request.args.to_dict()
+        args["report_type"] = report_type
+        # Validate filters
+        filters = parseOrderReportFilters(args)
+
+    except (ValueError, TypeError):
+        abort(400, "Invalid report filters")
+
+    # Retrieve orders from the stored procedure using filter dictionary
+    orders = getOrderReportRows(**filters)
+
+    pdf_buffer = io.BytesIO() # Create PDF buffer
+
+    document = SimpleDocTemplate(
+        pdf_buffer, # buffer where completed PDF to be stored
+        pagesize=landscape(letter)
+    )
+
+    # Custom PDF styling from RoadRewards Class
+    pdf_style = RoadRewardsPDF()
+
+    elements = pdf_style.createHeader(
+        f"Sales by {filters['role']}s - {report_type.title()}",
+        len(orders)
+    )
+
+    if report_type == "summary":
+
+        data = [[
+            "Ordered By",
+            "Sponsor Company",
+            "Purchases",
+            "Points Used",
+            "Total Sales"
+        ]]
+
+        for order in orders:
+            data.append([
+                order["ORDERED_BY_NAME"],
+                order["SPONSORCOMP_NAME"],
+                str(order["PURCHASE_COUNT"]),
+                str(order["TOTAL_POINTS_USED"]),
+                str(order["TOTAL_SALES"])
+            ])
+        # Custom column sizes to fit data
+        column_proportions = [2, 2, 1, 1, 1]
+
+    else:
+
+        data = [[
+            "Order ID",
+            "Ordered By",
+            "Receiving Driver",
+            "Sponsor",
+            "Date",
+            "Item",
+            "Points Used",
+            "Sales"
+        ]]
+
+        for order in orders:
+            data.append([
+                str(order["ORDER_ID"]),
+                order["ORDERED_BY_NAME"],
+                order["DRIVER_NAME"] or "N/A",
+                order["SPONSORCOMP_NAME"],
+                str(order["ORDER_DTS"]),
+                order["ITEM_NAME"],
+                str(order["POINTS_USED"])
+                    if order["POINTS_USED"] is not None
+                    else "",
+                str(order["LINE_TOTAL"])
+            ])
+        # Custom column sizes to fit data
+        column_proportions = [
+            0.7, 1.2, 1.2, 1.2,
+            1.1, 1.5, 0.8, 0.8
+        ]
+
+    # Wrap text for detailed reports
+    # NO WRAP = OVERFLOW
+    if report_type == "detailed":
+
+        # Header styling
+        header_style = ParagraphStyle(
+            "ReportHeader",
+            fontName="Helvetica-Bold",
+            fontSize=7,
+            leading=9,
+            textColor=colors.white,
+            splitLongWords=1
+        )
+
+        # Data styling
+        cell_style = ParagraphStyle(
+            "ReportCell",
+            fontName="Helvetica",
+            fontSize=7,
+            leading=9,
+            textColor=colors.black,
+            splitLongWords=1
+        )
+
+        # Wrap header text
+        data[0] = [
+            Paragraph(escape(str(value)), header_style)
+            for value in data[0]
+        ]
+
+        # Wrap table data
+        data[1:] = [
+            [
+                Paragraph(escape(str(value)), cell_style)
+                for value in row
+            ]
+            for row in data[1:]
+        ]
+
+    table = pdf_style.createTable(
+        data,
+        column_proportions=column_proportions
+    )
+    # Adds table to the list of elements that will appear
+    elements.append(table)
+
+    document.build(elements)
+    pdf_buffer.seek(0) # reset buffer pointer/cursor to beginning
+
+    # Use Flask's built in function for sending files
+    # Unlike CSV, the PDF buffer is binary
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=(
+            f"sales_by_{filters['role'].lower()}_{report_type}.pdf"
+        )
     )
