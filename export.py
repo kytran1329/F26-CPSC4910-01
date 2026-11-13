@@ -753,13 +753,9 @@ def exportSponsorPointChangesPdf():
 
 # Helper function to validate all filter values
 def parseOrderReportFilters(values):
-    reportType = (
-        values.get("report_type") or "summary"
-    ).strip().lower()
+    reportType = (values.get("report_type") or "summary").strip().lower()
 
-    role = (
-        values.get("role") or "Driver"
-    ).strip().title()
+    role = (values.get("role") or "Driver").strip().title()
 
     if reportType not in ("summary", "detailed"):
         raise ValueError("Invalid report type")

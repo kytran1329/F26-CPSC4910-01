@@ -2749,20 +2749,14 @@ def adminReports():
         if report_generated:
             # Retrieve all variables/values from UI
             try:
-                report_filters = parseOrderReportFilters(
-                    request.args
-                )
+                report_filters = parseOrderReportFilters(request.args)
 
                 report_type = report_filters["report_type"]
                 report_role = report_filters["role"]
 
-                selected_sponsorcomp_id = (
-                    report_filters["sponsorcomp_id"]
-                )
+                selected_sponsorcomp_id = (report_filters["sponsorcomp_id"])
 
-                selected_user_id = (
-                    report_filters["user_id"]
-                )
+                selected_user_id = (report_filters["user_id"])
 
                 selected_start_date = (
                     str(report_filters["start_date"])
@@ -2776,19 +2770,12 @@ def adminReports():
                     else ""
                 )
                 # Get Report using dictionary
-                report_rows = getOrderReportRows(
-                    **report_filters
-                )
+                report_rows = getOrderReportRows(**report_filters)
 
             except (ValueError, TypeError):
-                flash(
-                    "Invalid report filters.",
-                    "error"
-                )
+                flash("Invalid report filters.","error")
 
-                return redirect(
-                    url_for("adminReports") + "#sales-drivers"
-                )
+                return redirect(url_for("adminReports") + "#sales-drivers")
 
         return render_template(
             "adminReports.html",
