@@ -30,6 +30,7 @@ NOTIFICATION_TYPES = {
     "DRIVER_ORDER_COMPLETED": "Order completed",
 
     "SPONSOR_ITEM_ADDED": "Item added to catalog",
+    "SPONSOR_ITEM_REMOVED": "Item removed from catalog",
     "SPONSOR_ORDER_PLACED": "New driver order",
     "SPONSOR_ORDER_CANCELED": "Driver canceled order",
 
@@ -59,6 +60,7 @@ ROLE_NOTIFICATION_TYPES = {
         "SPONSOR_POINT_CHANGE",
         "PROFILE_UPDATED",
         "SPONSOR_ITEM_ADDED",
+        "SPONSOR_ITEM_REMOVED",
         "SPONSOR_ORDER_PLACED",
         "SPONSOR_ORDER_CANCELED"
     ],

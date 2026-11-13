@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
 import re
 from html import unescape
+from notifications import create_notification, NOTIFICATION_TYPES, ROLE_NOTIFICATION_TYPES
 
 load_dotenv()
 
@@ -438,6 +439,15 @@ def sponsor_catalog_items():
                     """,
                     (term, comp_id, user_id, sponsor_id)
                 )
+
+                if cursor.rowcount == 1:
+                    create_notification(
+                        cursor,
+                        user_id,
+                        "SPONSOR_ITEM_ADDED",
+                        "Item added to catalog",
+                        f"You added '{term}' to your company catalog."
+                    )
                 conn.commit()
 
         elif action == "delete":
@@ -445,6 +455,15 @@ def sponsor_catalog_items():
                 "DELETE FROM SPONSORORDERS WHERE SPONSORCOMP_ID = %s AND `QUERY` = %s",
                 (comp_id, term)
             )
+
+            if cursor.rowcount == 1:
+                create_notification(
+                    cursor,
+                    user_id,
+                    "SPONSOR_ITEM_REMOVED",
+                    "Item removed from catalog",
+                    f"You removed '{term}' from your company catalog."
+                )
             conn.commit()
 
     cursor.execute(
