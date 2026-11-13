@@ -13,6 +13,7 @@ NOTIFICATION_TYPES = {
     "APPLICATION_REJECTED": "Application rejected",
     "ADMIN_APPLICATION_ACCEPTED": "Driver application acceptance alerts",
     "ADMIN_DRIVER_REMOVED": "Driver removal alerts",
+    "PROFILE_UPDATED": "Profile information updated",
 }
 
 ROLE_NOTIFICATION_TYPES = {
@@ -22,19 +23,22 @@ ROLE_NOTIFICATION_TYPES = {
         "APPLICATION_ACCEPTED",
         "APPLICATION_REJECTED",
         "DRIVER_SPONSOR_ADDED",
-        "DRIVER_SPONSOR_REMOVED"
+        "DRIVER_SPONSOR_REMOVED",
+        "PROFILE_UPDATED"
     ],
     "Sponsor": [
         "SPONSOR_NEW_APPLICATION",
         "SPONSOR_DRIVER_ADDED",
         "SPONSOR_DRIVER_REMOVED",
-        "SPONSOR_POINT_CHANGE"
+        "SPONSOR_POINT_CHANGE",
+        "PROFILE_UPDATED"
     ],
     "Admin": [
         "ADMIN_NEW_APPLICATION",
         "ADMIN_APPLICATION_ACCEPTED",
         "ADMIN_DRIVER_REMOVED",
-        "ADMIN_POINT_CHANGE"
+        "ADMIN_POINT_CHANGE",
+        "PROFILE_UPDATED"
     ]
 }
 

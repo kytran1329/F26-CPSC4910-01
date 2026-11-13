@@ -1030,6 +1030,10 @@ def userProfile(user_id):
 
 @app.route("/updateFirstName/<int:user_id>", methods=["POST"])
 def updateFirstName(user_id):
+
+    if "user_id" not in session or session["user_id"] != user_id:
+        return redirect(url_for("login"))
+
     first_name = request.form["first_name"].strip()
 
     if not first_name:
@@ -1053,18 +1057,40 @@ def updateFirstName(user_id):
         database=DB_NAME
     )
 
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
+    # get current first name
     cursor.execute(
-        """
-        UPDATE USER
-        SET USER_FNAME = %s
-        WHERE USER_ID = %s
-        """,
-        (first_name, user_id)
+        "SELECT USER_FNAME FROM USER WHERE USER_ID = %s",
+        (user_id,)
     )
+    user = cursor.fetchone()
 
-    conn.commit()
+    if user is None:
+        cursor.close()
+        conn.close()
+        return "User not found", 404
+
+    # only update and notify if the name actually changed
+    if user["USER_FNAME"] != first_name:
+        cursor.execute(
+            """
+            UPDATE USER
+            SET USER_FNAME = %s
+            WHERE USER_ID = %s
+            """,
+            (first_name, user_id)
+        )
+
+        create_notification(
+            cursor,
+            user_id,
+            "PROFILE_UPDATED",
+            "Profile Updated",
+            "Your first name has been updated."
+        )
+
+        conn.commit()
 
     cursor.close()
     conn.close()
@@ -1076,6 +1102,10 @@ def updateFirstName(user_id):
 
 @app.route("/updateLastName/<int:user_id>", methods=["POST"])
 def updateLastName(user_id):
+
+    if "user_id" not in session or session["user_id"] != user_id:
+        return redirect(url_for("login"))
+
     last_name = request.form["last_name"].strip()
 
     if not last_name:
@@ -1098,18 +1128,40 @@ def updateLastName(user_id):
         database=DB_NAME
     )
 
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
+    # get current last name
     cursor.execute(
-        """
-        UPDATE USER
-        SET USER_LNAME = %s
-        WHERE USER_ID = %s
-        """,
-        (last_name, user_id)
+        "SELECT USER_LNAME FROM USER WHERE USER_ID = %s",
+        (user_id,)
     )
+    user = cursor.fetchone()
 
-    conn.commit()
+    if user is None:
+        cursor.close()
+        conn.close()
+        return "User not found", 404
+
+    # only update and notify if the name actually changed
+    if user["USER_LNAME"] != last_name:
+        cursor.execute(
+            """
+            UPDATE USER
+            SET USER_LNAME = %s
+            WHERE USER_ID = %s
+            """,
+            (last_name, user_id)
+        )
+
+        create_notification(
+            cursor,
+            user_id,
+            "PROFILE_UPDATED",
+            "Profile Updated",
+            "Your last name has been updated."
+        )
+
+        conn.commit()
 
     cursor.close()
     conn.close()
@@ -1209,6 +1261,15 @@ def changePassword():
                     old_password_hash, 
                     new_password_hash
                 )
+            )
+
+            # create profile update notification
+            create_notification(
+                cursor,
+                user_id,
+                "PROFILE_UPDATED",
+                "Profile Updated",
+                "Your password has been updated."
             )
 
             conn.commit()
