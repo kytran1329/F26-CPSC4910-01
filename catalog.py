@@ -501,13 +501,22 @@ def cart_add():
             database= DB_NAME
     )
 
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
     cursor.execute("""
         INSERT IGNORE INTO CART_ITEM (USER_ID, DRIVER_ID, SPONSORCOMP_ID, ITEM_ID)
         VALUES (%s, %s, %s, %s)
         """,
         (user_id, driver_id, comp_id, item_id)
     )
+
+    if cursor.rowcount == 1:
+        create_notification(
+            cursor,
+            user_id,
+            "DRIVER_CART_ADDED",
+            "Item added to cart",
+            f"You added an item to your cart."
+        )
     conn.commit()
 
     # not sure if flash is working
@@ -539,7 +548,7 @@ def cart_remove():
             database= DB_NAME
     )
         
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
     # scoped to this driver, so nobody can delete someone else's cart rows
     cursor.execute("""
         DELETE FROM CART_ITEM
@@ -547,6 +556,15 @@ def cart_remove():
         """,
         (driver_id, comp_id, item_id)
     )
+
+    if cursor.rowcount == 1:
+        create_notification(
+            cursor,
+            user_id,
+            "DRIVER_CART_REMOVED",
+            "Item removed from cart",
+            f"You removed an item from your cart."
+        )
     conn.commit()
 
     return redirect(url_for("cat.cart", comp_id=comp_id))
