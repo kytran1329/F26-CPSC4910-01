@@ -14,7 +14,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-from export import export
+from export import export, parseOrderReportFilters, getOrderReportRows
 from catalog import cat
 from auth import auth
 from notifications import create_notification, NOTIFICATION_TYPES, ROLE_NOTIFICATION_TYPES
@@ -2722,12 +2722,95 @@ def adminReports():
         )
         invoices = cursor.fetchall()
         
-        return render_template(
-            "adminReports.html", 
-            sponsor_companies=sponsor_companies,
-            invoices=invoices
+        # Load drivers and sponsors for report filtering
+        cursor.callproc("GET_REPORT_USERS") # MySQL stored procedure
+
+        report_users = []
+
+        # Retrieve the result sets and add each row to list
+        for result in cursor.stored_results():
+            report_users.extend(result.fetchall())
+
+        # Default report values
+        report_type = "summary"
+        report_role = "Driver"
+        report_rows = []
+        # Since no report at default, report_generated = false
+        report_generated = (
+            request.args.get("run_report") == "1"
         )
-    
+
+        selected_sponsorcomp_id = None
+        selected_user_id = None
+        selected_start_date = ""
+        selected_end_date = ""
+
+        # Generate report if requested
+        if report_generated:
+            # Retrieve all variables/values from UI
+            try:
+                report_filters = parseOrderReportFilters(
+                    request.args
+                )
+
+                report_type = report_filters["report_type"]
+                report_role = report_filters["role"]
+
+                selected_sponsorcomp_id = (
+                    report_filters["sponsorcomp_id"]
+                )
+
+                selected_user_id = (
+                    report_filters["user_id"]
+                )
+
+                selected_start_date = (
+                    str(report_filters["start_date"])
+                    if report_filters["start_date"]
+                    else ""
+                )
+
+                selected_end_date = (
+                    str(report_filters["end_date"])
+                    if report_filters["end_date"]
+                    else ""
+                )
+                # Get Report using dictionary
+                report_rows = getOrderReportRows(
+                    **report_filters
+                )
+
+            except (ValueError, TypeError):
+                flash(
+                    "Invalid report filters.",
+                    "error"
+                )
+
+                return redirect(
+                    url_for("adminReports") + "#sales-drivers"
+                )
+
+        return render_template(
+            "adminReports.html",
+
+            # Existing invoice variables
+            sponsor_companies=sponsor_companies,
+            invoices=invoices,
+
+            # Report variables
+            report_users=report_users,
+            report_type=report_type,
+            report_role=report_role,
+            report_rows=report_rows,
+            report_generated=report_generated,
+
+            # Selected filters
+            selected_sponsorcomp_id=selected_sponsorcomp_id,
+            selected_user_id=selected_user_id,
+            selected_start_date=selected_start_date,
+            selected_end_date=selected_end_date
+        )
+
     finally:
         cursor.close()
         conn.close()
