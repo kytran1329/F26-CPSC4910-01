@@ -778,6 +778,51 @@ def cart_checkout():
             (bal["BALANCE_ID"], driver_id, -total, f"Purchase (order #{order_id})", user_id)
         )
 
+        # notify the driver who submitted the order
+        create_notification(
+            cursor,
+            driver_id,
+            "DRIVER_ORDER_PLACED",
+            "Order placed",
+            f"Your order #{order_id} was successfully placed."
+        )
+
+        # notify the sponsor associated with this company
+        cursor.execute("""
+            SELECT USER_ID
+            FROM SPONSOR
+            WHERE SPONSORCOMP_ID = %s
+        """, (comp_id,))
+
+        sponsors = cursor.fetchall()
+
+        for sponsor in sponsors:
+            create_notification(
+                cursor,
+                sponsor["USER_ID"],
+                "SPONSOR_ORDER_PLACED",
+                "New driver order",
+                f"A new order #{order_id} was placed by a driver."
+            )
+
+        # notify all admins
+        cursor.execute("""
+            SELECT USER_ID
+            FROM USER
+            WHERE ROLE = 'Admin'
+        """)
+
+        admins = cursor.fetchall()
+
+        for admin in admins:
+            create_notification(
+                cursor,
+                admin["USER_ID"],
+                "ADMIN_ORDER_PLACED",
+                "New driver order",
+                f"A new order #{order_id} was placed by a driver."
+            )
+
         conn.commit()
 
     except Exception:

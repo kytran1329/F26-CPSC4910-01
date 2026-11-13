@@ -27,7 +27,6 @@ NOTIFICATION_TYPES = {
     "DRIVER_CART_REMOVED": "Item removed from cart",
     "DRIVER_ORDER_PLACED": "Order placed",
     "DRIVER_ORDER_CANCELED": "Order canceled",
-    "DRIVER_ORDER_COMPLETED": "Order completed",
 
     "SPONSOR_ITEM_ADDED": "Item added to catalog",
     "SPONSOR_ITEM_REMOVED": "Item removed from catalog",
@@ -50,8 +49,7 @@ ROLE_NOTIFICATION_TYPES = {
         "DRIVER_CART_ADDED",
         "DRIVER_CART_REMOVED",
         "DRIVER_ORDER_PLACED",
-        "DRIVER_ORDER_CANCELED",
-        "DRIVER_ORDER_COMPLETED"
+        "DRIVER_ORDER_CANCELED"
     ],
     "Sponsor": [
         "SPONSOR_NEW_APPLICATION",
