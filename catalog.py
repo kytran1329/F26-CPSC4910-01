@@ -1,6 +1,6 @@
 from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, flash, current_app, abort, g
 from dotenv import load_dotenv
-import requests, base64, os, mysql.connector, math
+import requests, base64, os, mysql.connector, math, time
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
 import re
@@ -19,6 +19,12 @@ cat = Blueprint("cat", __name__)
 
 CLIENT_ID = os.getenv("EBAY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET")
+
+
+# Short-lived cache so browsing approved items doesn't use up eBay API calls.
+# (Per process; it resets when the app restarts. Cart and checkout never use it.)
+_ITEM_CACHE = {}
+ITEM_CACHE_SECONDS = 300
 
 # This is used to get an access token for ebay's API in order to query for items
 # Access tokens are based on your client id and client secret
@@ -124,7 +130,7 @@ def availability_text(avail):
 
 # This is used to actually query for ebay items/data
 # It will return items in form of json
-def search_ebay(query, limit=10, offset=0, max_price=None, sort=None):
+def search_ebay(query, limit=10, offset=0, max_price=None, sort=None, enrich=True):
     access_token = get_access_token()
 
     if not access_token:
@@ -159,19 +165,20 @@ def search_ebay(query, limit=10, offset=0, max_price=None, sort=None):
     data = response.json()
     items = data.get("itemSummaries", [])
 
-    with ThreadPoolExecutor(max_workers=10) as pool:
-        results = pool.map(
-            lambda item: get_item_details(item["itemId"], access_token),
-            items
-        )
-        for item, details in zip(items, results):
-            avail = None
-            if details:
-                avail_list = details.get("estimatedAvailabilities", [])
-                avail = avail_list[0] if avail_list else None
+    if enrich:
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            results = pool.map(
+                lambda item: get_item_details(item["itemId"], access_token),
+                items
+            )
+            for item, details in zip(items, results):
+                avail = None
+                if details:
+                    avail_list = details.get("estimatedAvailabilities", [])
+                    avail = avail_list[0] if avail_list else None
 
-            item["availability"] = availability_text(avail)
-            item["description"] = clean_description(details)
+                item["availability"] = availability_text(avail)
+                item["description"] = clean_description(details)
 
     return data, None
 
@@ -375,19 +382,102 @@ def acting_driver_user_id():
     return acting_context()[0]
 
 
+def get_catalog_mode(comp_id):
+    conn = mysql.connector.connect(
+            host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME
+    )
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT CATALOG_MODE FROM SPONSORCOMP WHERE SPONSORCOMP_ID = %s", (comp_id,)
+        )
+        row = cursor.fetchone()
+        return "selection" if row and row["CATALOG_MODE"] == "selection" else "query"
+    finally:
+        conn.close()
+
+
+def get_approved_item_ids(comp_id):
+    conn = mysql.connector.connect(
+            host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME
+    )
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT ITEM_ID FROM SPONSOR_APPROVED_ITEM
+            WHERE SPONSORCOMP_ID = %s
+            ORDER BY ADDED_AT, APPROVED_ID
+            """,
+            (comp_id,)
+        )
+        return [row["ITEM_ID"] for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_item_details_cached(item_id, access_token):
+    now = time.time()
+    hit = _ITEM_CACHE.get(item_id)
+    if hit and now - hit[0] < ITEM_CACHE_SECONDS:
+        return hit[1]
+    details = get_item_details(item_id, access_token)
+    if details:
+        _ITEM_CACHE[item_id] = (now, details)
+    return details
+
+
+def load_selection_items(comp_id, balance, rate, sort, page, per_page):
+    """Approved items the driver can afford, sorted and paginated. Returns (items, total, error)."""
+    item_ids = get_approved_item_ids(comp_id)
+    if not item_ids:
+        return [], 0, None
+
+    token = get_access_token()
+    if not token:
+        return [], 0, "Could not reach eBay. Please try again shortly."
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        details_list = list(pool.map(lambda i: get_item_details_cached(i, token), item_ids))
+
+    items = []
+    for d in details_list:
+        price = (d or {}).get("price")
+        if not price or price.get("currency") != "USD":
+            continue                                   # listing ended or unusable
+
+        points = math.ceil(float(price["value"]) * rate)
+        if points > balance:
+            continue                                   # driver can't afford it
+
+        avail = (d.get("estimatedAvailabilities") or [None])[0]
+        item = dict(d)                                 # same shape the template already uses
+        item["points"] = points
+        item["availability"] = availability_text(avail)
+        item["description"] = clean_description(d)
+        items.append(item)
+
+    if sort == "low":
+        items.sort(key=lambda i: i["points"])
+    elif sort == "high":
+        items.sort(key=lambda i: i["points"], reverse=True)
+
+    start = (page - 1) * per_page
+    return items[start:start + per_page], len(items), None
+
+
 @cat.route("/catalog", methods=["GET", "POST"])
 def catalog():
-    items = []
-    error = None
-    total = 0
+    items, error, total = [], None, 0
 
     user_id = acting_driver_user_id()
-    # balance = get_user_balance(user_id)
 
     source = request.form if request.method == "POST" else request.args
     page = 1 if request.method == "POST" else source.get("page", 1)
-
     query = source.get("query", "").strip()
+
+    sort = source.get("sort", "default")
+    if sort not in ("default", "low", "high"):
+        sort = "default"
 
     try:
         per_page = int(source.get("per_page", 10))
@@ -396,20 +486,17 @@ def catalog():
     if per_page not in (10, 25, 50):
         per_page = 10
 
-    sort = source.get("sort", "default")
-    if sort not in ("default", "low", "high"):
-        sort = "default"
+    try:
+        page = max(1, int(page))
+    except ValueError:
+        page = 1
 
-    page = max(1, int(page))
-
-    # Companies this driver can choose from
     companies = get_driver_companies(user_id)
     valid_ids = {c["SPONSORCOMP_ID"] for c in companies}
 
     comp_id = None
-    allowed_terms = []
-    balance = 0.0
-    rate = 1.0
+    allowed_terms, balance, rate = [], 0.0, 1.0
+    mode = "query"
 
     if not companies:
         error = "You aren't assigned to any sponsor company yet."
@@ -420,107 +507,209 @@ def catalog():
         except ValueError:
             comp_id = None
         if comp_id not in valid_ids:
-            comp_id = companies[0]["SPONSORCOMP_ID"]   # default to the first company
+            comp_id = companies[0]["SPONSORCOMP_ID"]
 
-        allowed_terms = get_allowed_terms(user_id, comp_id)
+        mode = get_catalog_mode(comp_id)
         balance = get_user_balance(user_id, comp_id)
         rate = get_points_per_dollar(comp_id)
 
-        if query and query.lower() not in allowed_terms:
-            error = "That search isn't approved by this sponsor."
-            query = ""
+        if mode == "query":
+            allowed_terms = get_allowed_terms(user_id, comp_id)
+            if query and query.lower() not in allowed_terms:
+                error = "That search isn't approved by this sponsor."
+                query = ""
+        else:
+            query = ""          # no searching in selection mode
+            items, total, error = load_selection_items(
+                comp_id, balance, rate, sort, page, per_page
+            )
 
-    # search for both POST and GET requests
+    # Query mode only: search eBay
     if query:
         offset = (page - 1) * per_page
         data, error = search_ebay(
             query,
             limit=per_page,
             offset=offset,
-            max_price=balance/rate,
+            max_price=balance / rate,
             sort=SORT_OPTIONS.get(sort)
         )
-
         if data:
             items = data.get("itemSummaries", [])
-
+            total = int(data.get("total", 0))
             for item in items:
                 price = item.get("price")
                 if price:
                     item["points"] = math.ceil(float(price["value"]) * rate)
 
-            total = int(data.get("total", 0))
-
     total_pages = max(1, (total + per_page - 1) // per_page)
 
     return render_template(
         "catalog.html",
-        items=items,
-        error=error,
-        query=query,
-        per_page=per_page,
-        page=page,
-        total=total,
-        total_pages=total_pages,
-        companies=companies,
-        comp_id=comp_id,
-        allowed_terms=allowed_terms,
-        balance=balance
+        items=items, error=error, query=query,
+        per_page=per_page, page=page, total=total, total_pages=total_pages,
+        companies=companies, comp_id=comp_id,
+        allowed_terms=allowed_terms, balance=balance,
+        sort=sort, mode=mode
     )
 
-
+SPONSOR_SEARCH_PER_PAGE = 12
 @cat.route("/catalog-items", methods=["GET", "POST"])
 def sponsor_catalog_items():
     user_id = session.get("user_id")
     sponsor_id, comp_id = get_sponsor_info(user_id)
+    if not sponsor_id:
+        abort(403)                    # only users with a SPONSOR row get past here
 
-    message = None
-    conn = mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password= DB_PASSWORD,
-        database= DB_NAME
-    )
-    cursor = conn.cursor(dictionary=True)
+    mode = get_catalog_mode(comp_id)
 
+    # ---------- changes (POST) ----------
     if request.method == "POST":
-        action = request.form.get("action")
-        term = request.form.get("term", "").strip().lower()
+        action = request.form.get("action", "")
+        q = request.form.get("q", "").strip()
+        page = request.form.get("page", "1")
 
-        if action == "add":
-            if not term or len(term) > 100:
-                message = "Enter a term up to 100 characters."
-            else:
-                cursor.execute("""
-                    INSERT IGNORE INTO SPONSORORDERS
-                        (`QUERY`, SPONSORCOMP_ID, USER_ID, SPONSOR_ID)
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (term, comp_id, user_id, sponsor_id)
+        conn = mysql.connector.connect(
+            host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME
+        )
+        try:
+            cursor = conn.cursor()
+
+            if action == "set_mode":
+                new_mode = request.form.get("mode")
+                if new_mode in ("query", "selection"):
+                    cursor.execute(
+                        "UPDATE SPONSORCOMP SET CATALOG_MODE = %s WHERE SPONSORCOMP_ID = %s",
+                        (new_mode, comp_id)
+                    )
+                    conn.commit()
+                    flash(f"Catalog mode changed to {new_mode} mode.", "success")
+                else:
+                    flash("Choose a valid catalog mode.", "error")
+
+            elif action == "add" and mode == "query":
+                term = request.form.get("term", "").strip().lower()
+                if not term or len(term) > 100:
+                    flash("Enter a term up to 100 characters.", "error")
+                else:
+                    cursor.execute("""
+                        INSERT IGNORE INTO SPONSORORDERS
+                            (`QUERY`, SPONSORCOMP_ID, USER_ID, SPONSOR_ID)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (term, comp_id, user_id, sponsor_id)
+                    )
+                    conn.commit()
+
+            elif action == "delete" and mode == "query":
+                term = request.form.get("term", "").strip().lower()
+                cursor.execute(
+                    "DELETE FROM SPONSORORDERS WHERE SPONSORCOMP_ID = %s AND `QUERY` = %s",
+                    (comp_id, term)
                 )
                 conn.commit()
 
-        elif action == "delete":
-            cursor.execute(
-                "DELETE FROM SPONSORORDERS WHERE SPONSORCOMP_ID = %s AND `QUERY` = %s",
-                (comp_id, term)
-            )
-            conn.commit()
+            elif action in ("approve", "unapprove") and mode == "selection":
+                item_id = request.form.get("item_id", "").strip()
+                if not re.fullmatch(r"v1\|\d+\|\d+", item_id):
+                    flash("That isn't a valid item.", "error")
+                elif action == "approve":
+                    cursor.execute("""
+                        INSERT IGNORE INTO SPONSOR_APPROVED_ITEM
+                            (SPONSORCOMP_ID, ITEM_ID, USER_ID, SPONSOR_ID)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (comp_id, item_id, user_id, sponsor_id)
+                    )
+                    conn.commit()
+                else:
+                    cursor.execute(
+                        "DELETE FROM SPONSOR_APPROVED_ITEM WHERE SPONSORCOMP_ID = %s AND ITEM_ID = %s",
+                        (comp_id, item_id)
+                    )
+                    conn.commit()
 
-    cursor.execute(
-        "SELECT `QUERY` FROM SPONSORORDERS WHERE SPONSORCOMP_ID = %s ORDER BY `QUERY`",
-        (comp_id,)
-    )
-    terms = [row["QUERY"] for row in cursor.fetchall()]
-    cursor.close()
-    conn.close()
+            else:
+                flash("That action isn't available in the current catalog mode.", "error")
+
+        finally:
+            conn.close()
+
+        # Redirect so a refresh doesn't resubmit, and keep the sponsor on the same search page
+        return redirect(url_for("cat.sponsor_catalog_items", q=q, page=page))
+
+    # ---------- display (GET) ----------
+    q = request.args.get("q", "").strip()
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
+
+    error, terms, approved_items, search_items, total = None, [], [], [], 0
+
+    if mode == "query":
+        conn = mysql.connector.connect(
+            host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME
+        )
+        try:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT `QUERY` FROM SPONSORORDERS WHERE SPONSORCOMP_ID = %s ORDER BY `QUERY`",
+                (comp_id,)
+            )
+            terms = [row["QUERY"] for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    else:
+        rate = get_points_per_dollar(comp_id)
+        approved_ids = get_approved_item_ids(comp_id)
+        approved_set = set(approved_ids)
+        token = get_access_token()
+
+        # The items drivers can currently buy
+        if approved_ids and token:
+            with ThreadPoolExecutor(max_workers=10) as pool:
+                details = list(pool.map(lambda i: get_item_details_cached(i, token), approved_ids))
+        else:
+            details = [None] * len(approved_ids)
+
+        for item_id, d in zip(approved_ids, details):
+            d = d or {}
+            price = d.get("price")
+            approved_items.append({
+                "item_id": item_id,
+                "title": d.get("title", "Listing no longer available"),
+                "image": (d.get("image") or {}).get("imageUrl"),
+                "url": d.get("itemWebUrl"),
+                "points": math.ceil(float(price["value"]) * rate) if price else None,
+            })
+
+        # The sponsor's eBay search
+        if q:
+            data, error = search_ebay(
+                q,
+                limit=SPONSOR_SEARCH_PER_PAGE,
+                offset=(page - 1) * SPONSOR_SEARCH_PER_PAGE,
+                enrich=False
+            )
+            if data:
+                search_items = data.get("itemSummaries", [])
+                total = int(data.get("total", 0))
+                for it in search_items:
+                    price = it.get("price")
+                    if price:
+                        it["points"] = math.ceil(float(price["value"]) * rate)
+                    it["approved"] = it["itemId"] in approved_set
+
+    total_pages = max(1, math.ceil(total / SPONSOR_SEARCH_PER_PAGE))
 
     return render_template(
-        "sponsor_catalog_terms.html", 
-        terms=terms, 
-        message=message
+        "sponsor_catalog_terms.html",
+        mode=mode, terms=terms, approved_items=approved_items,
+        search_items=search_items, q=q, page=page,
+        total=total, total_pages=total_pages, error=error
     )
-
 
 @cat.route("/cart/add", methods=["POST"])
 def cart_add():
@@ -534,6 +723,10 @@ def cart_add():
     valid_ids = {c["SPONSORCOMP_ID"] for c in get_driver_companies(user_id)}
     if not driver_id or comp_id not in valid_ids or not item_id or len(item_id) > 100:
         abort(400)
+
+    if get_catalog_mode(comp_id) == "selection" and item_id not in get_approved_item_ids(comp_id):
+        flash("That item isn't available from this sponsor.", "error")
+        return redirect(url_for("cat.catalog", comp_id=comp_id))
 
     conn = mysql.connector.connect(
             host=DB_HOST,

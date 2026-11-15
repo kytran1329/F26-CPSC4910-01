@@ -85,6 +85,7 @@
                                 {% endfor %}
                             </select>
                         </div>
+                        {% if mode == 'query' %}
                         <div class="filter-field">
                             <label for="query">Category</label>
                             <select id="query" name="query">
@@ -96,6 +97,7 @@
                                 {% endfor %}
                             </select>
                         </div>
+                        {% endif %}
                         <div class="filter-field">
                             <label for="per_page">Items per page</label>
                             <select id="per_page" name="per_page">
@@ -114,9 +116,9 @@
                                 <option value="high"    {% if sort == 'high' %}selected{% endif %}>Points: high to low</option>
                             </select>
                         </div>
-                        <button type="submit">Search</button>
+                        <button type="submit">{{ 'Search' if mode == 'query' else 'Apply' }}</button>
                     </form>
-                    {% if not allowed_terms %}
+                    {% if mode == 'query' and not allowed_terms %}
                         <p class="empty-note">This sponsor hasn't approved any searches yet.</p>
                     {% endif %}
                 </div>
@@ -125,7 +127,7 @@
                 {% if items %}
                     <div class="history-section">
                         <h2>
-                            Results for "{{ query }}"
+                            {% if mode == 'query' %}Results for "{{ query }}"{% else %}Available Items{% endif %}
                         </h2>
                         <div class="products">
                             {% for item in items %}
@@ -181,7 +183,7 @@
                             {% endfor %}
                         </div>
 
-                        {% if query %}
+                        {% if query or mode == 'selection' %}
                         <div class="pagination">
                             {% if page > 1 %}
                                 <a href="{{ url_for('cat.catalog', query=query, per_page=per_page, page=page - 1, comp_id=comp_id, sort=sort) }}">
@@ -205,7 +207,7 @@
                         </div>
                         {% endif %}
                     </div>
-                {% elif query and not items and not error %}
+                {% elif (query or mode == 'selection') and not items and not error %}
                     <p class="empty-note">No results found for "{{ query }}".</p>
                 {% endif %}
             {% endif %}
