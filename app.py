@@ -1035,15 +1035,65 @@ def driverApplications():
         success=success
     )
 
+def can_manage_user(cursor, current_user_id, target_user_id):
+
+    # users can update own info
+    if current_user_id == target_user_id:
+        return True
+
+    # get current user role
+    cursor.execute(
+        "SELECT ROLE FROM USER WHERE USER_ID = %s",
+        (current_user_id,)
+    )
+    current_user = cursor.fetchone()
+
+    if current_user is None:
+        return False
+
+    role = current_user["ROLE"]
+
+    # admins can update own + sponsors + drivers
+    if role == "Admin":
+        cursor.execute(
+            "SELECT ROLE FROM USER WHERE USER_ID = %s",
+            (target_user_id,)
+        )
+        target_user = cursor.fetchone()
+
+        return (
+            target_user is not None
+            and target_user["ROLE"] in ("Sponsor", "Driver")
+        )
+
+    # sponsor can update own + driver
+    if role == "Sponsor":
+        cursor.execute("""
+            SELECT 1
+            FROM SPONSOR s
+            JOIN BALANCE b
+                ON s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+            JOIN DRIVER d
+                ON b.DRIVER_ID = d.DRIVER_ID
+            WHERE s.USER_ID = %s
+              AND d.USER_ID = %s
+              AND b.IS_ACTIVE = 1
+            LIMIT 1
+            """,
+            (current_user_id, target_user_id)
+        )
+
+        return cursor.fetchone() is not None
+
+    return False
+
 @app.route("/userProfile/<int:user_id>")
 def userProfile(user_id):
-    # user_id = USER_ID
 
     current_user_id = session.get("user_id")
 
     if current_user_id is None:
-        user_id = USER_ID
-        # return redirect(url_for("login"))
+        return redirect(url_for("login"))
 
     error = request.args.get("error")
     success = request.args.get("success")
@@ -1056,6 +1106,13 @@ def userProfile(user_id):
     )
 
     cursor = conn.cursor(dictionary=True)
+
+    # check whether the current user can access the profile
+    if not can_manage_user(cursor, current_user_id, user_id):
+        cursor.close()
+        conn.close()
+        return "Access denied", 403
+
     cursor.execute(
         "SELECT * FROM USER WHERE USER_ID = %s",
         (user_id,)
@@ -1065,6 +1122,9 @@ def userProfile(user_id):
 
     cursor.close()
     conn.close()
+
+    if user is None:
+        return "User not found", 404
 
     return render_template(
         "userProfile.html", 
@@ -1076,10 +1136,12 @@ def userProfile(user_id):
 @app.route("/updateFirstName/<int:user_id>", methods=["POST"])
 def updateFirstName(user_id):
 
-    if "user_id" not in session or session["user_id"] != user_id:
+    current_user_id = session.get("user_id")
+
+    if current_user_id is None:
         return redirect(url_for("login"))
 
-    first_name = request.form["first_name"].strip()
+    first_name = request.form.get("first_name", "").strip()
 
     if not first_name:
         return redirect(url_for(
@@ -1088,7 +1150,7 @@ def updateFirstName(user_id):
             error="First name cannot be empty."
             ))
 
-    if not first_name.isalpha():
+    if not first_name.replace("-", "").replace("'", "").replace(" ", "").isalpha():
         return redirect(url_for(
             "userProfile", 
             user_id=user_id, 
@@ -1103,6 +1165,12 @@ def updateFirstName(user_id):
     )
 
     cursor = conn.cursor(dictionary=True)
+
+    # check permissions
+    if not can_manage_user(cursor, current_user_id, user_id):
+        cursor.close()
+        conn.close()
+        return "Unauthorized", 403
 
     # get current first name
     cursor.execute(
@@ -1148,10 +1216,12 @@ def updateFirstName(user_id):
 @app.route("/updateLastName/<int:user_id>", methods=["POST"])
 def updateLastName(user_id):
 
-    if "user_id" not in session or session["user_id"] != user_id:
+    current_user_id = session.get("user_id")
+    
+    if current_user_id is None:
         return redirect(url_for("login"))
 
-    last_name = request.form["last_name"].strip()
+    last_name = request.form.get("last_name", "").strip()
 
     if not last_name:
         return redirect(url_for(
@@ -1160,7 +1230,7 @@ def updateLastName(user_id):
                 error="Last name cannot be empty."
             ))
 
-    if not last_name.isalpha():
+    if not last_name.replace("-", "").replace("'", "").replace(" ", "").isalpha():
         return redirect(url_for(
             "userProfile",
             user_id=user_id,
@@ -1174,6 +1244,12 @@ def updateLastName(user_id):
     )
 
     cursor = conn.cursor(dictionary=True)
+
+    # check permissions
+    if not can_manage_user(cursor, current_user_id, user_id):
+        cursor.close()
+        conn.close()
+        return "Unauthorized", 403
 
     # get current last name
     cursor.execute(
