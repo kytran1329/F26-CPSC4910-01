@@ -182,11 +182,16 @@ def driverDash():
                 pc.POINTCHANGE_ID,
                 pc.POINTCHANGE_AMOUNT,
                 pc.POINTCHANGE_REASON,
-                pc.DTS
+                pc.DTS,
+                sc.SPONSORCOMP_NAME
             from POINTCHANGES as pc
-            where pc.USER_ID =  %s
+            left join BALANCE as b
+                on pc.BALANCE_ID = b.BALANCE_ID
+            left join SPONSORCOMP as sc
+                on b.SPONSORCOMP_ID = sc.SPONSORCOMP_ID
+            where pc.DRIVER_ID =  %s
             order by pc.DTS desc;
-                """, (user_id,))
+                """, (drive_info["DRIVER_ID"],))
 
         history = cursor.fetchall()
 
