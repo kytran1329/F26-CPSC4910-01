@@ -65,6 +65,40 @@
 
     <!-- Main Content -->
     <main>
+        <!-- Sponsor Company Selector -->
+        <div class="company-selector-section">
+
+            <form action="{{ url_for('driverDash') }}" method="GET">
+
+                <label for="company_id">
+                    Select Sponsor Company
+                </label>
+
+                <select
+                    id="company_id"
+                    name="company_id"
+                    onchange="this.form.submit()"
+                >
+
+                    {% for company in driver_balances %}
+
+                        <option
+                            value="{{ company['SPONSORCOMP_ID'] }}"
+                            {% if company['SPONSORCOMP_ID'] == selected_company_id %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ company["SPONSORCOMP_NAME"] }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </form>
+
+        </div>
+
 
         <div class="dashboard-card">
             {% for company in driver_balances %}
@@ -72,11 +106,11 @@
             <div class="points-box">
 
                 <div class="points-label">
-                    {{ company["SPONSORCOMP_NAME"] }}
+                    {{ selected_company["SPONSORCOMP_NAME"] }} Points
                 </div>
 
                 <div class="points-value">
-                    {{ company["BALANCE"] }}
+                    {{ selected_company["BALANCE"] }}
                 </div>
 
             </div>

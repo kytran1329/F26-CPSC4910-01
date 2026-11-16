@@ -748,3 +748,40 @@ footer {
 .order-history-scroll::-webkit-scrollbar-thumb:hover {
     background-color: #6b7280;
 }
+
+/* Sponsor Company Selector */
+
+.company-selector-section {
+    margin-bottom: 24px;
+    padding: 20px;
+    background-color: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.company-selector-section form {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.company-selector-section label {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.company-selector-section select {
+    min-width: 220px;
+    padding: 10px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background-color: white;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.company-selector-section select:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}

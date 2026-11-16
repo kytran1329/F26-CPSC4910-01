@@ -170,21 +170,76 @@ def driverDash():
         
         drive_info = cursor.fetchone()
 
-        cursor.execute("""
-                        SELECT
-                            b.BALANCE_ID,
-                            b.SPONSORCOMP_ID,
-                            sc.SPONSORCOMP_NAME,
-                            b.BALANCE
-                        FROM BALANCE AS b
-                        JOIN SPONSORCOMP AS sc
-                            ON sc.SPONSORCOMP_ID = b.SPONSORCOMP_ID
-                        WHERE b.DRIVER_ID = %s
-                        AND b.IS_ACTIVE = 1
-                        ORDER BY sc.SPONSORCOMP_NAME
-                    """, (drive_info["DRIVER_ID"],))
+        company_query = """
+            SELECT
+                b.BALANCE_ID,
+                b.SPONSORCOMP_ID,
+                sc.SPONSORCOMP_NAME,
+                b.BALANCE
+            FROM BALANCE AS b
+            JOIN SPONSORCOMP AS sc
+                ON sc.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+            WHERE b.DRIVER_ID = %s
+            AND b.IS_ACTIVE = 1
+        """
+
+        company_params = [drive_info["DRIVER_ID"]]
+
+        # Sponsors may only view their own company's balance
+        if session.get("role") == "Sponsor":
+            company_query += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM SPONSOR AS s
+                    WHERE s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                    AND s.USER_ID = %s
+                )
+            """
+            company_params.append(session["user_id"])
+
+        company_query += " ORDER BY sc.SPONSORCOMP_NAME"
+
+        cursor.execute(company_query, tuple(company_params))
 
         driver_balances = cursor.fetchall()
+
+        #select company
+        selection_key = f"selected_company_{drive_info['DRIVER_ID']}"
+
+        # company dropdown
+        requested_company = request.args.get("company_id")
+
+        #companies this Driver is allowed to access
+        allowed_companies = {
+            company["SPONSORCOMP_ID"]: company
+            for company in driver_balances
+        }
+
+        if not allowed_companies:
+            return "No active Sponsor companies found", 404
+
+        if requested_company is not None:
+            try:
+                requested_company_id = int(requested_company)
+            except (ValueError, TypeError):
+                return "Invalid Sponsor company", 400
+
+            if requested_company_id not in allowed_companies:
+                return "Unauthorized Sponsor company", 403
+
+            session[selection_key] = requested_company_id
+
+        selected_company_id = session.get(selection_key)
+
+        # Auto select the first company if needed
+        if selected_company_id not in allowed_companies:
+            selected_company_id = driver_balances[0]["SPONSORCOMP_ID"]
+            session[selection_key] = selected_company_id
+
+        selected_company = allowed_companies[selected_company_id]
+
+        drive_info["BALANCE"] = selected_company["BALANCE"]
+
 
         if drive_info is None:
             return driverApplications()
@@ -203,8 +258,9 @@ def driverDash():
             left join SPONSORCOMP as sc
                 on b.SPONSORCOMP_ID = sc.SPONSORCOMP_ID
             where pc.DRIVER_ID =  %s
+                and b.SPONSORCOMP_ID = %s
             order by pc.DTS desc;
-                """, (drive_info["DRIVER_ID"],))
+                """, (drive_info["DRIVER_ID"], selected_company_id))
 
         history = cursor.fetchall()
 
@@ -222,8 +278,9 @@ def driverDash():
             ) AS CAN_CANCEL
             from ORDERS
             WHERE DRIVER_ID = %s
+                AND SPONSORCOMP_ID = %s
             order by ORDER_DTS DESC;
-                """, (drive_info["DRIVER_ID"],))
+                """, (drive_info["DRIVER_ID"], selected_company_id))
 
         order_stat = cursor.fetchall()
 
@@ -241,8 +298,9 @@ def driverDash():
             join ORDERS as o
                 on io.ORDER_ID = o.ORDER_ID
             where o.DRIVER_ID = %s
+                and o.SPONSORCOMP_ID = %s
             order by o.ORDER_DTS desc, io.ITEMIZED_ID asc
-        """, (drive_info["DRIVER_ID"],))
+        """, (drive_info["DRIVER_ID"], selected_company_id))
 
         itemized_orders = cursor.fetchall()
 
@@ -252,7 +310,9 @@ def driverDash():
         return render_template("driverDash.html", drive_info = drive_info,
                             history= history, order_stat = order_stat,
                             itemized_orders = itemized_orders,
-                            driver_balances = driver_balances)
+                            driver_balances = driver_balances,
+                            selected_company=selected_company,
+                            selected_company_id=selected_company_id)
     finally: 
         cursor.close()
         conn.close()
