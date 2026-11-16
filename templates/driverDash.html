@@ -67,19 +67,22 @@
     <main>
 
         <div class="dashboard-card">
-
+            {% for company in driver_balances %}
             <!-- Point Total -->
             <div class="points-box">
 
                 <div class="points-label">
-                    Point Total
+                    {{ company["SPONSORCOMP_NAME"] }}
                 </div>
 
                 <div class="points-value">
-                    {{ drive_info["BALANCE"] }}
+                    {{ company["BALANCE"] }}
                 </div>
 
             </div>
+            {% else %}
+                <p>No active Sponsor balances found.</p>
+            {% endfor %}
 
 
             <!-- Driver Information -->

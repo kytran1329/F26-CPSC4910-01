@@ -162,17 +162,30 @@ def driverDash():
                         u.USER_FNAME,
                         u.USER_LNAME,
                         u.ROLE,
-                        u.EMAIL,
-                        b.BALANCE
-                    from BALANCE as b
-                    join DRIVER as d
-                        on d.DRIVER_ID = b.DRIVER_ID 
+                        u.EMAIL
+                    from DRIVER as d
                     join `USER` as u
                         on u.USER_ID = d.USER_ID
-                    where d.USER_ID  = %s
-                    and b.IS_ACTIVE = 1""", (user_id,))
+                    WHERE d.USER_ID = %s""", (user_id,))
         
         drive_info = cursor.fetchone()
+
+        cursor.execute("""
+                        SELECT
+                            b.BALANCE_ID,
+                            b.SPONSORCOMP_ID,
+                            sc.SPONSORCOMP_NAME,
+                            b.BALANCE
+                        FROM BALANCE AS b
+                        JOIN SPONSORCOMP AS sc
+                            ON sc.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                        WHERE b.DRIVER_ID = %s
+                        AND b.IS_ACTIVE = 1
+                        ORDER BY sc.SPONSORCOMP_NAME
+                    """, (drive_info["DRIVER_ID"],))
+
+        driver_balances = cursor.fetchall()
+
         if drive_info is None:
             return driverApplications()
         
@@ -238,7 +251,8 @@ def driverDash():
         #print(drive_info)
         return render_template("driverDash.html", drive_info = drive_info,
                             history= history, order_stat = order_stat,
-                            itemized_orders = itemized_orders)
+                            itemized_orders = itemized_orders,
+                            driver_balances = driver_balances)
     finally: 
         cursor.close()
         conn.close()
