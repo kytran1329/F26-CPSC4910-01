@@ -25,6 +25,8 @@
 
             <div class="header-links">
 
+                <a href="{{ url_for('driverDash') }}" class="nav-link">Dashboard</a>
+
                 <a href="{{ url_for('driverApplications') }}" class="nav-link">Applications</a>
 
                 <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>

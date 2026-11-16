@@ -44,6 +44,8 @@
 
             <div class="header-links">
 
+                <a href="{{ url_for('driverDash') }}" class="nav-link">Dashboard</a>
+                
                 <a href="{{ url_for('driverApplications') }}" class="nav-link">Applications</a>
 
                 <a href="{{ url_for('cat.catalog') }}" class="nav-link">Catalog</a>
@@ -65,22 +67,54 @@
 
     <!-- Main Content -->
     <main>
+        <!-- Sponsor Company Selector -->
+        <div class="company-selector-section">
+
+            <form action="{{ url_for('driverDash') }}" method="GET">
+
+                <label for="company_id">
+                    Select Sponsor Company
+                </label>
+
+                <select
+                    id="company_id"
+                    name="company_id"
+                    onchange="this.form.submit()"
+                >
+
+                    {% for company in driver_balances %}
+
+                        <option
+                            value="{{ company['SPONSORCOMP_ID'] }}"
+                            {% if company['SPONSORCOMP_ID'] == selected_company_id %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ company["SPONSORCOMP_NAME"] }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </form>
+
+        </div>
+
 
         <div class="dashboard-card">
-
             <!-- Point Total -->
             <div class="points-box">
 
                 <div class="points-label">
-                    Point Total
+                    {{ selected_company["SPONSORCOMP_NAME"] }} Points
                 </div>
 
                 <div class="points-value">
-                    {{ drive_info["BALANCE"] }}
+                    {{ selected_company["BALANCE"] }}
                 </div>
 
             </div>
-
 
             <!-- Driver Information -->
             <h2>Driver Information</h2>
@@ -133,11 +167,11 @@
                 <div class="info-box">
 
                     <div class="info-label">
-                        Current Balance
+                        Total Balance
                     </div>
 
                     <div class="info-value">
-                        {{ drive_info["BALANCE"] }} points
+                        {{ total_balance }} points
                     </div>
 
                 </div>
