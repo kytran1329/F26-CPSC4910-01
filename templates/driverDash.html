@@ -44,6 +44,8 @@
 
             <div class="header-links">
 
+                <a href="{{ url_for('driverDash') }}" class="nav-link">Dashboard</a>
+                
                 <a href="{{ url_for('driverApplications') }}" class="nav-link">Applications</a>
 
                 <a href="{{ url_for('cat.catalog') }}" class="nav-link">Catalog</a>
@@ -165,11 +167,11 @@
                 <div class="info-box">
 
                     <div class="info-label">
-                        Current Balance
+                        Total Balance
                     </div>
 
                     <div class="info-value">
-                        {{ drive_info["BALANCE"] }} points
+                        {{ total_balance }} points
                     </div>
 
                 </div>

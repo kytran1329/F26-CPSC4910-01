@@ -202,6 +202,12 @@ def driverDash():
         cursor.execute(company_query, tuple(company_params))
 
         driver_balances = cursor.fetchall()
+        #get total of all accout owned by user, if spon is looking it should
+        #only give that company's total
+        total_balance = sum(
+            company["BALANCE"] or 0
+            for company in driver_balances
+)
 
         #select company
         selection_key = f"selected_company_{drive_info['DRIVER_ID']}"
@@ -312,7 +318,8 @@ def driverDash():
                             itemized_orders = itemized_orders,
                             driver_balances = driver_balances,
                             selected_company=selected_company,
-                            selected_company_id=selected_company_id)
+                            selected_company_id=selected_company_id,
+                            total_balance= total_balance)
     finally: 
         cursor.close()
         conn.close()
