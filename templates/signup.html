@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up</title>
 
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
 </head>
 
@@ -20,7 +21,7 @@
                 <p class="error">{{ error }}</p>
             {% endif %}
 
-            <form method="POST" action="{{ url_for('signup') }}">
+            <form method="POST" action="{{ url_for('auth.signup') }}">
 
                 <div class="form-group">
                     <label for="first_name">First Name</label>
@@ -65,13 +66,25 @@
                     >
                 </div>
 
+                <div class="filter-container">
+                    <label for="sponsorcomp_id">Apply for Company:</label>
+
+                    <select id="sponsorcomp_id" name="sponsorcomp_id" required>
+                        {% for company in sponsor_companies %}
+                        <option value="{{ company.SPONSORCOMP_ID }}">
+                            {{ company.SPONSORCOMP_NAME }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
                 <button type="submit">Create Account</button>
 
             </form>
 
             <div class="signup-link">
                 <p>Already have an account?
-                    <a href="{{ url_for('login') }}">Log In</a>
+                    <a href="{{ url_for('auth.login') }}">Log In</a>
                 </p>
             </div>
 

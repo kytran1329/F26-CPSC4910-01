@@ -1,0 +1,223 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Bulk Upload Results</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='/adminDash.css') }}">
+
+    <style>
+        .results-container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 25px;
+        }
+
+        .results-header {
+            margin-bottom: 30px;
+        }
+
+        .results-header h1 {
+            color: white;
+            margin-bottom: 8px;
+        }
+
+        .results-header p {
+            color: #b5b7ba;
+        }
+
+        .results-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .results-card h2 {
+            color: #245c43;
+            margin-bottom: 20px;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .results-table th {
+            background: #245c43;
+            color: white;
+            text-align: left;
+            padding: 14px;
+        }
+
+        .results-table td {
+            padding: 14px;
+            border-bottom: 1px solid #e5e7eb;
+            color: #374151;
+        }
+
+        .results-table tr:hover {
+            background: #f8fafc;
+        }
+
+        .success-heading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .success-icon {
+            color: #245c43;
+            font-size: 22px;
+        }
+
+        .error-heading {
+            color: #b42318 !important;
+        }
+
+        .error-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .error-list li {
+            background: #fff5f5;
+            border-left: 4px solid #dc2626;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            color: #991b1b;
+        }
+
+        .empty-message {
+            color: #6b7280;
+            padding: 10px 0;
+        }
+
+        .dashboard-button {
+            display: inline-block;
+            background: #245c43;
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: background 0.2s ease;
+        }
+
+        .dashboard-button:hover {
+            background: #194832;
+            color: white;
+        }
+
+        .password-cell {
+            font-family: monospace;
+            overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 700px) {
+            .results-card {
+                padding: 18px;
+                overflow-x: auto;
+            }
+
+            .results-table {
+                min-width: 600px;
+            }
+
+            .results-header h1 {
+                font-size: 25px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <main class="results-container">
+
+        <header class="results-header">
+            <h1>Bulk Upload Results</h1>
+            <p>Review the records processed during your upload.</p>
+        </header>
+
+        <!-- Successful Records -->
+        <section class="results-card">
+
+            <div class="success-heading">
+                <span class="success-icon">&#10003;</span>
+                <h2>Successful Records</h2>
+            </div>
+
+            {% if results %}
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Result</th>
+                            <th>Email</th>
+                            <th>Temporary Password</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for result in results %}
+                        <tr>
+                            <td>{{ result.message }}</td>
+                            <td>{{ result.email }}</td>
+                            <td class="password-cell">
+                                {% if result.temporary_password %}
+                                    {{ result.temporary_password }}
+                                {% else %}
+                                    Existing account
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="empty-message">
+                    No records were successfully processed.
+                </p>
+            {% endif %}
+
+        </section>
+
+
+        <!-- Errors -->
+        <section class="results-card">
+
+            <h2 class="error-heading">Upload Errors</h2>
+
+            {% if errors %}
+                <ul class="error-list">
+                    {% for error in errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="empty-message">
+                    No errors occurred. All records were processed successfully.
+                </p>
+            {% endif %}
+
+        </section>
+
+
+        <!-- Return to Dashboard -->
+        <a href="{{ url_for('backToDash') }}" class="dashboard-button">
+            &#8592; Return to Dashboard
+        </a>
+
+    </main>
+
+</body>
+</html>

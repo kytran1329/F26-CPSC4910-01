@@ -14,7 +14,6 @@ header {
     background-color: #1f2937;
     color: white;
     padding: 20px;
-    text-align: center;
 }
 
 header h1 {
@@ -207,23 +206,16 @@ h2 {
 /* Buttons */
 
 .button {
-    display: inline-block;
-
-    background: #1f2937;
-    color: white;
-
     padding: 10px 18px;
-
+    background-color: #1f2937;
+    color: white;
+    border: none;
     border-radius: 5px;
-
-    text-decoration: none;
-    font-weight: bold;
-
-    margin-left: 20px;
+    cursor: pointer;
 }
 
 .button:hover {
-    background: #374151;
+    background-color: #374151;
 }
 
 
@@ -302,35 +294,86 @@ footer {
     padding: 30px;
 }
 
+.header-links {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
 
-/* Mobile */
+.nav-link {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
 
-@media (max-width: 650px) {
+.nav-link:hover {
+    text-decoration: underline;
+}
 
-    header {
-        padding: 20px;
-    }
+#company-search,
+.company-filter select {
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 14px;
+}
 
-    .profile-name {
-        font-size: 1.6rem;
-    }
+#company-search {
+    min-width: 220px;
+}
 
-    main {
-        margin: 30px auto;
-        padding: 0 15px;
-    }
+.company-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
 
-    .profile-card {
-        padding: 25px;
-    }
+.company-filter label {
+    font-size: 14px;
+    font-weight: 500;
+}
 
-    .profile-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 15px;
-    }
+/* Filter */
 
-    .button {
-        margin-left: 0;
-    }
+.filter-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    margin-bottom: 20px;
+}
+
+.filter-container label {
+    font-weight: bold;
+}
+
+.filter-container select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+.filter-container input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+.reason-field {
+    margin: 15px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.reason-field textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    resize: vertical;
+    font-family: inherit;
+    box-sizing: border-box;
 }
