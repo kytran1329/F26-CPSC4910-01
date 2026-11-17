@@ -89,7 +89,7 @@ def test_user_profile_information():
 
 def test_admin_user_profile_link():
     admin = webdriver.Chrome()
-    admin.get("http://54.226.176.242")
+    admin.get("http://127.0.0.1:5000")
 
     admin.implicitly_wait(1)
     
@@ -117,7 +117,7 @@ def test_admin_can_change_first_name():
     wait = WebDriverWait(admin, 10)
 
     try:
-        admin.get("http://54.226.176.242")
+        admin.get("http://127.0.0.1:5000")
 
         username_field = admin.find_element(By.NAME, "username")
         password_field = admin.find_element(By.NAME, "password")
