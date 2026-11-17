@@ -2732,6 +2732,111 @@ def adminDash():
     while cursor.nextset():
         pass
 
+    # driver point history for admin to view
+    history_filter = request.args.get("history_filter", "all_time")
+    history_driver = request.args.get("history_driver", "all")
+    history_type = request.args.get("history_type", "all")
+    history_company = request.args.get("history_company", "all")
+
+    # validate selected driver
+    valid_driver_ids = {str(row["DRIVER_ID"]) for row in drivers}
+
+    if history_driver != "all" and history_driver not in valid_driver_ids:
+        history_driver = "all"
+
+    # validate selected company
+    valid_company_ids = {str(row["SPONSORCOMP_ID"]) for row in sponsor_companies}
+
+    if history_company != "all" and history_company not in valid_company_ids:
+        history_company = "all"
+
+    # validate point change type
+    if history_type not in {"all", "added", "deducted"}:
+        history_type = "all"
+
+    # date calculations
+    today = date.today()
+    month_start = today.replace(day=1)
+
+    # previous calendar month's start date
+    if month_start.month == 1:
+        previous_month_start = date(month_start.year - 1, 12, 1)
+    else:
+        previous_month_start = date(
+            month_start.year, month_start.month - 1, 1
+        )
+
+    # base point history query
+    history_query = """
+        SELECT
+            p.POINTCHANGE_ID,
+            p.DRIVER_ID,
+            u.USER_FNAME,
+            u.USER_LNAME,
+            p.POINTCHANGE_AMOUNT,
+            p.POINTCHANGE_REASON,
+            p.DTS
+        FROM POINTCHANGES AS p
+        JOIN DRIVER AS d
+            ON d.DRIVER_ID = p.DRIVER_ID
+        JOIN `USER` AS u
+            ON u.USER_ID = d.USER_ID
+        WHERE 1=1
+    """
+
+    params = []
+
+    # date filter
+    if history_filter == "current_month":
+
+        if month_start.month == 12:
+            next_month_start = date(month_start.year + 1, 1, 1)
+        else:
+            next_month_start = date(
+                month_start.year, month_start.month + 1, 1
+            )
+
+        history_query += " AND p.DTS >= %s AND p.DTS < %s"
+        params.extend([month_start, next_month_start])
+
+    elif history_filter == "past_month":
+
+        history_query += " AND p.DTS >= %s AND p.DTS < %s"
+        params.extend([previous_month_start, month_start])
+
+    elif history_filter != "all_time":
+        history_filter = "all_time"
+
+    # driver filter
+    if history_driver != "all":
+        history_query += " AND p.DRIVER_ID = %s"
+        params.append(int(history_driver))
+
+    # point change type filter
+    if history_type == "added":
+        history_query += " AND p.POINTCHANGE_AMOUNT > 0"
+    elif history_type == "deducted":
+        history_query += " AND p.POINTCHANGE_AMOUNT < 0"
+
+    # sponsor company filter
+    if history_company != "all":
+        history_query += """
+            AND EXISTS (
+                SELECT 1
+                FROM BALANCE AS b
+                WHERE b.DRIVER_ID = p.DRIVER_ID
+                  AND b.SPONSORCOMP_ID = %s
+                  AND b.IS_ACTIVE = 1
+            )
+        """
+        params.append(int(history_company))
+
+    # most recent changes first
+    history_query += " ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC"
+
+    cursor.execute(history_query, tuple(params))
+    point_history = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
@@ -2739,7 +2844,12 @@ def adminDash():
         "adminDash.html",
         drivers=drivers,
         sponsors=sponsors,
-        sponsor_companies=sponsor_companies
+        sponsor_companies=sponsor_companies,
+        point_history=point_history,
+        history_filter=history_filter,
+        history_driver=history_driver,
+        history_type=history_type,
+        history_company=history_company
     )
 
 @app.route("/adminDash/sponsors")
