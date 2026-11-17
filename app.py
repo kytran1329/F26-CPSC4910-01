@@ -1599,6 +1599,19 @@ def sponDash():
         # Individual point history
     # Get the selected history filter
     history_filter = request.args.get("history_filter", "all_time")
+    history_driver = request.args.get("history_driver", "all")
+    history_type = request.args.get("history_type", "all")
+
+    # get valid driver IDs for this sponsor's company
+    valid_driver_ids = {str(row["DRIVER_ID"]) for row in user_info}
+
+    # validate selected driver
+    if history_driver != "all" and history_driver not in valid_driver_ids:
+        history_driver = "all"
+
+    # validate selected point change type
+    if history_type not in ("all", "added", "deducted"):
+        history_type = "all"
 
     today = date.today()
     month_start = today.replace(day=1)
@@ -1657,6 +1670,17 @@ def sponDash():
     elif history_filter != "all_time":
         history_filter = "all_time"
 
+    # Apply the selected driver filter
+    if history_driver != "all":
+        history_query += " AND p.DRIVER_ID = %s"
+        params.append(int(history_driver))
+
+    # Apply the selected point change type filter
+    if history_type == "added":
+        history_query += " AND p.POINTCHANGE_AMOUNT > 0"
+    elif history_type == "deducted":
+        history_query += " AND p.POINTCHANGE_AMOUNT < 0"
+
     history_query += " ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC"
 
     cursor.execute(history_query, tuple(params))
@@ -1706,6 +1730,8 @@ def sponDash():
         user_info=user_info,
         point_history=point_history, 
         history_filter=history_filter,
+        history_driver=history_driver,
+        history_type=history_type,
         pending_applications=pending_applications,
         points_this_month=points_this_month
     )
