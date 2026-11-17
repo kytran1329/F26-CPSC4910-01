@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from notifications import create_notification, NOTIFICATION_TYPES
 
 load_dotenv()
 
@@ -36,6 +37,19 @@ def login():
             cursor.execute("SELECT USER_ID, EMAIL, PASSWORD, ROLE FROM USER WHERE EMAIL = %s", (username,))
             user = cursor.fetchone()
 
+            # Check whether the user exists
+            if user is None:
+                cursor.execute(
+                """
+                INSERT INTO LOGINATTEMPTS (ATTEMPTED_EMAIL, RESULT)
+                VALUES (%s, %s)
+                """,
+                (username, False)
+                )
+                conn.commit()
+
+                return render_template("login.html",error="Invalid username or password")
+
             global USER_ID
             USER_ID= user["USER_ID"]
 
@@ -44,6 +58,16 @@ def login():
                 role = user["ROLE"]
                 session["user_id"] = user["USER_ID"]
                 session["role"] = user["ROLE"]
+
+                cursor.execute(
+                """
+                INSERT INTO LOGINATTEMPTS (ATTEMPTED_EMAIL, RESULT)
+                VALUES (%s, %s)
+                """,
+                (username, True)
+                )
+
+                conn.commit()
 
                 if role == "Driver":
                     return redirect(url_for("driverDash"))
@@ -55,6 +79,15 @@ def login():
                     return redirect(url_for("home"))
 
             # if password doesn't match stay on the page and give an error
+            cursor.execute(
+            """
+            INSERT INTO LOGINATTEMPTS (ATTEMPTED_EMAIL, RESULT)
+            VALUES (%s, %s)
+            """,
+            (username, False)
+            )
+            conn.commit()
+
             return render_template( "login.html", error="Invalid username or password" )
             
         finally:
@@ -73,12 +106,29 @@ def logout():
 
 @auth.route("/signup", methods=["GET", "POST"])
 def signup():
+    # connect to sql database
+    conn = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password= DB_PASSWORD,
+            database= DB_NAME
+        )
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute("""
+                SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+                FROM SPONSORCOMP
+                ORDER BY SPONSORCOMP_NAME
+                """)
+    sponsor_companies = cursor.fetchall()
+    
     if request.method == "POST":
         # get user info to create an account
         first_name = request.form.get("first_name") 
         last_name = request.form.get("last_name") 
         email = request.form.get("email") 
         pwd = request.form.get("password")
+        sponsorcomp_id = request.form.get("sponsorcomp_id")
         role = "Driver"
 
         # connect to sql database
@@ -90,18 +140,41 @@ def signup():
         )
         cursor = conn.cursor(dictionary=True)
 
+        cursor.execute("""
+                    SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+                    FROM SPONSORCOMP
+                    ORDER BY SPONSORCOMP_NAME
+                    """)
+        sponsor_companies = cursor.fetchall()
+
         try:
             # check if email already exists 
             cursor.execute( "SELECT USER_ID FROM `USER` WHERE EMAIL = %s", (email,) )
             if cursor.fetchone(): 
                 return render_template( 
                     "signup.html", 
-                    error="An account with this email already exists." 
+                    error="An account with this email already exists.",
+                    sponsor_companies=sponsor_companies 
+                )
+
+            # Verify that the selected sponsor company exists
+            cursor.execute("""
+                SELECT SPONSORCOMP_ID
+                FROM SPONSORCOMP
+                WHERE SPONSORCOMP_ID = %s
+            """, (sponsorcomp_id,))
+
+            if not cursor.fetchone():
+                return render_template(
+                    "signup.html",
+                    error="Please select a valid sponsor company.",
+                    sponsor_companies=sponsor_companies
                 )
 
             # hash the password
             hashed_password = generate_password_hash(pwd)
 
+            # Insert the new driver
             cursor.execute(""" 
                 INSERT INTO `USER` 
                 (USER_FNAME, USER_LNAME, EMAIL, PASSWORD, ROLE) 
@@ -109,6 +182,72 @@ def signup():
                 (first_name, last_name, email, hashed_password, "Driver")
             )
 
+            user_id = cursor.lastrowid
+
+            # Insert the sponsor application without an assigned sponsor user
+            cursor.execute("""
+                INSERT INTO APPLICATIONS
+                    (USER_ID, SPONSORCOMP_ID, SPONSOR_ID)
+                VALUES (%s, %s, NULL)
+            """, (user_id, sponsorcomp_id))
+
+            application_id = cursor.lastrowid
+
+            # get the sponsor company's name for the notification
+            cursor.execute("""
+                SELECT SPONSORCOMP_NAME
+                FROM SPONSORCOMP
+                WHERE SPONSORCOMP_ID = %s
+            """, (sponsorcomp_id,))
+
+            company = cursor.fetchone()
+            company_name = (
+                company["SPONSORCOMP_NAME"]
+                if company
+                else "the sponsor company"
+            )
+
+            # notify all sponsors in company
+            cursor.execute("""
+                SELECT USER_ID
+                FROM SPONSOR
+                WHERE SPONSORCOMP_ID = %s
+            """, (sponsorcomp_id,))
+
+            sponsor_users = cursor.fetchall()
+
+            for sponsor_user in sponsor_users:
+                create_notification(
+                    cursor,
+                    sponsor_user["USER_ID"],
+                    "SPONSOR_NEW_APPLICATION",
+                    "New driver application",
+                    f"{first_name} {last_name} has applied to join "
+                    f"{company_name}.",
+                    application_id=application_id
+                )
+
+            # notify admin of application acceptance
+            cursor.execute("""
+                SELECT USER_ID
+                FROM USER
+                WHERE ROLE = 'Admin'
+            """)
+
+            admin_users = cursor.fetchall()
+                
+            for admin_user in admin_users:
+                create_notification(
+                    cursor,
+                    admin_user["USER_ID"],
+                    "ADMIN_NEW_APPLICATION",
+                    "New driver application",
+                    f"{first_name} {last_name} has applied to join "
+                    f"{company_name}.",
+                    application_id=application_id
+                )
+
+            # Commit only after both inserts succeed
             conn.commit()
 
             return redirect(url_for("auth.login"))
@@ -118,10 +257,11 @@ def signup():
             current_app.logger.exception("Error creating user account") 
             return render_template( 
                 "signup.html", 
-                error="Unable to create your account. Please try again." 
+                error="Unable to create your account. Please try again.",
+                sponsor_companies=sponsor_companies 
             )
             
         finally:
             cursor.close()
             conn.close()
-    return render_template("signup.html")
+    return render_template("signup.html", sponsor_companies=sponsor_companies)

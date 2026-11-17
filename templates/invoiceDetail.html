@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice #{{ invoice.INVOICE_ID }}</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='/adminDash.css') }}">
+
+    <style>
+        .invoice-page {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .invoice-header {
+            margin-bottom: 28px;
+        }
+
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0 30px;
+        }
+
+        .invoice-table th,
+        .invoice-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        .invoice-table th {
+            background: #f2f2f2;
+        }
+
+        .invoice-total {
+            text-align: right;
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin: 25px 0;
+        }
+
+        .invoice-actions {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .invoice-actions a,
+        .invoice-actions button {
+            padding: 10px 16px;
+            cursor: pointer;
+        }
+
+        @media print {
+            header, footer, .invoice-actions {
+                display: none !important;
+            }
+
+            .invoice-page {
+                margin: 0;
+                padding: 0;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="dashboard-header">
+        <div class="header-content">
+            <div>
+                <h1 class="dashboard-name">Invoice #{{ invoice.INVOICE_ID }}</h1>
+                <p class="tagline">Good Driving. Better Rewards.</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="invoice-page">
+        <section class="invoice-header">
+            <h2>{{ invoice.SPONSORCOMP_NAME }}</h2>
+            <p><strong>Invoice number:</strong> {{ invoice.INVOICE_ID }}</p>
+            <p><strong>Period start:</strong> {{ invoice.PERIOD_START }}</p>
+            <p><strong>Period end:</strong> {{ invoice.PERIOD_END }}</p>
+            <p><strong>Date generated:</strong> {{ invoice.GENERATED_DTS }}</p>
+        </section>
+
+        <h2>Driver Purchase Summary</h2>
+
+        {% if driver_summaries %}
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th>Driver</th>
+                        <th>Driver ID</th>
+                        <th>Number of Purchases</th>
+                        <th>Total Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for driver in driver_summaries %}
+                        <tr>
+                            <td>
+                                {{ driver.USER_FNAME }} {{ driver.USER_LNAME }}
+                            </td>
+                            <td>{{ driver.DRIVER_ID }}</td>
+                            <td>{{ driver.PURCHASE_COUNT }}</td>
+                            <td>
+                                ${{ "%.2f"|format(driver.DRIVER_TOTAL|float) }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No driver purchases are listed on this invoice.</p>
+        {% endif %}
+
+        <h2>Itemized Purchase Details</h2>
+
+        {% if details %}
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th>Order #</th>
+                        <th>Driver</th>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Line Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in details %}
+                        <tr>
+                            <td>{{ item.ORDER_ID }}</td>
+                            <td>
+                                {{ item.USER_FNAME }} {{ item.USER_LNAME }}
+                            </td>
+                            <td>{{ item.ITEM_NAME }}</td>
+                            <td>{{ item.ITEM_AMOUNT }}</td>
+                            <td>
+                                ${{ "%.2f"|format(item.ITEM_PRICE|float) }}
+                            </td>
+                            <td>
+                                ${{ "%.2f"|format(item.LINE_TOTAL|float) }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No itemized purchases are listed on this invoice.</p>
+        {% endif %}
+
+        <p class="invoice-total">
+            Total Invoice Fee:
+            ${{ "%.2f"|format(invoice.TOTAL_FEE|float) }}
+        </p>
+
+        <div class="invoice-actions">
+            <a href="{{ url_for('adminReports') }}#invoice">
+                Back to Reports
+            </a>
+            <button type="button" onclick="window.print()">
+                Print Invoice
+            </button>
+        </div>
+    </main>
+
+    <footer>
+        Good (Truck) Driver Incentive Program &mdash; Fall 2026
+    </footer>
+</body>
+
+</html>

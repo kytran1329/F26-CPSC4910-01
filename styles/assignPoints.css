@@ -21,7 +21,7 @@ header {
 }
 
 .header-content {
-    max-width: 1200px;
+    max-width: 1100px;
     margin: auto;
 }
 
@@ -32,7 +32,7 @@ header {
 
 .tagline {
     color: #d1d5db;
-    margin: 5px 0 15px;
+    margin-top: 5px;
 }
 
 .logout-button,
@@ -57,6 +57,22 @@ header {
 }
 .return-dashboard-button:hover {
     background-color: #194832;
+}
+
+.header-links {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.nav-link:hover {
+    text-decoration: underline;
 }
 
 

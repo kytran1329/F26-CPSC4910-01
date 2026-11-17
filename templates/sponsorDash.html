@@ -9,6 +9,7 @@
     <title>Sponsor Dashboard</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='driverDash.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 
 </head>
 
@@ -39,8 +40,18 @@
 
             <div class="header-links">
                 <a href="{{ url_for('sponDash') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('cat.sponsor_catalog_items') }}" class="nav-link">Catalog Items</a>
                 <a href="{{ url_for('applications') }}" class="nav-link">Applications</a>
+                <a href="{{ url_for('driverView') }}" class="nav-link">Drivers</a>
+                <a href="{{ url_for('assignPoints') }}" class="nav-link">Assign Points</a>
+                <a href="{{ url_for('sponsorAudit') }}" class="nav-link">Audit Logs</a>
                 <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+                <a href="{{ url_for('notifications') }}" class="notification-button">
+                    🔔 Notifications
+                    <span class="notification-badge">
+                        {{ unread_notification_count | default(0) }}
+                    </span>
+                </a>
                 <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
             </div>
 
@@ -98,10 +109,6 @@
             <div class="history-section">
 
                 <h2>Driver Information</h2>
-
-                <div class="assign-points-link-row">
-                    <a href="{{ url_for('assignPoints') }}" class="view-driver-btn">Assign Points</a>
-                </div>
 
                 <div class="table-container">
 
@@ -221,16 +228,141 @@
                 </div>
 
             </div>
+            
+            <!-- Bulk Upload Section -->
+            <div class="history-section bulk-upload-section">
+
+                <div class="bulk-upload-header">
+                    <div>
+                        <h2>Bulk Upload</h2>
+                        <p>
+                            Upload multiple drivers and sponsors to your organization.
+                        </p>
+                    </div>
+                </div>
+
+                <form action="{{ url_for('bulkUpload') }}"
+                    method="POST"
+                    enctype="multipart/form-data"
+                    class="bulk-upload-form">
+
+                    <div class="upload-instructions">
+                        <strong>Upload Instructions</strong>
+
+                        <ul>
+                            <li>Upload a pipe-delimited (.txt) file.</li>
+                            <li>Use D for Drivers and S for Sponsors.</li>
+                            <li>Leave the organization field blank.</li>
+                            <li>Points may only be assigned to Drivers.</li>
+                            <li>A reason is required when assigning points.</li>
+                            <li>Invalid records will be skipped and reported.</li>
+                        </ul>
+                    </div>
+
+                    <div class="file-upload-area">
+
+                        <label for="bulk-upload-file">
+                            Select Upload File
+                        </label>
+
+                        <input type="file"
+                            id="bulk-upload-file"
+                            name="file"
+                            accept=".txt"
+                            required>
+
+                        <span id="selected-file-name">
+                            No file selected
+                        </span>
+
+                    </div>
+
+                    <button type="submit" class="bulk-upload-button">
+                        Upload File
+                    </button>
+
+                </form>
+
+            </div>
 
 
             <!-- point history -->
             <div class="history-section">
 
                 <h2>Driver Point History</h2>
+                
+                <div class="history-filter">
+
+                    <form method="GET" action="{{ url_for('sponDash') }}">
+
+                        <!-- Date Filter -->
+                        <label for="history_filter">Filter by date:</label>
+
+                        <select name="history_filter" id="history_filter">
+                            <option value="all_time"
+                                {% if history_filter == "all_time" %}selected{% endif %}>
+                                All Time
+                            </option>
+
+                            <option value="current_month"
+                                {% if history_filter == "current_month" %}selected{% endif %}>
+                                Current Month
+                            </option>
+
+                            <option value="past_month"
+                                {% if history_filter == "past_month" %}selected{% endif %}>
+                                Past Month
+                            </option>
+                        </select>
+
+                        <!-- Driver Filter -->
+                        <label for="history_driver">Filter by driver:</label>
+
+                        <select name="history_driver" id="history_driver">
+                            <option value="all"
+                                {% if history_driver == "all" %}selected{% endif %}>
+                                All Drivers
+                            </option>
+
+                            {% for driver in user_info %}
+                                <option value="{{ driver['DRIVER_ID'] }}"
+                                    {% if history_driver == (driver['DRIVER_ID'] | string) %}selected{% endif %}>
+                                    {{ driver['USER_FNAME'] }} {{ driver['USER_LNAME'] }}
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                        <!-- Point Change Type Filter -->
+                        <label for="history_type">Filter by point change type:</label>
+
+                        <select name="history_type" id="history_type">
+                            <option value="all"
+                                {% if history_type == "all" %}selected{% endif %}>
+                                All Changes
+                            </option>
+
+                            <option value="added"
+                                {% if history_type == "added" %}selected{% endif %}>
+                                Added Points
+                            </option>
+
+                            <option value="deducted"
+                                {% if history_type == "deducted" %}selected{% endif %}>
+                                Deducted Points
+                            </option>
+                        </select>
+
+                        <button type="submit" class="view-driver-btn">
+                            Apply Filter
+                        </button>
+
+                    </form>
+
+                </div>
 
                 <div class="table-container">
-
-                    <table class="history-table">
+                    
+                    <table class="history-table" id="point-history-table">
 
                         <thead>
 
@@ -240,7 +372,12 @@
                                 <th>Driver</th>
                                 <th>Points</th>
                                 <th>Reason</th>
-                                <th>Date & Time</th>
+                                <th aria-sort="descending">
+                                    <button type="button" class="date-sort-button"
+                                            onclick="sortPointHistoryByDate()">
+                                        Date &amp; Time <span class="sort-indicator" aria-hidden="true">↓</span>
+                                    </button>
+                                </th>
                             </tr>
 
                         </thead>
@@ -250,7 +387,7 @@
 
                             {% for row in point_history %}
 
-                            <tr>
+                            <tr data-sort-date="{{ row['DTS'] }}">
 
                                 <td>
                                     {{ row["POINTCHANGE_ID"] }}
@@ -325,6 +462,49 @@
 
         }
 
+        let nextPointHistorySortDirection = "descending";
+
+        function sortPointHistoryByDate() {
+            const tableBody = document.querySelector(
+                "#point-history-table tbody"
+            );
+            const dateHeader = document.querySelector(
+                "#point-history-table th[aria-sort]"
+            );
+            const rows = Array.from(tableBody.rows);
+
+            rows.sort((first, second) => {
+                const firstDate = Date.parse(
+                    first.dataset.sortDate.replace(" ", "T")
+                );
+                const secondDate = Date.parse(
+                    second.dataset.sortDate.replace(" ", "T")
+                );
+                return nextPointHistorySortDirection === "descending"
+                    ? secondDate - firstDate
+                    : firstDate - secondDate;
+            });
+
+            tableBody.append(...rows);
+            dateHeader.setAttribute("aria-sort", nextPointHistorySortDirection);
+            dateHeader.querySelector(".sort-indicator").textContent =
+                nextPointHistorySortDirection === "descending" ? "↓" : "↑";
+            nextPointHistorySortDirection =
+                nextPointHistorySortDirection === "descending"
+                    ? "ascending"
+                    : "descending";
+        }
+
+        document.getElementById("bulk-upload-file")
+            .addEventListener("change", function () {
+
+                const fileName = this.files.length > 0
+                    ? this.files[0].name
+                    : "No file selected";
+
+                document.getElementById("selected-file-name")
+                    .textContent = fileName;
+            });
     </script>
 
 </body>

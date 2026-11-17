@@ -6,6 +6,7 @@
     <title>Manage Sponsors</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='/adminDash.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 </head>
 
 <body>
@@ -15,6 +16,20 @@
             <div>
                 <h1 class="dashboard-name">Manage Sponsors</h1>
                 <p class="tagline">Good Driving. Better Rewards.</p>
+            </div>
+            <div class="header-links">
+                <a href="{{ url_for('adminSponsors') }}" class="nav-link">Sponsors</a>
+                <a href="{{ url_for('adminDrivers') }}" class="nav-link">Drivers</a>
+                <a href="{{ url_for('adminReports') }}" class="nav-link">Reports</a>
+                <a href="{{ url_for('adminAudit') }}" class="nav-link">Audit Logs</a>
+                <a href="{{ url_for('userProfile', user_id=session['user_id']) }}" class="nav-link">Profile</a>
+                <a href="{{ url_for('notifications') }}" class="notification-button">
+                    🔔 Notifications
+                    <span class="notification-badge">
+                        {{ unread_notification_count | default(0) }}
+                    </span>
+                </a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-button">Logout</a>
             </div>
         </div>
     </header>
@@ -139,8 +154,10 @@
                             <td>{{ sponsor["SPONSOR_ID"] }}</td>
 
                             <td>
-                                {{ sponsor["USER_FNAME"] }}
-                                {{ sponsor["USER_LNAME"] }}
+                                <a href="{{ url_for('userProfile', user_id=sponsor['USER_ID']) }}"
+                                onclick="event.stopPropagation();">
+                                    {{ sponsor["USER_FNAME"] }} {{ sponsor["USER_LNAME"] }}
+                                </a>
                             </td>
 
                             <td>{{ sponsor["EMAIL"] }}</td>
