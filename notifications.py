@@ -37,6 +37,12 @@ NOTIFICATION_TYPES = {
     "ADMIN_ORDER_CANCELED": "Driver canceled order",
 }
 
+# Driver notifications that must remain enabled
+MANDATORY_NOTIFICATION_TYPES = {
+    "DRIVER_SPONSOR_ADDED",
+    "DRIVER_SPONSOR_REMOVED"
+}
+
 ROLE_NOTIFICATION_TYPES = {
     "Driver": [
         "POINTS_GAINED",
@@ -90,19 +96,27 @@ def create_notification (
     default is enabled.
     """
 
-    # check if user had disabled notification type
-    cursor.execute("""
-        SELECT IS_ENABLED
-        FROM NOTIFICATIONSETTINGS
-        WHERE USER_ID = %s
-            AND NOTIFICATION_TYPE = %s
-    """, (user_id, notification_type))
+    # these notifications must ALWAYS be created
+    mandatory_notifications = {
+        "DRIVER_SPONSOR_ADDED",
+        "DRIVER_SPONSOR_REMOVED"
+    }
 
-    setting = cursor.fetchone()
+    if notification_type not in mandatory_notifications:
+    
+        # check if user had disabled notification type
+        cursor.execute("""
+            SELECT IS_ENABLED
+            FROM NOTIFICATIONSETTINGS
+            WHERE USER_ID = %s
+                AND NOTIFICATION_TYPE = %s
+        """, (user_id, notification_type))
 
-    # no saved setting means all notifications are enabled
-    if setting and not setting["IS_ENABLED"]:
-        return
+        setting = cursor.fetchone()
+
+        # no saved setting means all notifications are enabled
+        if setting and not setting["IS_ENABLED"]:
+            return
 
     # create the notification
     cursor.execute("""

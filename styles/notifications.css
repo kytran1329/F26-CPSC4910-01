@@ -272,6 +272,19 @@ main {
     margin-top: 25px;
 }
 
+.mandatory-label {
+    color: #777;
+    font-size: 0.8rem;
+    font-weight: normal;
+    margin-left: 5px;
+}
+
+input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+    pointer-events: none;
+}
+
 .back-link {
     display: inline-block;
     margin-top: 25px;

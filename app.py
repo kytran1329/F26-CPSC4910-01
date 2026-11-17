@@ -17,7 +17,7 @@ from decimal import Decimal, InvalidOperation
 from export import export, parseOrderReportFilters, getOrderReportRows
 from catalog import cat
 from auth import auth
-from notifications import create_notification, NOTIFICATION_TYPES, ROLE_NOTIFICATION_TYPES
+from notifications import create_notification, NOTIFICATION_TYPES, MANDATORY_NOTIFICATION_TYPES, ROLE_NOTIFICATION_TYPES
 from bulk_upload import validate_bulk_upload
 
 load_dotenv()
@@ -3577,10 +3577,15 @@ def notification_settings():
     try:
         if request.method == "POST":
             for notification_type in user_notification_types:
-                is_enabled = (
-                    1 if request.form.get(notification_type) == "1"
-                    else 0
-                )
+
+                # mandatory notifications ALWAYS enabled
+                if notification_type in MANDATORY_NOTIFICATION_TYPES:
+                    is_enabled = 1
+                else:
+                    is_enabled = (
+                        1 if request.form.get(notification_type) == "1"
+                        else 0
+                    )
 
                 cursor.execute("""
                     INSERT INTO NOTIFICATIONSETTINGS
@@ -3609,14 +3614,18 @@ def notification_settings():
 
         # without saved preferences all notifs enabled
         settings = {
-            notification_type: saved_settings.get(notification_type, True)
+            notification_type: (
+                True if notification_type in MANDATORY_NOTIFICATION_TYPES 
+                else saved_settings.get(notification_type, True)
+            )
             for notification_type in user_notification_types
         }
 
         return render_template(
             "notification_settings.html",
             notification_types=user_notification_types,
-            settings=settings
+            settings=settings,
+            mandatory_types=MANDATORY_NOTIFICATION_TYPES
         )
 
     except mysql.connector.Error:
