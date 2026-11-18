@@ -251,7 +251,29 @@ def driverDash():
             return driverApplications()
         
         #point history
-        cursor.execute("""
+        # point history filters
+        history_filter = request.args.get("history_filter", "all_time")
+        history_type = request.args.get("history_type", "all")
+        history_sponsor = request.args.get("history_sponsor", "all")
+
+        # only allow valid filter options
+        if history_filter not in ("all_time", "current_month", "past_month"):
+            history_filter = "all_time"
+
+        if history_type not in ("all", "added", "deducted"):
+            history_type = "all"
+
+        # only allow sponsors this driver is allowed to access
+        allowed_sponsor_ids = {
+            str(company["SPONSORCOMP_ID"])
+            for company in driver_balances
+        }
+
+        if history_sponsor not in "all" and history_sponsor not in allowed_sponsor_ids:
+            return "Unauthorized Sponsor company", 403
+
+        # build point history query
+        history_query = """
             select
                 pc.POINTCHANGE_ID,
                 pc.POINTCHANGE_AMOUNT,
@@ -264,10 +286,69 @@ def driverDash():
             left join SPONSORCOMP as sc
                 on b.SPONSORCOMP_ID = sc.SPONSORCOMP_ID
             where pc.DRIVER_ID =  %s
-                and b.SPONSORCOMP_ID = %s
-            order by pc.DTS desc;
-                """, (drive_info["DRIVER_ID"], selected_company_id))
+        """
 
+        history_params = [drive_info["DRIVER_ID"]]
+
+        # sponsors can only see history from their own company
+        if session.get("role") == "Sponsor":
+            history_query += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM SPONSOR AS s
+                    WHERE s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                    AND s.USER_ID = %s
+                )
+            """
+            history_params.append(session["user_id"])
+
+        # date filter
+        today = date.today()
+        current_month_start = today.replace(day=1)
+
+        if history_filter == "current_month":
+            if current_month_start.month == 12:
+                next_month_start = date(current_month_start.year + 1, 1, 1)
+            else:
+                next_month_start = date(
+                    current_month_start.year, 
+                    current_month_start.month + 1,
+                    1
+                )
+            
+            history_query += " AND pc.DTS >= %s AND pc.DTS < %s"
+            history_params.extend([current_month_start, next_month_start])
+
+        elif history_filter == "past_month":
+            previous_month_end = current_month_start
+            previous_month_start = (
+                date(current_month_start.year - 1, 12, 1)
+                if current_month_start.month == 1
+                else date(
+                    current_month_start.year, 
+                    current_month_start.month - 1, 
+                    1
+                )
+            )
+
+            history_query += " AND pc.DTS >= %s AND pc.DTS < %s"
+            history_params.extend([previous_month_start, previous_month_end])
+
+        # added or deducted filter
+        if history_type == "added":
+            history_query += " AND pc.POINTCHANGE_AMOUNT > 0"
+        
+        elif history_type == "deducted":
+            history_query += " AND pc.POINTCHANGE_AMOUNT < 0"
+
+        # sponsor company filter
+        if history_sponsor != "all":
+            history_query += " AND b.SPONSORCOMP_ID = %s"
+            history_params.append(int(history_sponsor))
+
+        history_query += " order by pc.DTS desc, pc.POINTCHANGE_ID desc"
+
+        cursor.execute(history_query, tuple(history_params))
         history = cursor.fetchall()
 
         #order and status
@@ -319,7 +400,10 @@ def driverDash():
                             driver_balances = driver_balances,
                             selected_company=selected_company,
                             selected_company_id=selected_company_id,
-                            total_balance= total_balance)
+                            total_balance= total_balance,
+                            history_filter=history_filter,
+                            history_type=history_type,
+                            history_sponsor=history_sponsor)
     finally: 
         cursor.close()
         conn.close()
