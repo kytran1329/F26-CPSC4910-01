@@ -176,6 +176,60 @@ def getPointChanges(sponsorcomp_id=None,start_date=None,end_date=None,driver_id=
         cursor.close()
         conn.close()
 
+# Retrieve Report Rows using Filters
+def getOrderReportRows(
+    report_type,
+    role,
+    sponsorcomp_id=None,
+    user_id=None,
+    start_date=None,
+    end_date=None,
+):
+
+    # Uses MySQL stored procedure names for different forms
+    procedures = {
+        "summary": "GET_ORDER_SUMMARY",
+        "detailed": "GET_ORDER_DETAILED"
+    }
+
+    if report_type not in procedures:
+        raise ValueError("Invalid report type")
+
+    if role not in ("Driver", "Sponsor"):
+        raise ValueError("Invalid role")
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
+
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.callproc(
+            procedures[report_type],
+            (
+                sponsorcomp_id,
+                user_id,
+                start_date,
+                end_date,
+                role
+            )
+        )
+
+        rows = []
+
+        for result in cursor.stored_results():
+            rows.extend(result.fetchall())
+
+        return rows
+
+    finally:
+        cursor.close()
+        conn.close()
+
 #Export CSV
 @export.route("/login-attempts/csv")
 def exportLoginAttemptsCsv():
@@ -801,60 +855,6 @@ def parseOrderReportFilters(values):
         )
 
     return filters
-
-# Retrieve Report Rows using Filters
-def getOrderReportRows(
-    report_type,
-    role,
-    sponsorcomp_id=None,
-    user_id=None,
-    start_date=None,
-    end_date=None,
-):
-
-    # Uses MySQL stored procedure names for different forms
-    procedures = {
-        "summary": "GET_ORDER_SUMMARY",
-        "detailed": "GET_ORDER_DETAILED"
-    }
-
-    if report_type not in procedures:
-        raise ValueError("Invalid report type")
-
-    if role not in ("Driver", "Sponsor"):
-        raise ValueError("Invalid role")
-
-    conn = mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME
-    )
-
-    cursor = conn.cursor(dictionary=True)
-
-    try:
-        cursor.callproc(
-            procedures[report_type],
-            (
-                sponsorcomp_id,
-                user_id,
-                start_date,
-                end_date,
-                role
-            )
-        )
-
-        rows = []
-
-        for result in cursor.stored_results():
-            rows.extend(result.fetchall())
-
-        return rows
-
-    finally:
-        cursor.close()
-        conn.close()
 
 @export.route("/orders/<report_type>/csv")
 def exportOrderReportCsv(report_type):
