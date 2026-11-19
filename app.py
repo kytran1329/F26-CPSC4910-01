@@ -17,7 +17,7 @@ from decimal import Decimal, InvalidOperation
 from export import export, parseOrderReportFilters, getOrderReportRows
 from catalog import cat
 from auth import auth
-from notifications import create_notification, NOTIFICATION_TYPES, ROLE_NOTIFICATION_TYPES
+from notifications import create_notification, NOTIFICATION_TYPES, MANDATORY_NOTIFICATION_TYPES, ROLE_NOTIFICATION_TYPES
 from bulk_upload import validate_bulk_upload
 
 load_dotenv()
@@ -251,7 +251,29 @@ def driverDash():
             return driverApplications()
         
         #point history
-        cursor.execute("""
+        # point history filters
+        history_filter = request.args.get("history_filter", "all_time")
+        history_type = request.args.get("history_type", "all")
+        history_sponsor = request.args.get("history_sponsor", "all")
+
+        # only allow valid filter options
+        if history_filter not in ("all_time", "current_month", "past_month"):
+            history_filter = "all_time"
+
+        if history_type not in ("all", "added", "deducted"):
+            history_type = "all"
+
+        # only allow sponsors this driver is allowed to access
+        allowed_sponsor_ids = {
+            str(company["SPONSORCOMP_ID"])
+            for company in driver_balances
+        }
+
+        if history_sponsor not in "all" and history_sponsor not in allowed_sponsor_ids:
+            return "Unauthorized Sponsor company", 403
+
+        # build point history query
+        history_query = """
             select
                 pc.POINTCHANGE_ID,
                 pc.POINTCHANGE_AMOUNT,
@@ -264,10 +286,69 @@ def driverDash():
             left join SPONSORCOMP as sc
                 on b.SPONSORCOMP_ID = sc.SPONSORCOMP_ID
             where pc.DRIVER_ID =  %s
-                and b.SPONSORCOMP_ID = %s
-            order by pc.DTS desc;
-                """, (drive_info["DRIVER_ID"], selected_company_id))
+        """
 
+        history_params = [drive_info["DRIVER_ID"]]
+
+        # sponsors can only see history from their own company
+        if session.get("role") == "Sponsor":
+            history_query += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM SPONSOR AS s
+                    WHERE s.SPONSORCOMP_ID = b.SPONSORCOMP_ID
+                    AND s.USER_ID = %s
+                )
+            """
+            history_params.append(session["user_id"])
+
+        # date filter
+        today = date.today()
+        current_month_start = today.replace(day=1)
+
+        if history_filter == "current_month":
+            if current_month_start.month == 12:
+                next_month_start = date(current_month_start.year + 1, 1, 1)
+            else:
+                next_month_start = date(
+                    current_month_start.year, 
+                    current_month_start.month + 1,
+                    1
+                )
+            
+            history_query += " AND pc.DTS >= %s AND pc.DTS < %s"
+            history_params.extend([current_month_start, next_month_start])
+
+        elif history_filter == "past_month":
+            previous_month_end = current_month_start
+            previous_month_start = (
+                date(current_month_start.year - 1, 12, 1)
+                if current_month_start.month == 1
+                else date(
+                    current_month_start.year, 
+                    current_month_start.month - 1, 
+                    1
+                )
+            )
+
+            history_query += " AND pc.DTS >= %s AND pc.DTS < %s"
+            history_params.extend([previous_month_start, previous_month_end])
+
+        # added or deducted filter
+        if history_type == "added":
+            history_query += " AND pc.POINTCHANGE_AMOUNT > 0"
+        
+        elif history_type == "deducted":
+            history_query += " AND pc.POINTCHANGE_AMOUNT < 0"
+
+        # sponsor company filter
+        if history_sponsor != "all":
+            history_query += " AND b.SPONSORCOMP_ID = %s"
+            history_params.append(int(history_sponsor))
+
+        history_query += " order by pc.DTS desc, pc.POINTCHANGE_ID desc"
+
+        cursor.execute(history_query, tuple(history_params))
         history = cursor.fetchall()
 
         #order and status
@@ -319,7 +400,10 @@ def driverDash():
                             driver_balances = driver_balances,
                             selected_company=selected_company,
                             selected_company_id=selected_company_id,
-                            total_balance= total_balance)
+                            total_balance= total_balance,
+                            history_filter=history_filter,
+                            history_type=history_type,
+                            history_sponsor=history_sponsor)
     finally: 
         cursor.close()
         conn.close()
@@ -1599,6 +1683,19 @@ def sponDash():
         # Individual point history
     # Get the selected history filter
     history_filter = request.args.get("history_filter", "all_time")
+    history_driver = request.args.get("history_driver", "all")
+    history_type = request.args.get("history_type", "all")
+
+    # get valid driver IDs for this sponsor's company
+    valid_driver_ids = {str(row["DRIVER_ID"]) for row in user_info}
+
+    # validate selected driver
+    if history_driver != "all" and history_driver not in valid_driver_ids:
+        history_driver = "all"
+
+    # validate selected point change type
+    if history_type not in ("all", "added", "deducted"):
+        history_type = "all"
 
     today = date.today()
     month_start = today.replace(day=1)
@@ -1657,6 +1754,17 @@ def sponDash():
     elif history_filter != "all_time":
         history_filter = "all_time"
 
+    # Apply the selected driver filter
+    if history_driver != "all":
+        history_query += " AND p.DRIVER_ID = %s"
+        params.append(int(history_driver))
+
+    # Apply the selected point change type filter
+    if history_type == "added":
+        history_query += " AND p.POINTCHANGE_AMOUNT > 0"
+    elif history_type == "deducted":
+        history_query += " AND p.POINTCHANGE_AMOUNT < 0"
+
     history_query += " ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC"
 
     cursor.execute(history_query, tuple(params))
@@ -1706,6 +1814,8 @@ def sponDash():
         user_info=user_info,
         point_history=point_history, 
         history_filter=history_filter,
+        history_driver=history_driver,
+        history_type=history_type,
         pending_applications=pending_applications,
         points_this_month=points_this_month
     )
@@ -2706,6 +2816,111 @@ def adminDash():
     while cursor.nextset():
         pass
 
+    # driver point history for admin to view
+    history_filter = request.args.get("history_filter", "all_time")
+    history_driver = request.args.get("history_driver", "all")
+    history_type = request.args.get("history_type", "all")
+    history_company = request.args.get("history_company", "all")
+
+    # validate selected driver
+    valid_driver_ids = {str(row["DRIVER_ID"]) for row in drivers}
+
+    if history_driver != "all" and history_driver not in valid_driver_ids:
+        history_driver = "all"
+
+    # validate selected company
+    valid_company_ids = {str(row["SPONSORCOMP_ID"]) for row in sponsor_companies}
+
+    if history_company != "all" and history_company not in valid_company_ids:
+        history_company = "all"
+
+    # validate point change type
+    if history_type not in {"all", "added", "deducted"}:
+        history_type = "all"
+
+    # date calculations
+    today = date.today()
+    month_start = today.replace(day=1)
+
+    # previous calendar month's start date
+    if month_start.month == 1:
+        previous_month_start = date(month_start.year - 1, 12, 1)
+    else:
+        previous_month_start = date(
+            month_start.year, month_start.month - 1, 1
+        )
+
+    # base point history query
+    history_query = """
+        SELECT
+            p.POINTCHANGE_ID,
+            p.DRIVER_ID,
+            u.USER_FNAME,
+            u.USER_LNAME,
+            p.POINTCHANGE_AMOUNT,
+            p.POINTCHANGE_REASON,
+            p.DTS
+        FROM POINTCHANGES AS p
+        JOIN DRIVER AS d
+            ON d.DRIVER_ID = p.DRIVER_ID
+        JOIN `USER` AS u
+            ON u.USER_ID = d.USER_ID
+        WHERE 1=1
+    """
+
+    params = []
+
+    # date filter
+    if history_filter == "current_month":
+
+        if month_start.month == 12:
+            next_month_start = date(month_start.year + 1, 1, 1)
+        else:
+            next_month_start = date(
+                month_start.year, month_start.month + 1, 1
+            )
+
+        history_query += " AND p.DTS >= %s AND p.DTS < %s"
+        params.extend([month_start, next_month_start])
+
+    elif history_filter == "past_month":
+
+        history_query += " AND p.DTS >= %s AND p.DTS < %s"
+        params.extend([previous_month_start, month_start])
+
+    elif history_filter != "all_time":
+        history_filter = "all_time"
+
+    # driver filter
+    if history_driver != "all":
+        history_query += " AND p.DRIVER_ID = %s"
+        params.append(int(history_driver))
+
+    # point change type filter
+    if history_type == "added":
+        history_query += " AND p.POINTCHANGE_AMOUNT > 0"
+    elif history_type == "deducted":
+        history_query += " AND p.POINTCHANGE_AMOUNT < 0"
+
+    # sponsor company filter
+    if history_company != "all":
+        history_query += """
+            AND EXISTS (
+                SELECT 1
+                FROM BALANCE AS b
+                WHERE b.DRIVER_ID = p.DRIVER_ID
+                  AND b.SPONSORCOMP_ID = %s
+                  AND b.IS_ACTIVE = 1
+            )
+        """
+        params.append(int(history_company))
+
+    # most recent changes first
+    history_query += " ORDER BY p.DTS DESC, p.POINTCHANGE_ID DESC"
+
+    cursor.execute(history_query, tuple(params))
+    point_history = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
@@ -2713,7 +2928,12 @@ def adminDash():
         "adminDash.html",
         drivers=drivers,
         sponsors=sponsors,
-        sponsor_companies=sponsor_companies
+        sponsor_companies=sponsor_companies,
+        point_history=point_history,
+        history_filter=history_filter,
+        history_driver=history_driver,
+        history_type=history_type,
+        history_company=history_company
     )
 
 @app.route("/adminDash/sponsors")
@@ -3577,10 +3797,15 @@ def notification_settings():
     try:
         if request.method == "POST":
             for notification_type in user_notification_types:
-                is_enabled = (
-                    1 if request.form.get(notification_type) == "1"
-                    else 0
-                )
+
+                # mandatory notifications ALWAYS enabled
+                if notification_type in MANDATORY_NOTIFICATION_TYPES:
+                    is_enabled = 1
+                else:
+                    is_enabled = (
+                        1 if request.form.get(notification_type) == "1"
+                        else 0
+                    )
 
                 cursor.execute("""
                     INSERT INTO NOTIFICATIONSETTINGS
@@ -3609,14 +3834,18 @@ def notification_settings():
 
         # without saved preferences all notifs enabled
         settings = {
-            notification_type: saved_settings.get(notification_type, True)
+            notification_type: (
+                True if notification_type in MANDATORY_NOTIFICATION_TYPES 
+                else saved_settings.get(notification_type, True)
+            )
             for notification_type in user_notification_types
         }
 
         return render_template(
             "notification_settings.html",
             notification_types=user_notification_types,
-            settings=settings
+            settings=settings,
+            mandatory_types=MANDATORY_NOTIFICATION_TYPES
         )
 
     except mysql.connector.Error:

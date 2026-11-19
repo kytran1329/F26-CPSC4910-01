@@ -184,6 +184,51 @@
 
                 <h2>Point History</h2>
 
+                <!-- Point History Filters -->
+                <form action="{{ url_for('driverDash') }}" method="GET" class="history-filters">
+                    <!-- Keep selected balance company when applying filters-->
+                    <input
+                        type="hidden"
+                        name="company_id"
+                        value="{{ selected_company_id }}"
+                    >
+
+                    <div class="history-filter-group">
+                        <label for="history_filter">Date</label>
+                        <select name="history_filter" id="history_filter">
+                            <option value="all_time" {% if history_filter == "all_time" %}selected{% endif %}>All Time</option>
+                            <option value="current_month" {% if history_filter == "current_month" %}selected{% endif %}>Current Month</option>
+                            <option value="past_month" {% if history_filter == "past_month" %}selected{% endif %}>Past Month</option>
+                        </select>
+                    </div>
+
+                    <div class="history-filter-group">
+                        <label for="history_type">Point Type</label>
+                        <select name="history_type" id="history_type">
+                            <option value="all" {% if history_type == "all" %}selected{% endif %}>All Changes</option>
+                            <option value="added" {% if history_type == "added" %}selected{% endif %}>Points Added</option>
+                            <option value="deducted" {% if history_type == "deducted" %}selected{% endif %}>Points Deducted</option>
+                        </select>
+                    </div>
+
+                    <div class="history-filter-group">
+                        <label for="history_sponsor">Sponsor Company</label>
+                        <select name="history_sponsor" id="history_sponsor">
+                            <option value="all" {% if history_sponsor == "all" %}selected{% endif %}>All Sponsors</option>
+                            {% for company in driver_balances %}
+                                <option value="{{ company['SPONSORCOMP_ID'] }}" {% if history_sponsor|string == company['SPONSORCOMP_ID']|string %}selected{% endif %}>
+                                    {{ company["SPONSORCOMP_NAME"] }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="view-driver-btn">
+                        Apply Filters
+                    </button>
+
+                </form>
+                
                 <div class="table-container point-history-scroll">
 
                     <table class="history-table">

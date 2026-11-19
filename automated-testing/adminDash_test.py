@@ -8,6 +8,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 load_dotenv()
 
+# Tests if admins can login
 def test_admin_login():
     driver = webdriver.Chrome()
     driver.get("http://54.226.176.242")

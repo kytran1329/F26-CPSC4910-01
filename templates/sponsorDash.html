@@ -295,6 +295,7 @@
 
                     <form method="GET" action="{{ url_for('sponDash') }}">
 
+                        <!-- Date Filter -->
                         <label for="history_filter">Filter by date:</label>
 
                         <select name="history_filter" id="history_filter">
@@ -311,6 +312,43 @@
                             <option value="past_month"
                                 {% if history_filter == "past_month" %}selected{% endif %}>
                                 Past Month
+                            </option>
+                        </select>
+
+                        <!-- Driver Filter -->
+                        <label for="history_driver">Filter by driver:</label>
+
+                        <select name="history_driver" id="history_driver">
+                            <option value="all"
+                                {% if history_driver == "all" %}selected{% endif %}>
+                                All Drivers
+                            </option>
+
+                            {% for driver in user_info %}
+                                <option value="{{ driver['DRIVER_ID'] }}"
+                                    {% if history_driver == (driver['DRIVER_ID'] | string) %}selected{% endif %}>
+                                    {{ driver['USER_FNAME'] }} {{ driver['USER_LNAME'] }}
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                        <!-- Point Change Type Filter -->
+                        <label for="history_type">Filter by point change type:</label>
+
+                        <select name="history_type" id="history_type">
+                            <option value="all"
+                                {% if history_type == "all" %}selected{% endif %}>
+                                All Changes
+                            </option>
+
+                            <option value="added"
+                                {% if history_type == "added" %}selected{% endif %}>
+                                Added Points
+                            </option>
+
+                            <option value="deducted"
+                                {% if history_type == "deducted" %}selected{% endif %}>
+                                Deducted Points
                             </option>
                         </select>
 
