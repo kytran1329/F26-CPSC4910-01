@@ -316,6 +316,7 @@
                             name="sponsorcomp_id"
                             required>
                             <option value="">Select a sponsor</option>
+                            <option value="all">All Sponsors</option>
                             {% for sponsor in sponsor_companies %}
                                 <option value="{{ sponsor.SPONSORCOMP_ID }}">
                                     {{ sponsor.SPONSORCOMP_NAME }}

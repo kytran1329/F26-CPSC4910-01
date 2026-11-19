@@ -3063,127 +3063,173 @@ def adminReports():
             return "Unauthorized", 403
 
         if request.method == "POST":
-            sponsorcomp_id = request.form.get("sponsorcomp_id", "")
+            sponsor_selection = request.form.get("sponsorcomp_id", "")
             start_text = request.form.get("start_date", "")
             end_text = request.form.get("end_date", "")
 
-            # validate submitted form
+            # validate submitted dates
             try:
-                sponsorcomp_id = int(sponsorcomp_id)
                 start_date = date.fromisoformat(start_text)
                 end_date = date.fromisoformat(end_text)
             except (ValueError, TypeError):
-                flash("Please select a sponsor and valid dates.", "error")
+                flash("Please select valid dates.", "error")
                 return redirect(url_for("adminReports") + "#invoice")
             
             if start_date > end_date:
                 flash("The end date must be on or after the start date.", "error")
                 return redirect(url_for("adminReports") + "#invoice")
 
-            cursor.execute(
-                """
-                SELECT SPONSORCOMP_ID
-                FROM SPONSORCOMP
-                WHERE SPONSORCOMP_ID = %s
-                """,
-                (sponsorcomp_id,)
-            )
-
-            if cursor.fetchone() is None:
-                flash("The selected sponsor company was not found.", "error")
-                return redirect(url_for("adminReports") + "#invoice")
-
-            # get itemized purchases for this sponsor and date range
-            # only completed orders count as purchases
-            cursor.execute(
-                """
-                SELECT
-                    o.ORDER_ID,
-                    o.DRIVER_ID,
-                    o.ORDER_DTS,
-                    io.ITEM_NAME,
-                    io.ITEM_AMOUNT,
-                    io.ITEM_PRICE,
-                    (io.ITEM_AMOUNT * io.ITEM_PRICE) AS LINE_TOTAL
-                FROM ORDERS AS o
-                JOIN DRIVER AS d
-                    ON d.DRIVER_ID = o.DRIVER_ID
-                JOIN BALANCE AS b
-                    ON d.DRIVER_ID = b.DRIVER_ID
-                    AND b.SPONSORCOMP_ID = %s
-                    AND b.IS_ACTIVE = 1
-                JOIN ITEMIZEDORDER AS io
-                    ON io.ORDER_ID = o.ORDER_ID
-                WHERE LOWER(o.ORDER_STATUS) = 'done'
-                    AND o.ORDER_DTS >= %s
-                    AND o.ORDER_DTS < DATE_ADD(%s, INTERVAL 1 DAY)
-                ORDER BY o.DRIVER_ID, o.ORDER_ID, io.ITEMIZED_ID
-                """,
-                (sponsorcomp_id, start_date, end_date)
-            )
-
-            purchase_rows = cursor.fetchall()
-
-            if not purchase_rows:
-                flash ("No completed itemized purchases were found for that sponsor and date range. No invoice was created.", "error")
-                return redirect(url_for("adminReports") + "#invoice")
-
-            # calculate invoice total
-            total_fee = sum (
-                (Decimal(str(row["LINE_TOTAL"])) for row in purchase_rows),
-                Decimal("0.00")
-            )
-
-            try:
-                # save the invoice header
+            # determine which sponsors should receive invoices
+            if sponsor_selection == "all":
                 cursor.execute(
                     """
-                    INSERT INTO INVOICE (
-                        SPONSORCOMP_ID,
-                        PERIOD_START,
-                        PERIOD_END,
-                        TOTAL_FEE
-                    )
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (sponsorcomp_id, start_date, end_date, total_fee)
+                    SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+                    FROM SPONSORCOMP
+                    ORDER BY SPONSORCOMP_NAME
+                    """
                 )
+                selected_sponsors = cursor.fetchall()
+            else:
+                try:
+                    sponsorcomp_id = int(sponsor_selection)
+                except (ValueError, TypeError):
+                    flash("Please select a valid sponsor company.", "error")
+                    return redirect(url_for("adminReports") + "#invoice")
+                
+                cursor.execute(
+                    """
+                    SELECT SPONSORCOMP_ID, SPONSORCOMP_NAME
+                    FROM SPONSORCOMP
+                    WHERE SPONSORCOMP_ID = %s
+                    """,
+                    (sponsorcomp_id,)
+                )
+                selected_sponsors = cursor.fetchall()
 
-                invoice_id = cursor.lastrowid
+                if not selected_sponsors:
+                    flash("The selected sponsor company was not found.", "error")
+                    return redirect(url_for("adminReports") + "#invoice")
+            if not selected_sponsors:
+                flash("No sponsor companies were found.", "error")
+                return redirect(url_for("adminReports") + "#invoice")
+            
+            # keep track of generated and skipped invoices
+            generated_invoices = []
+            skipped_sponsors = []
 
-                # save each item as an invoice detail
-                for row in purchase_rows:
+            try:
+                # generate a separate invoice for each selected sponsor
+                for sponsor in selected_sponsors:
+                    current_sponsor_id = sponsor["SPONSORCOMP_ID"]
+                    current_sponsor_name = sponsor["SPONSORCOMP_NAME"]
+
+                    # get itemized purchases for this sponsor
                     cursor.execute(
                         """
-                        INSERT INTO INVOICEDETAIL (
-                            INVOICE_ID,
-                            ORDER_ID,
-                            DRIVER_ID,
-                            ITEM_NAME,
-                            ITEM_AMOUNT,
-                            ITEM_PRICE,
-                            LINE_TOTAL
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        SELECT
+                            o.ORDER_ID,
+                            o.DRIVER_ID,
+                            o.ORDER_DTS,
+                            io.ITEM_NAME,
+                            io.ITEM_AMOUNT,
+                            io.ITEM_PRICE,
+                            (io.ITEM_AMOUNT * io.ITEM_PRICE) AS LINE_TOTAL
+                        FROM ORDERS AS o
+                        JOIN DRIVER AS d
+                            ON d.DRIVER_ID = o.DRIVER_ID
+                        JOIN BALANCE AS b
+                            ON d.DRIVER_ID = b.DRIVER_ID
+                            AND b.SPONSORCOMP_ID = %s
+                            AND b.IS_ACTIVE = 1
+                        JOIN ITEMIZEDORDER AS io
+                            ON io.ORDER_ID = o.ORDER_ID
+                        WHERE LOWER(o.ORDER_STATUS) = 'done'
+                            AND o.ORDER_DTS >= %s
+                            AND o.ORDER_DTS < DATE_ADD(%s, INTERVAL 1 DAY)
+                        ORDER BY o.DRIVER_ID, o.ORDER_ID, io.ITEMIZED_ID
                         """,
-                        (
-                            invoice_id,
-                            row["ORDER_ID"],
-                            row["DRIVER_ID"],
-                            row["ITEM_NAME"],
-                            row["ITEM_AMOUNT"],
-                            row["ITEM_PRICE"],
-                            row["LINE_TOTAL"]
-                        )
+                        (current_sponsor_id, start_date, end_date)
                     )
-                
-                conn.commit()
+
+                    purchase_rows = cursor.fetchall()
+
+                    # skip sponsors without completed purchases
+                    if not purchase_rows:
+                        skipped_sponsors.append(current_sponsor_name)
+                        continue
+
+                    # calculate this sponsor's invoice total
+                    total_fee = sum (
+                        (Decimal(str(row["LINE_TOTAL"])) for row in purchase_rows),
+                        Decimal("0.00")
+                    )
+
+                    # save the invoice header
+                    cursor.execute(
+                        """
+                        INSERT INTO INVOICE (
+                            SPONSORCOMP_ID,
+                            PERIOD_START,
+                            PERIOD_END,
+                            TOTAL_FEE
+                        )
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (current_sponsor_id, start_date, end_date, total_fee)
+                    )
+
+                    invoice_id = cursor.lastrowid
+
+                    # save each item as an invoice detail
+                    for row in purchase_rows:
+                        cursor.execute(
+                            """
+                            INSERT INTO INVOICEDETAIL (
+                                INVOICE_ID,
+                                ORDER_ID,
+                                DRIVER_ID,
+                                ITEM_NAME,
+                                ITEM_AMOUNT,
+                                ITEM_PRICE,
+                                LINE_TOTAL
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                invoice_id,
+                                row["ORDER_ID"],
+                                row["DRIVER_ID"],
+                                row["ITEM_NAME"],
+                                row["ITEM_AMOUNT"],
+                                row["ITEM_PRICE"],
+                                row["LINE_TOTAL"]
+                            )
+                        )
+
+                    generated_invoices.append(invoice_id)
+
+                # save all generated invoices together
+                if generated_invoices:
+                    conn.commit()
+                else:
+                    conn.rollback()
             
             except Exception:
                 conn.rollback()
                 raise
+
+            # display the result
+            if not generated_invoices:
+                flash("No completed itemized purchases were found for the selected sponsors and date range. No invoices were created", "error")
+            else:
+                if len(generated_invoices) == 1:
+                    flash(f"Invoice #{generated_invoices[0]} was generated successfully.", "success")
+                else:
+                    flash(f"{len(generated_invoices)} invoices were generated successfully! Invoice numbers: {', '.join(str(i) for i in generated_invoices)}.", "success")
+
+                if skipped_sponsors:
+                    flash(f"No invoices were created for these sponsors because they had no completed purchases: {', '.join(skipped_sponsors)}.", "info")
             
-            flash(f"Invoice #{invoice_id} was generated successfully.", "success")
             return redirect(url_for("adminReports") + "#invoice")
 
         # load sponsor companies for dropdown
