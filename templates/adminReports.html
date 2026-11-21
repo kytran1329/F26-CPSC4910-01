@@ -93,16 +93,292 @@
                 id="sales-sponsors"
                 role="tabpanel"
                 aria-labelledby="tab-sponsors">
-
                 <h2>Sales by Sponsors</h2>
 
-                <p>
-                    View sales totals grouped by sponsor company or sponsor??
-                </p>
+                    <p>
+                        View purchases and sales totals from orders
+                        placed by sponsor users.
+                    </p>
 
-                <!-- Add sponsor sales stuff here -->
+                    <!-- Sponsor report filters -->
+                    <form
+                        method="GET"
+                        action="{{ url_for('adminReports') }}#sales-sponsors"
+                    >
+
+                        <!-- Identify which report to generate -->
+                        <input type="hidden" name="run_report" value="1">
+                        <input type="hidden" name="role" value="Sponsor">
+
+                        <div class="filter-container report-filters">
+
+                            <!-- Filter by sponsor company -->
+                            <div>
+                                <label for="report-sponsor-company-filter">
+                                    Filter by Sponsor Company:
+                                </label>
+
+                                <select
+                                    id="report-sponsor-company-filter"
+                                    name="sponsorcomp_id"
+                                    onchange="filterReportSponsors()"
+                                >
+                                    <option value="">
+                                        All Sponsor Companies
+                                    </option>
+
+                                    {% for company in sponsor_companies %}
+                                        <option
+                                            value="{{ company.SPONSORCOMP_ID }}"
+                                            {% if report_role == "Sponsor"
+                                                and selected_sponsorcomp_id ==
+                                                company.SPONSORCOMP_ID %}
+                                                selected
+                                            {% endif %}
+                                        >
+                                            {{ company.SPONSORCOMP_NAME }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Filter by sponsor user -->
+                            <div>
+                                <label for="report-sponsor-user-filter">
+                                    Filter by Sponsor:
+                                </label>
+
+                                <select
+                                    id="report-sponsor-user-filter"
+                                    name="user_id"
+                                >
+                                    <option value="">All Sponsors</option>
+
+                                    {% for user in report_users %}
+                                        {% if user.ROLE == "Sponsor" %}
+                                            <option
+                                                value="{{ user.USER_ID }}"
+                                                data-sponsors="{{ user.SPONSOR_IDS or '' }}"
+                                                {% if report_role == "Sponsor"
+                                                    and selected_user_id == user.USER_ID %}
+                                                    selected
+                                                {% endif %}
+                                            >
+                                                {{ user.USER_NAME }}
+                                            </option>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                </select>
+                            </div>
+
+                            <!-- Start date -->
+                            <div>
+                                <label for="sponsor-start-date">
+                                    Start Date:
+                                </label>
+
+                                <input
+                                    type="date"
+                                    id="sponsor-start-date"
+                                    name="start_date"
+                                    value="{{ selected_start_date if report_role == 'Sponsor' else '' }}"
+                                >
+                            </div>
+
+                            <!-- End date -->
+                            <div>
+                                <label for="sponsor-end-date">
+                                    End Date:
+                                </label>
+
+                                <input
+                                    type="date"
+                                    id="sponsor-end-date"
+                                    name="end_date"
+                                    value="{{ selected_end_date if report_role == 'Sponsor' else '' }}"
+                                >
+                            </div>
+
+                            <!-- Report type -->
+                            <div>
+                                <label for="sponsor-report-type">
+                                    Report Type:
+                                </label>
+
+                                <select
+                                    id="sponsor-report-type"
+                                    name="report_type"
+                                >
+                                    <option
+                                        value="summary"
+                                        {% if report_type == "summary" %}
+                                            selected
+                                        {% endif %}
+                                    >
+                                        Summary
+                                    </option>
+
+                                    <option
+                                        value="detailed"
+                                        {% if report_type == "detailed" %}
+                                            selected
+                                        {% endif %}
+                                    >
+                                        Detailed
+                                    </option>
+                                </select>
+                            </div>
+
+                        </div>
+
+                        <!-- Generate and export buttons -->
+                        <div class="report-actions">
+
+                            <div class="report-filter-buttons">
+
+                                <button type="submit" class="button">
+                                    Generate Report
+                                </button>
+
+                                <a
+                                    href="{{ url_for('adminReports') }}#sales-sponsors"
+                                    class="button"
+                                >
+                                    Clear Filters
+                                </a>
+
+                            </div>
+
+                            {% if report_generated and report_role == "Sponsor" %}
+
+                                <div class="report-export-buttons">
+
+                                    <a class="back-link"
+                                        href="{{ url_for(
+                                            'export.exportOrderReportCsv',
+                                            report_type=report_type,
+                                            role='Sponsor',
+                                            sponsorcomp_id=selected_sponsorcomp_id,
+                                            user_id=selected_user_id,
+                                            start_date=selected_start_date,
+                                            end_date=selected_end_date
+                                        ) }}"
+                                        
+                                    >
+                                        Export CSV
+                                    </a>
+
+                                    <a class="back-link"
+                                        href="{{ url_for(
+                                            'export.exportOrderReportPdf',
+                                            report_type=report_type,
+                                            role='Sponsor',
+                                            sponsorcomp_id=selected_sponsorcomp_id,
+                                            user_id=selected_user_id,
+                                            start_date=selected_start_date,
+                                            end_date=selected_end_date
+                                        ) }}"
+                                    >
+                                        Export PDF
+                                    </a>
+
+                                </div>
+
+                            {% endif %}
+
+                        </div>
+
+                    </form>
+
+                    <!-- Display sponsor report results -->
+                    {% if report_generated and report_role == "Sponsor" %}
+
+                        {% if report_rows %}
+
+                            <div class="table-container">
+                                <table class="admin-table">
+
+                                    {% if report_type == "summary" %}
+
+                                        <thead>
+                                            <tr>
+                                                <th>Sponsor Name</th>
+                                                <th>Sponsor Company</th>
+                                                <th>Number of Purchases</th>
+                                                <th>Points Used</th>
+                                                <th>Total Sales</th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody>
+                                            {% for row in report_rows %}
+                                                <tr>
+                                                    <td>{{ row.ORDERED_BY_NAME }}</td>
+                                                    <td>{{ row.SPONSORCOMP_NAME }}</td>
+                                                    <td>{{ row.PURCHASE_COUNT }}</td>
+                                                    <td>{{ row.TOTAL_POINTS_USED }}</td>
+                                                    <td>
+                                                        ${{ "%.2f"|format(row.TOTAL_SALES|float) }}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+
+                                    {% else %}
+
+                                        <thead>
+                                            <tr>
+                                                <th>Order ID</th>
+                                                <th>Sponsor Name</th>
+                                                <th>Receiving Driver</th>
+                                                <th>Sponsor Company</th>
+                                                <th>Order Date</th>
+                                                <th>Item</th>
+                                                <th>Quantity</th>
+                                                <th>Points Used</th>
+                                                <th>Total Sales</th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody>
+                                            {% for row in report_rows %}
+                                                <tr>
+                                                    <td>{{ row.ORDER_ID }}</td>
+                                                    <td>{{ row.ORDERED_BY_NAME }}</td>
+                                                    <td>{{ row.DRIVER_NAME or "N/A" }}</td>
+                                                    <td>{{ row.SPONSORCOMP_NAME }}</td>
+                                                    <td>{{ row.ORDER_DTS }}</td>
+                                                    <td>{{ row.ITEM_NAME }}</td>
+                                                    <td>{{ row.ITEM_AMOUNT }}</td>
+                                                    <td>
+                                                        {{ row.POINTS_USED if row.POINTS_USED is not none else "—" }}
+                                                    </td>
+                                                    <td>
+                                                        ${{ "%.2f"|format(row.LINE_TOTAL|float) }}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+
+                                    {% endif %}
+
+                                </table>
+                            </div>
+
+                        {% else %}
+
+                            <p>
+                                No completed purchases were found
+                                for the selected filters.
+                            </p>
+
+                        {% endif %}
+
+                    {% endif %}
 
             </section>
+
             <!-- Sales by Driver(s) -->
             <section class="report-content" id="sales-drivers" role="tabpanel"
                     aria-labelledby="tab-drivers" hidden>
@@ -206,7 +482,7 @@
                                 </a>
                             </div>
                             <!-- Right side -->
-                            {% if report_generated %}
+                            {% if report_generated and report_role == "Driver" %}
                             <div class="report-export-buttons">
                                 <a class="back-link" 
                                 href="{{ url_for('export.exportOrderReportCsv',
@@ -228,9 +504,10 @@
                                     end_date=selected_end_date) }}">Export PDF</a>
                             </div>
                             {% endif %}
+                        </div>
                     </form>
 
-                    {% if report_generated %}
+                    {% if report_generated and report_role == "Driver" %}
                     {% if report_rows %}
                     <div class="table-container">
                         <table class="admin-table">
@@ -403,8 +680,8 @@
     </footer>
 
     <script>
+        // Visual Tab Selector
         function showReport(reportId, clickedTab) {
-
             // Hide all report sections
             document.querySelectorAll(".report-content").forEach(section => {
                 section.classList.remove("active");
@@ -427,15 +704,21 @@
             clickedTab.setAttribute("aria-selected", "true");
         }
 
-        document.addEventListener("DOMContentLoaded", function () {
-            const tabByHash = {
-                "#invoice": "tab-invoice",
-                "#sales-drivers": "tab-drivers",
-                "#sales-sponsors": "tab-sponsors"
-            };
-            const tabId = tabByHash[window.location.hash];
-            if (tabId) {
-                showReport(window.location.hash.slice(1), document.getElementById(tabId));
+        // Load Correct Tab
+        document.addEventListener("DOMContentLoaded", function() {
+
+            if (window.location.hash === "#invoice") {
+
+                showReport("invoice", document.getElementById("tab-invoice"));
+
+            } else if (window.location.hash === "#sales-drivers") {
+
+                showReport("sales-drivers", document.getElementById("tab-drivers"));
+
+            } else if (window.location.hash === "#sales-sponsors") {
+
+                showReport("sales-sponsors", document.getElementById("tab-sponsors"));
+
             }
         });
 
@@ -504,6 +787,74 @@
                 driverDropdown.value = selectedDriver;
             } else {
                 driverDropdown.value = "";
+            }
+        }
+
+        // Save the original list of sponsor options
+        let allSponsorOptions = [];
+
+        document.addEventListener("DOMContentLoaded", function() {
+
+            const sponsorDropdown = document.getElementById(
+                "report-sponsor-user-filter"
+            );
+
+            if (!sponsorDropdown) return;
+
+            // Save all available sponsors
+            allSponsorOptions = Array.from(
+                sponsorDropdown.options
+            ).map(option => option.cloneNode(true));
+
+            // Apply filter when page loads
+            filterReportSponsors();
+        });
+
+        // Filter sponsors by sponsor company
+        function filterReportSponsors() {
+
+            const selectedCompany = document.getElementById(
+                "report-sponsor-company-filter"
+            ).value;
+
+            const sponsorDropdown = document.getElementById(
+                "report-sponsor-user-filter"
+            );
+
+            // Remember currently selected sponsor
+            const selectedSponsor = sponsorDropdown.value;
+
+            // Clear the dropdown
+            sponsorDropdown.innerHTML = "";
+
+            allSponsorOptions.forEach(option => {
+
+                const sponsorIds = (
+                    option.dataset.sponsors || ""
+                ).split(",");
+
+                const matchesCompany =
+                    selectedCompany === "" ||
+                    sponsorIds.includes(selectedCompany);
+
+                // Always include "All Sponsors"
+                if (option.value === "" || matchesCompany) {
+                    sponsorDropdown.appendChild(
+                        option.cloneNode(true)
+                    );
+                }
+
+            });
+
+            // Restore selected sponsor if still available
+            const sponsorExists = Array.from(
+                sponsorDropdown.options
+            ).some(option => option.value === selectedSponsor);
+
+            if (sponsorExists) {
+                sponsorDropdown.value = selectedSponsor;
+            } else {
+                sponsorDropdown.value = "";
             }
         }
     </script>

@@ -2767,7 +2767,7 @@ def assignPoints():
 @app.route("/adminDash")
 def adminDash():
 
-    # dont allows the page to be accessed unless someone is logged in
+    # dont allow the page to be accessed unless someone is logged in
     if "user_id" not in session:
         return redirect(url_for("login"))
 
