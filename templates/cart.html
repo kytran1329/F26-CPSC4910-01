@@ -151,7 +151,7 @@
                             </div>
                         {% endif %}
                         <form method="POST" action="{{ url_for('cat.cart_checkout') }}"
-                            onsubmit="if (!confirm('Spend {{ '%g'|format(total) }} points on these items?')) return false;
+                                onsubmit="if (!confirm('Are you sure you want to make this purchase?\n\nThis will spend {{ '%g'|format(total) }} points.')) return false;
                                       this.querySelector('button').disabled = true;">
                             <input type="hidden" name="comp_id" value="{{ comp_id }}">
                             <input type="hidden" name="expected_total" value="{{ total }}">
