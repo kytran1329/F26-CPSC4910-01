@@ -557,10 +557,9 @@ def catalog():
 SPONSOR_SEARCH_PER_PAGE = 12
 @cat.route("/catalog-items", methods=["GET", "POST"])
 def sponsor_catalog_items():
-    user_id = session.get("user_id")
-    sponsor_id, comp_id = get_sponsor_info(user_id)
+    sponsor_id, comp_id, user_id = get_acting_sponsor()
     if not sponsor_id:
-        abort(403)                    # only users with a SPONSOR row get past here
+        abort(403)
 
     mode = get_catalog_mode(comp_id)
 
@@ -720,6 +719,50 @@ def sponsor_catalog_items():
         search_items=search_items, q=q, page=page,
         total=total, total_pages=total_pages, error=error
     )
+
+
+def get_acting_sponsor():
+    """
+    Returns (sponsor_id, sponsorcomp_id, sponsor_user_id),
+    or (None, None, None) if this session may not act as a sponsor.
+    - Sponsor: their own SPONSOR row.
+    - Admin who took control of a sponsor: that sponsor's row.
+    """
+    role = session.get("role")
+    if session.get("user_id") is None:
+        return None, None, None
+
+    conn = mysql.connector.connect(
+        host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME
+    )
+    try:
+        cursor = conn.cursor(dictionary=True)
+
+        if role == "Sponsor":
+            cursor.execute("""
+                SELECT SPONSOR_ID, SPONSORCOMP_ID, USER_ID
+                FROM SPONSOR WHERE USER_ID = %s
+                """,
+                (session["user_id"],)
+            )
+        elif role == "Admin" and session.get("view_as_sponsor_id") is not None:
+            cursor.execute("""
+                SELECT SPONSOR_ID, SPONSORCOMP_ID, USER_ID
+                FROM SPONSOR WHERE SPONSOR_ID = %s
+                """,
+                (session["view_as_sponsor_id"],)
+            )
+        else:
+            return None, None, None
+
+        row = cursor.fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None, None, None
+    return row["SPONSOR_ID"], row["SPONSORCOMP_ID"], row["USER_ID"]
+
 
 @cat.route("/cart/add", methods=["POST"])
 def cart_add():
