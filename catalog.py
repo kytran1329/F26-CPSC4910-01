@@ -551,7 +551,7 @@ def catalog():
         per_page=per_page, page=page, total=total, total_pages=total_pages,
         companies=companies, comp_id=comp_id,
         allowed_terms=allowed_terms, balance=balance,
-        sort=sort, mode=mode
+        sort=sort, mode=mode, profile_user_id=user_id
     )
 
 SPONSOR_SEARCH_PER_PAGE = 12
@@ -918,7 +918,8 @@ def cart():
         companies=companies, 
         comp_id=comp_id, 
         error=error,
-        has_unavailable=has_unavailable
+        has_unavailable=has_unavailable,
+        profile_user_id=user_id
     )
 
 
@@ -1128,3 +1129,8 @@ def cart_checkout():
 
     flash(f"Order #{order_id} placed! {total} points were deducted.", "success")
     return redirect(cart_url)
+
+@cat.app_context_processor
+def inject_profile_user_id():
+    # The driver's user id while a sponsor/admin is in control, otherwise your own
+    return {"profile_user_id": acting_driver_user_id()}
