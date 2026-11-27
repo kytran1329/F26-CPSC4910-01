@@ -18,6 +18,19 @@
             <div class="tagline">
                 Good Driving. Better Rewards.
             </div>
+            {% if session.get("view_as_driver_id") is not none %}
+                <form action="{{ url_for('stopViewingAsDriver') }}" method="POST"
+                    style="display: inline;">
+                    <button type="submit" class="return-dashboard-button">
+                        Return to
+                        {% if session.get("role") == "Admin" %}
+                            Admin Dashboard
+                        {% else %}
+                            Sponsor Dashboard
+                        {% endif %}
+                    </button>
+                </form>
+            {% endif %}
             <div class="header-links">
                 <a href="{{ url_for('driverDash') }}" class="nav-link">Dashboard</a>
                 <a href="{{ url_for('driverApplications') }}" class="nav-link">Applications</a>
