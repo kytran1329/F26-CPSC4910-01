@@ -328,7 +328,7 @@
                                     <td>{{ row["ORDER_DTS"] }}</td>
                                     <td>
                                         {% if row["ORDER_STATUS"] == "Active"
-                                            and session.get("role") == "Driver"
+                                            and session.get("role") in ("Driver", "Sponsor", "Admin")
                                             and row["CAN_CANCEL"] %}
 
                                             <form

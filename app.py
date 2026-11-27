@@ -412,14 +412,17 @@ def driverDash():
 @app.route("/cancelOrder/<int:order_id>", methods=["POST"])
 def cancelOrder(order_id):
 
-    # Only logged-in Drivers can cancel their own orders.
     if "user_id" not in session:
         return redirect(url_for("auth.login"))
 
-    if session.get("role") != "Driver":
+    # Drivers cancel their own orders. Sponsors and admins can cancel orders
+    # for the driver they have taken control of.
+    role = session.get("role")
+    if role not in ("Driver", "Sponsor", "Admin"):
         return "Unauthorized", 403
 
-    user_id = session["user_id"]
+    actor_id = session["user_id"]                  # whoever is actually clicking
+    acting_for_driver = role in ("Sponsor", "Admin")
 
     conn = mysql.connector.connect(
         host=DB_HOST,
@@ -441,6 +444,7 @@ def cancelOrder(order_id):
                 o.POINT_TOTAL,
                 o.ORDER_STATUS,
                 o.ORDER_DTS,
+                d.USER_ID AS DRIVER_USER_ID,
                 (NOW() < DATE_ADD(
                     o.ORDER_DTS, INTERVAL 5 MINUTE
                 )) AS CAN_CANCEL
@@ -448,14 +452,33 @@ def cancelOrder(order_id):
             JOIN DRIVER AS d
                 ON d.DRIVER_ID = o.DRIVER_ID
             WHERE o.ORDER_ID = %s
-              AND o.USER_ID = %s
-              AND d.USER_ID = %s
             FOR UPDATE
-        """, (order_id, user_id, user_id))
+        """, (order_id,))
 
         order = cursor.fetchone()
 
-        if order is None:
+        # Is this person allowed to cancel this order?
+        allowed = False
+        if order is not None:
+            if role == "Driver":
+                allowed = order["DRIVER_USER_ID"] == actor_id
+
+            # Sponsors/admins: only the driver they are controlling
+            elif str(order["DRIVER_ID"]) == str(session.get("view_as_driver_id")):
+                if role == "Admin":
+                    allowed = True
+                else:
+                    # Sponsors: only orders from their own company
+                    cursor.execute("""
+                        SELECT 1
+                        FROM SPONSOR
+                        WHERE USER_ID = %s
+                          AND SPONSORCOMP_ID = %s
+                        LIMIT 1
+                    """, (actor_id, order["SPONSORCOMP_ID"]))
+                    allowed = cursor.fetchone() is not None
+
+        if not allowed:
             conn.rollback()
             flash("Order not found.", "error")
             return redirect(url_for("driverDash"))
@@ -469,6 +492,8 @@ def cancelOrder(order_id):
             conn.rollback()
             flash("The 5-minute cancellation window has expired.", "error")
             return redirect(url_for("driverDash"))
+
+        driver_user_id = order["DRIVER_USER_ID"]
 
         # Find the original sponsor balance, including
         # balances that are no longer active.
@@ -518,7 +543,11 @@ def cancelOrder(order_id):
         if cursor.rowcount != 1:
             raise ValueError("The points could not be refunded.")
 
-        # Record the refund in point history.
+        # Record the refund in point history (and who did it).
+        refund_reason = f"Refund for cancelled order #{order_id}"
+        if acting_for_driver:
+            refund_reason += f" (cancelled by {role.lower()})"
+
         cursor.execute("""
             INSERT INTO POINTCHANGES (
                 BALANCE_ID,
@@ -532,17 +561,27 @@ def cancelOrder(order_id):
             balance["BALANCE_ID"],
             order["DRIVER_ID"],
             order["POINT_TOTAL"],
-            f"Refund for cancelled order #{order_id}",
-            user_id
+            refund_reason,
+            actor_id
         ))
 
-        # notify the driver who submitted the cancellation
+        # notify the driver
+        if acting_for_driver:
+            driver_message = (
+                f"Your order #{order_id} was cancelled by a {role.lower()} "
+                f"and {order['POINT_TOTAL']} points were refunded."
+            )
+            other_message = f"A {role.lower()} canceled order #{order_id} on a driver's behalf."
+        else:
+            driver_message = f"Your order #{order_id} was successfully canceled."
+            other_message = f"A driver canceled order #{order_id}."
+
         create_notification(
             cursor,
-            user_id,
+            driver_user_id,
             "DRIVER_ORDER_CANCELED",
             "Order canceled",
-            f"Your order #{order_id} was successfully canceled."
+            driver_message
         )
 
         # notify the sponsor associated with this company
@@ -559,8 +598,8 @@ def cancelOrder(order_id):
                 cursor,
                 sponsor["USER_ID"],
                 "SPONSOR_ORDER_CANCELED",
-                "Driver canceled order",
-                f"A driver canceled order #{order_id}."
+                "Order canceled",
+                other_message
             )
 
         # notify all admins
@@ -577,8 +616,8 @@ def cancelOrder(order_id):
                 cursor,
                 admin["USER_ID"],
                 "ADMIN_ORDER_CANCELED",
-                "Driver canceled order",
-                f"A driver canceled order #{order_id}."
+                "Order canceled",
+                other_message
             )
 
         # Save the cancellation and refund together.
@@ -605,6 +644,7 @@ def cancelOrder(order_id):
         conn.close()
 
     return redirect(url_for("driverDash"))
+
 
 @app.route("/sponDash/applications")
 def applications():
